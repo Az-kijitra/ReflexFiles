@@ -2,6 +2,8 @@
   import ModalShell from "$lib/components/modals/ModalShell.svelte";
   import ModalCloseActions from "$lib/components/modals/ModalCloseActions.svelte";
   import { handleConfirmCancelKeydown } from "$lib/utils/modal_keyboard";
+  import { onMount } from "svelte";
+  import { getVersion } from "@tauri-apps/api/app";
 
   /** @type {HTMLElement | null} */
   export let aboutModalEl = null;
@@ -11,6 +13,16 @@
   export let ABOUT_LICENSE = "";
   export let closeAbout;
   export let trapModalTab;
+
+  let appVersion = "";
+
+  onMount(async () => {
+    try {
+      appVersion = await getVersion();
+    } catch {
+      appVersion = "";
+    }
+  });
 </script>
 
 <ModalShell
@@ -38,6 +50,12 @@
       <span class="about-label">{t("about.license")}</span>
       <span>{ABOUT_LICENSE}</span>
     </div>
+    {#if appVersion}
+      <div class="about-row">
+        <span class="about-label">{t("about.version")}</span>
+        <span>{appVersion}</span>
+      </div>
+    {/if}
   </div>
   <ModalCloseActions slot="actions" label={t("about.close")} onClose={closeAbout} />
 </ModalShell>

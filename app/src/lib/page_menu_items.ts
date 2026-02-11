@@ -23,6 +23,7 @@ import { buildMenuItems } from "$lib/page_menus";
  * @param {() => void} params.selectAll
  * @param {() => void} params.clearSelection
  * @param {() => void} params.invertSelection
+ * @param {() => void} params.openConfigFile
  * @param {() => Promise<void>} params.openSearch
  * @param {() => void} params.openSortMenu
  * @param {() => void} params.toggleHidden

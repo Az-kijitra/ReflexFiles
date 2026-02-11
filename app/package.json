@@ -4,8 +4,9 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build_manual.mjs && vite dev",
-    "build": "node scripts/build_manual.mjs && vite build",
+    "sync:version": "node scripts/sync_version.mjs",
+    "dev": "node scripts/sync_version.mjs && node scripts/build_manual.mjs && vite dev",
+    "build": "node scripts/sync_version.mjs && node scripts/build_manual.mjs && vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",

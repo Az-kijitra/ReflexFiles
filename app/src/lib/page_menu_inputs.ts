@@ -30,6 +30,7 @@
  *       selectAll: () => void;
  *       clearSelection: () => void;
  *       invertSelection: () => void;
+ *       openConfigFile: () => void;
  *       openKeymapHelp: () => void;
  *       openUserManual: () => void;
  *       openAbout: () => void;
@@ -85,6 +86,7 @@ export function buildMenuSetupInputs(params) {
       selectAll: page.selectAll,
       clearSelection: page.clearSelection,
       invertSelection: page.invertSelection,
+      openConfigFile: page.openConfigFile,
       openSearch: actions.openSearch,
       openSortMenu: actions.openSortMenu,
       toggleHidden: actions.toggleHidden,

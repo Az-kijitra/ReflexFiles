@@ -22,6 +22,7 @@ export function buildMenuItemsParams(params) {
     invokeExit: params.invokeExit,
     performUndo: params.performUndo,
     performRedo: params.performRedo,
+    openConfigFile: params.openConfigFile,
     selectAll: params.selectAll,
     clearSelection: params.clearSelection,
     invertSelection: params.invertSelection,

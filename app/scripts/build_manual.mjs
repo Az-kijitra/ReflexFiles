@@ -24,7 +24,12 @@ const md = new MarkdownIt({
 
 async function main() {
   const markdown = await fs.readFile(inputPath, "utf-8");
-  const body = md.render(markdown);
+  let body = md.render(markdown);
+  // Add anchors for in-manual navigation (e.g., Help -> Keymap).
+  body = body.replace(
+    "<h2>キー操作（既定）</h2>",
+    '<h2 id="keymap">キー操作（既定）</h2>'
+  );
   const html = `<!doctype html>
 <html lang="ja">
   <head>

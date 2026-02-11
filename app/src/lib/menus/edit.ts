@@ -4,6 +4,13 @@
  * @param {(actionId: import("$lib/ui_types").ActionId) => string} params.getMenuShortcut
  * @param {() => void} params.performUndo
  * @param {() => void} params.performRedo
+ * @param {() => void} params.copySelected
+ * @param {() => void} params.duplicateSelected
+ * @param {() => void} params.prefixDateSelected
+ * @param {() => void} params.cutSelected
+ * @param {() => void} params.pasteItems
+ * @param {() => void} params.requestDeleteSelected
+ * @param {() => void} params.requestOpenPropertiesSelected
  * @param {() => void} params.selectAll
  * @param {() => void} params.clearSelection
  * @param {() => void} params.invertSelection
@@ -15,6 +22,13 @@ export function buildEditMenuItems(params) {
     getMenuShortcut,
     performUndo,
     performRedo,
+    copySelected,
+    duplicateSelected,
+    prefixDateSelected,
+    cutSelected,
+    pasteItems,
+    requestDeleteSelected,
+    requestOpenPropertiesSelected,
     selectAll,
     clearSelection,
     invertSelection,
@@ -33,6 +47,50 @@ export function buildEditMenuItems(params) {
       enabled: true,
       action: () => performRedo(),
       shortcut: getMenuShortcut("redo"),
+    },
+    { separator: true },
+    {
+      label: t("menu.copy"),
+      enabled: true,
+      action: () => copySelected(),
+      shortcut: getMenuShortcut("copy"),
+    },
+    {
+      label: t("menu.duplicate"),
+      enabled: true,
+      action: () => duplicateSelected(),
+      shortcut: getMenuShortcut("duplicate"),
+    },
+    {
+      label: t("menu.prefix_date"),
+      enabled: true,
+      action: () => prefixDateSelected(),
+      shortcut: getMenuShortcut("prefix_date"),
+    },
+    {
+      label: t("menu.cut"),
+      enabled: true,
+      action: () => cutSelected(),
+      shortcut: getMenuShortcut("cut"),
+    },
+    {
+      label: t("menu.paste"),
+      enabled: true,
+      action: () => pasteItems(),
+      shortcut: getMenuShortcut("paste"),
+    },
+    { separator: true },
+    {
+      label: t("menu.delete"),
+      enabled: true,
+      action: () => requestDeleteSelected(),
+      shortcut: getMenuShortcut("delete"),
+    },
+    {
+      label: t("menu.properties"),
+      enabled: true,
+      action: () => requestOpenPropertiesSelected(),
+      shortcut: getMenuShortcut("properties"),
     },
     { separator: true },
     {

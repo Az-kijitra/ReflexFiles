@@ -2,7 +2,6 @@
  * @param {object} params
  * @param {(key: string, vars?: Record<string, string | number>) => string} params.t
  * @param {(actionId: import("$lib/ui_types").ActionId) => string} params.getMenuShortcut
- * @param {() => void} params.openKeymapHelp
  * @param {() => void} params.openSortMenu
  * @param {() => void} params.toggleHidden
  * @param {() => void} params.toggleTree
@@ -16,7 +15,6 @@ export function buildViewMenuItems(params) {
   const {
     t,
     getMenuShortcut,
-    openKeymapHelp,
     openSortMenu,
     toggleHidden,
     toggleTree,
@@ -28,12 +26,6 @@ export function buildViewMenuItems(params) {
   } = params;
 
   return [
-    {
-      label: t("menu.settings"),
-      enabled: true,
-      action: () => openKeymapHelp(),
-      shortcut: getMenuShortcut("settings"),
-    },
     {
       label: t("menu.sort"),
       enabled: true,
