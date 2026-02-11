@@ -1,3 +1,19 @@
 e2e_artifacts/
 app/e2e_artifacts/
 development_documents/
+
+# App build/dep artifacts (redundant with subdir .gitignore, kept for clarity)
+app/.svelte-kit/
+app/build/
+app/node_modules/
+app/package/
+app/src-tauri/target/
+app/src-tauri/gen/schemas/
+
+# Generated manual assets (created by app/scripts/build_manual.mjs)
+app/static/user_manual.html
+app/src-tauri/resources/user_manual.html
+
+# Local WebDriver binaries
+msedgedriver.exe
+docs/msedgedriver.exe
