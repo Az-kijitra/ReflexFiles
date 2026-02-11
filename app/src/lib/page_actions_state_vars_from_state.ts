@@ -1,0 +1,50 @@
+/**
+ * @param {{ state: any; statusTimer: ReturnType<typeof setTimeout> | null }} params
+ */
+export function buildPageActionsStateVarsFromState(params) {
+  const { state, statusTimer } = params;
+
+  return {
+    pastePendingPaths: state.pastePendingPaths,
+    pasteConflicts: state.pasteConflicts,
+    pasteMode: state.pasteMode,
+    pasteApplyAll: state.pasteApplyAll,
+    deleteTargets: state.deleteTargets,
+    renameTarget: state.renameTarget,
+    renameValue: state.renameValue,
+    createType: state.createType,
+    createName: state.createName,
+    jumpUrlValue: state.jumpUrlValue,
+    jumpList: state.jumpList,
+    pathHistory: state.pathHistory,
+    searchQuery: state.searchQuery,
+    searchHistory: state.searchHistory,
+    externalAppAssociations: state.externalAppAssociations,
+    externalApps: state.externalApps,
+    contextMenuOpen: state.contextMenuOpen,
+    contextMenuPos: state.contextMenuPos,
+    contextMenuMode: state.contextMenuMode,
+    contextMenuCanPaste: state.contextMenuCanPaste,
+    contextMenuIndex: state.contextMenuIndex,
+    lastClipboard: state.lastClipboard,
+    dropdownOpen: state.dropdownOpen,
+    statusMessage: state.statusMessage,
+    statusTimer,
+    error: state.error,
+    failureModalOpen: state.failureModalOpen,
+    failureModalTitle: state.failureModalTitle,
+    failureItems: state.failureItems,
+    currentPath: state.currentPath,
+    entries: state.entries,
+    focusedIndex: state.focusedIndex,
+    selectedPaths: state.selectedPaths,
+    undoStack: state.undoStack,
+    redoStack: state.redoStack,
+    zipMode: state.zipMode,
+    zipTargets: state.zipTargets,
+    zipDestination: state.zipDestination,
+    zipPassword: state.zipPassword,
+    zipPasswordAttempts: state.zipPasswordAttempts,
+    zipOverwriteConfirmed: state.zipOverwriteConfirmed,
+  };
+}

@@ -1,0 +1,212 @@
+import {
+  buildClipboardFeature,
+  buildContextMenuFeature,
+  buildDeleteFeature,
+  buildEditFeature,
+  buildExternalFeature,
+  buildFeedbackFeature,
+  buildFileOpsFeature,
+  buildHistoryFeature,
+  buildSelectionFeature,
+  buildUndoFeature,
+} from "$lib/page_actions_registry_feature_builders";
+import type { PageActionsRegistryContext } from "$lib/page_actions_registry_features_types";
+
+export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
+  const {
+    setStatusMessage,
+    showError,
+    showFailures,
+    failureMessage,
+    closeFailureModal,
+  } = buildFeedbackFeature(ctx);
+
+  const { pushUndoEntry, performUndo, performRedo } = buildUndoFeature(ctx, {
+    setStatusMessage,
+    showError,
+    showFailures,
+  });
+
+  const {
+    confirmPasteOverwrite,
+    confirmPasteSkip,
+    cancelPasteConfirm,
+    copySelected,
+    cutSelected,
+    pasteItems,
+    runPaste,
+  } = buildClipboardFeature(ctx, {
+    setStatusMessage,
+    showError,
+    showFailures,
+    pushUndoEntry,
+  });
+
+  const {
+    isSelected,
+    setSelected,
+    toggleSelection,
+    selectRange,
+    selectAll,
+    clearSelection,
+    invertSelection,
+  } = buildSelectionFeature(ctx);
+
+  const {
+    addJumpCurrent,
+    addJumpUrl,
+    openJumpUrlModal,
+    confirmJumpUrl,
+    cancelJumpUrl,
+    applySearch,
+    clearSearch,
+    onSearchKeydown,
+    scrollDropdownToIndex,
+    removeJump,
+    removeHistory,
+    selectDropdown,
+  } = buildHistoryFeature(ctx, { setStatusMessage });
+
+  const {
+    getExternalApps,
+    getTargetEntry,
+    runExternalApp,
+    openEntry,
+    openFocusedOrSelected,
+    openParentForSelection,
+    openInExplorer,
+    openInCmd,
+    openInVSCode,
+    openInGitClient,
+    openConfigFile,
+    openKeymapHelp,
+    openUserManual,
+    openAbout,
+    closeAbout,
+  } = buildExternalFeature(ctx, { setStatusMessage, showError });
+
+  const {
+    openRename,
+    confirmRename,
+    cancelRename,
+    openCreate,
+    confirmCreate,
+    cancelCreate,
+  } = buildEditFeature(ctx, { setStatusMessage, showError, pushUndoEntry });
+
+  const { confirmDelete, cancelDelete } = buildDeleteFeature(ctx, {
+    setStatusMessage,
+    showError,
+    pushUndoEntry,
+  });
+
+  const { duplicateSelected, prefixDateSelected } = buildFileOpsFeature(ctx, {
+    setStatusMessage,
+    showError,
+    showFailures,
+    pushUndoEntry,
+  });
+
+  const { zipActions, contextMenuActions } = buildContextMenuFeature(ctx, {
+    openCreate,
+    openEntry,
+    openInExplorer,
+    openInCmd,
+    openInVSCode,
+    openInGitClient,
+    openRename,
+    copySelected,
+    duplicateSelected,
+    prefixDateSelected,
+    cutSelected,
+    pasteItems,
+    setStatusMessage,
+    showError,
+    runExternalApp,
+    getExternalApps,
+  });
+  const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
+  const {
+    openContextMenu,
+    closeContextMenu,
+    getSelectableIndex,
+    handleContextMenuKey,
+    getContextMenuItems,
+    onContextDelete,
+    onContextProperties,
+  } = contextMenuActions;
+
+  return {
+    confirmPasteOverwrite,
+    confirmPasteSkip,
+    cancelPasteConfirm,
+    confirmDelete,
+    cancelDelete,
+    openRename,
+    confirmRename,
+    cancelRename,
+    openCreate,
+    confirmCreate,
+    cancelCreate,
+    addJumpCurrent,
+    addJumpUrl,
+    openJumpUrlModal,
+    confirmJumpUrl,
+    cancelJumpUrl,
+    openZipCreate,
+    openZipExtract,
+    runZipAction,
+    closeZipModal,
+    openEntry,
+    openFocusedOrSelected,
+    openParentForSelection,
+    openInExplorer,
+    openInCmd,
+    openInVSCode,
+    openInGitClient,
+    openConfigFile,
+    openKeymapHelp,
+    openUserManual,
+    openAbout,
+    closeAbout,
+    applySearch,
+    clearSearch,
+    onSearchKeydown,
+    scrollDropdownToIndex,
+    removeJump,
+    removeHistory,
+    selectDropdown,
+    setStatusMessage,
+    showError,
+    showFailures,
+    failureMessage,
+    closeFailureModal,
+    copySelected,
+    cutSelected,
+    pasteItems,
+    runPaste,
+    duplicateSelected,
+    prefixDateSelected,
+    pushUndoEntry,
+    performUndo,
+    performRedo,
+    isSelected,
+    setSelected,
+    toggleSelection,
+    selectRange,
+    selectAll,
+    clearSelection,
+    invertSelection,
+    openContextMenu,
+    closeContextMenu,
+    getSelectableIndex,
+    handleContextMenuKey,
+    getContextMenuItems,
+    onContextDelete,
+    onContextProperties,
+    getExternalApps,
+    runExternalApp,
+    getTargetEntry,
+  };
+}
+

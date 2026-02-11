@@ -1,0 +1,71 @@
+/**
+ * @param {object} params
+ */
+export function buildViewInputsState(params) {
+  return {
+    menu: { menuOpen: params.state.menuOpen },
+    path: {
+      currentPath: params.state.currentPath,
+      pathHistory: params.state.pathHistory,
+    },
+    tree: {
+      showTree: params.state.showTree,
+      treeEl: params.state.treeEl,
+      treeLoading: params.state.treeLoading,
+      treeRoot: params.state.treeRoot,
+      treeSelectedPath: params.state.treeSelectedPath,
+      treeFocusedIndex: params.state.treeFocusedIndex,
+    },
+    list: {
+      showSize: params.state.showSize,
+      showTime: params.state.showTime,
+      loading: params.state.loading,
+      filteredEntries: params.state.filteredEntries,
+      entries: params.state.entries,
+      overflowLeft: params.state.overflowLeft,
+      overflowRight: params.state.overflowRight,
+      visibleColStart: params.state.visibleColStart,
+      visibleColEnd: params.state.visibleColEnd,
+      listRows: params.state.listRows,
+      selectedPaths: params.state.selectedPaths,
+    },
+    dropdown: {
+      dropdownItems: params.state.dropdownItems,
+      searchActive: params.state.searchActive,
+      searchError: params.state.searchError,
+      sortMenuOpen: params.state.sortMenuOpen,
+    },
+    modals: {
+      aboutOpen: params.state.aboutOpen,
+      deleteConfirmOpen: params.state.deleteConfirmOpen,
+      deleteTargets: params.state.deleteTargets,
+      deleteError: params.state.deleteError,
+      pasteConfirmOpen: params.state.pasteConfirmOpen,
+      pasteConflicts: params.state.pasteConflicts,
+      createOpen: params.state.createOpen,
+      createError: params.state.createError,
+      jumpUrlOpen: params.state.jumpUrlOpen,
+      renameOpen: params.state.renameOpen,
+      renameError: params.state.renameError,
+      propertiesOpen: params.state.propertiesOpen,
+      propertiesData: params.state.propertiesData,
+      dirStatsInFlight: params.state.dirStatsInFlight,
+      zipModalOpen: params.state.zipModalOpen,
+      zipMode: params.state.zipMode,
+      zipTargets: params.state.zipTargets,
+      zipPasswordAttempts: params.state.zipPasswordAttempts,
+      zipOverwriteConfirmed: params.state.zipOverwriteConfirmed,
+      zipError: params.state.zipError,
+    },
+    context: {
+      contextMenuOpen: params.state.contextMenuOpen,
+      contextMenuPos: params.state.contextMenuPos,
+      contextMenuIndex: params.state.contextMenuIndex,
+      error: params.state.error,
+      failureModalOpen: params.state.failureModalOpen,
+      failureModalTitle: params.state.failureModalTitle,
+      failureItems: params.state.failureItems,
+      jumpList: params.state.jumpList,
+    },
+  };
+}
