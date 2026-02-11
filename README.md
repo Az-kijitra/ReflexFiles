@@ -38,8 +38,6 @@ npm run e2e:tauri
 
 ## ドキュメント
 - ユーザーマニュアル: `user_manual.md`
-- メンテナンスガイド: `development_documents/maintenance_guide.md`
-- CI E2E ガイド: `development_documents/ci_e2e_guide.md`
 
 ## コントリビュート
 `CONTRIBUTING.md` を参照してください。
