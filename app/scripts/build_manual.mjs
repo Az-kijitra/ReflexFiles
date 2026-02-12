@@ -22,6 +22,58 @@ const md = new MarkdownIt({
   typographer: false,
 });
 
+function getManualImageSources(markdown) {
+  const tokens = md.parse(markdown, {});
+  const sources = new Set();
+  for (const token of tokens) {
+    if (token.type !== "inline" || !token.children) continue;
+    for (const child of token.children) {
+      if (child.type !== "image") continue;
+      const src = child.attrGet("src");
+      if (src) sources.add(src.trim());
+    }
+  }
+  return [...sources];
+}
+
+function isRemoteOrDataUrl(src) {
+  return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(src);
+}
+
+function normalizeAssetPath(src) {
+  const cleaned = src.split("#")[0].split("?")[0].trim();
+  return cleaned.replace(/^\.?[\\/]/, "");
+}
+
+async function copyAssetToRoots(absSrc, relSrc) {
+  const staticAssetPath = path.join(staticDir, relSrc);
+  const resourceAssetPath = path.join(resourcesDir, relSrc);
+  await fs.mkdir(path.dirname(staticAssetPath), { recursive: true });
+  await fs.copyFile(absSrc, staticAssetPath);
+  await fs.mkdir(path.dirname(resourceAssetPath), { recursive: true });
+  await fs.copyFile(absSrc, resourceAssetPath);
+}
+
+async function copyManualAssets(markdown) {
+  const sources = getManualImageSources(markdown);
+  for (const source of sources) {
+    if (!source || isRemoteOrDataUrl(source)) continue;
+    const normalized = normalizeAssetPath(source);
+    if (!normalized) continue;
+    const absSrc = path.resolve(repoRoot, normalized);
+    const relSrc = path.relative(repoRoot, absSrc);
+    if (relSrc.startsWith("..") || path.isAbsolute(relSrc)) {
+      console.warn(`Skipped manual asset outside repository: ${source}`);
+      continue;
+    }
+    try {
+      await copyAssetToRoots(absSrc, relSrc);
+    } catch (err) {
+      console.warn(`Failed to copy manual asset: ${source}`, err);
+    }
+  }
+}
+
 async function main() {
   const markdown = await fs.readFile(inputPath, "utf-8");
   let body = md.render(markdown);
@@ -90,6 +142,7 @@ ${body}
 </html>`;
   await fs.mkdir(staticDir, { recursive: true });
   await fs.writeFile(outputPath, html, "utf-8");
+  await copyManualAssets(markdown);
   try {
     await fs.copyFile(logoSrc, logoDest);
   } catch {

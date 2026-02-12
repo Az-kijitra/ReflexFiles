@@ -26,7 +26,8 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
 4. **ファイル一覧（複数列表示）**
 5. **ステータスバー**
 
-> [スクリーンショット: 全体レイアウト（図1: 主要UIの位置関係）]
+![alt text](docs/screenshot/list_light.png) 
+![alt text](docs/screenshot/list_dark.png)
 
 ---
 
@@ -43,9 +44,10 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
    - **Ctrl+C** でコピー、**Ctrl+V** でペーストします。
 6. **よく使う場所を登録**
    - **Ctrl+Shift+J** でジャンプリストに追加し、**Ctrl+J** で開きます。
+7. **フォルダ履歴**
+   - **Ctrl+Shift+Y** でフォルダの履歴を開きます。
 
-> [スクリーンショット: 初回操作フロー（図2: 3分で分かる基本操作）]
-
+![alt text](docs/screenshot/jump_list.png)
 ---
 
 ## 基本的な使い方
@@ -66,8 +68,7 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
 - **Tab / Shift+Tab** でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）
 - **Ctrl+J / Ctrl+Y** でジャンプリスト / 履歴を表示
 
-> [スクリーンショット: PATH バー（図3: 直接入力で移動）]
-
+![alt text](docs/screenshot/path.png)
 ---
 
 ## 機能一覧（詳細）

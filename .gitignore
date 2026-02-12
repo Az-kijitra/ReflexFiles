@@ -13,6 +13,8 @@ app/src-tauri/gen/schemas/
 # Generated manual assets (created by app/scripts/build_manual.mjs)
 app/static/user_manual.html
 app/src-tauri/resources/user_manual.html
+app/static/docs/
+app/src-tauri/resources/docs/
 
 # Local WebDriver binaries
 msedgedriver.exe

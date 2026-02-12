@@ -1,5 +1,6 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    configure_windows_webview_logging();
     let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
     builder
         .setup(|app| {
@@ -59,3 +60,30 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(target_os = "windows")]
+fn configure_windows_webview_logging() {
+    let key = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+    let mut args = std::env::var(key).unwrap_or_default();
+
+    // Reduce Chromium/WebView2 shutdown noise on Windows consoles.
+    if !args.contains("--disable-logging") {
+        if !args.is_empty() {
+            args.push(' ');
+        }
+        args.push_str("--disable-logging");
+    }
+    if !args.contains("--log-level=") {
+        if !args.is_empty() {
+            args.push(' ');
+        }
+        args.push_str("--log-level=3");
+    }
+
+    if !args.is_empty() {
+        unsafe { std::env::set_var(key, args) };
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn configure_windows_webview_logging() {}
