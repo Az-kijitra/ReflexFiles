@@ -91,12 +91,7 @@ pub fn emit_progress(
     );
 }
 
-pub fn record_failure(
-    failures: &mut Vec<OpFailure>,
-    item: &str,
-    code: &str,
-    err: &str,
-) {
+pub fn record_failure(failures: &mut Vec<OpFailure>, item: &str, code: &str, err: &str) {
     failures.push(OpFailure {
         path: item.to_string(),
         code: code.to_string(),

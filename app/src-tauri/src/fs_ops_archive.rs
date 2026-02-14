@@ -55,7 +55,8 @@ fn zip_add_path(
         writer
             .start_file(name, options)
             .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
-        let mut file = fs::File::open(src).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+        let mut file =
+            fs::File::open(src).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)
             .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
@@ -67,7 +68,11 @@ fn zip_add_path(
 }
 
 #[tauri::command]
-pub fn zip_create(items: Vec<String>, destination: String, password: Option<String>) -> Result<(), String> {
+pub fn zip_create(
+    items: Vec<String>,
+    destination: String,
+    password: Option<String>,
+) -> Result<(), String> {
     let started = Instant::now();
     if let Err(err) = preflight_zip_create(&items, &destination) {
         crate::log_error(
@@ -82,14 +87,13 @@ pub fn zip_create(items: Vec<String>, destination: String, password: Option<Stri
     if let Some(parent) = dest_path.parent() {
         fs::create_dir_all(parent).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
     }
-    let file = fs::File::create(&dest_path).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+    let file =
+        fs::File::create(&dest_path).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
     let mut writer = ZipWriter::new(file);
     let total = items.len();
     for item in items {
         let src = PathBuf::from(&item);
-        let name = src
-            .file_name()
-            .ok_or_else(|| "invalid path".to_string())?;
+        let name = src.file_name().ok_or_else(|| "invalid path".to_string())?;
         zip_add_path(&mut writer, &src, Path::new(name), &password)?;
     }
     writer
@@ -105,7 +109,11 @@ pub fn zip_create(items: Vec<String>, destination: String, password: Option<Stri
 }
 
 #[tauri::command]
-pub fn zip_extract(path: String, destination: String, password: Option<String>) -> Result<(), String> {
+pub fn zip_extract(
+    path: String,
+    destination: String,
+    password: Option<String>,
+) -> Result<(), String> {
     let started = Instant::now();
     if let Err(err) = preflight_zip_extract(&path, &destination) {
         crate::log_error(
@@ -137,13 +145,16 @@ pub fn zip_extract(path: String, destination: String, password: Option<String>) 
         };
         let outpath = zip_safe_path(&dest_path, file.name())?;
         if file.name().ends_with('/') {
-            fs::create_dir_all(&outpath).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+            fs::create_dir_all(&outpath)
+                .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
             continue;
         }
         if let Some(parent) = outpath.parent() {
-            fs::create_dir_all(parent).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
         }
-        let mut outfile = fs::File::create(&outpath).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+        let mut outfile = fs::File::create(&outpath)
+            .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
         std::io::copy(&mut file, &mut outfile)
             .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
     }

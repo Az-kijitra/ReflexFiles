@@ -9,14 +9,12 @@ fn spawn_with_args(command: impl AsRef<Path>, args: &[String]) -> AppResult<()> 
     if !args.is_empty() {
         cmd.args(args);
     }
-    cmd.spawn()
-        .map(|_| ())
-        .map_err(|e| {
-            AppError::with_kind(
-                AppErrorKind::from_io(e.kind()),
-                format!("launch failed: {e}"),
-            )
-        })
+    cmd.spawn().map(|_| ()).map_err(|e| {
+        AppError::with_kind(
+            AppErrorKind::from_io(e.kind()),
+            format!("launch failed: {e}"),
+        )
+    })
 }
 
 fn append_if_env_path(candidates: &mut Vec<PathBuf>, env_key: &str, suffix: &str) {
@@ -81,13 +79,12 @@ pub(crate) fn external_open_vscode_impl(path: String) -> AppResult<()> {
             return spawn_with_args(exe, &[path.clone()]);
         }
     }
-    spawn_with_args("code", &[path])
-        .map_err(|e| {
-            AppError::with_kind(
-                AppErrorKind::NotFound,
-                format!("program not found (set external_vscode_path): {e}"),
-            )
-        })
+    spawn_with_args("code", &[path]).map_err(|e| {
+        AppError::with_kind(
+            AppErrorKind::NotFound,
+            format!("program not found (set external_vscode_path): {e}"),
+        )
+    })
 }
 
 pub(crate) fn external_open_git_client_impl(path: String) -> AppResult<()> {

@@ -12,7 +12,11 @@ use crate::fs_ops_transfer_helpers::{
 use crate::types::{OpKind, OpStatus, OpSummary};
 
 #[tauri::command]
-pub fn fs_move(app: AppHandle, items: Vec<String>, destination: String) -> Result<OpSummary, String> {
+pub fn fs_move(
+    app: AppHandle,
+    items: Vec<String>,
+    destination: String,
+) -> Result<OpSummary, String> {
     let started = Instant::now();
     reset_cancel_request();
     let dest = match preflight_transfer(&items, &destination) {

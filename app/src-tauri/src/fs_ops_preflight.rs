@@ -44,8 +44,7 @@ pub fn preflight_create(parent: &str, name: &str, kind: &str) -> PreflightResult
         return Err(PreflightError::new("invalid_kind", "invalid create kind"));
     }
     let base = PathBuf::from(parent);
-    ensure_parent_exists(&base)
-        .map_err(|err| PreflightError::new("parent_not_found", err))?;
+    ensure_parent_exists(&base).map_err(|err| PreflightError::new("parent_not_found", err))?;
     let target = base.join(trimmed);
     if target.exists() {
         return Err(PreflightError::new(

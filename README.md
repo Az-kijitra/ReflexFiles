@@ -1,69 +1,64 @@
 # ReflexFiles
 
-ReflexFiles は Windows 向けのキーボード操作に最適化されたファイルマネージャです。
-Tauri + SvelteKit で構成されています。
+ReflexFiles is a keyboard-first file manager for Windows built with Tauri + SvelteKit.
+It focuses on fast navigation, multi-column list views, and efficient file operations.
 
-**重要:** 本アプリケーションは現在も開発途上であり、十分なテストが完了していません。
-利用は自己責任でお願いします。
+## Features
+- Multi-column file list and tree view
+- Fast keyboard navigation and configurable keymap
+- Search (substring + regex)
+- Copy / move / delete / rename / create
+- ZIP create / extract
+- Jump list and history
+- Integrated ReflexViewer (text, markdown, source highlight, image)
 
-## 主な機能
-- 複数列のファイル一覧とツリービュー
-- 高速なキーボード操作とキーマップのカスタマイズ
-- 検索（部分一致 / 正規表現）
-- コピー / 移動 / 削除 / リネーム / 新規作成
-- ZIP 作成 / 解凍
-- ジャンプリスト / 履歴
-
-## 開発要件
+## Requirements (Development)
 - Windows 10/11
-- Node.js（LTS 推奨）
-- Rust（stable）
-- Tauri の前提ツール
+- Node.js (LTS recommended)
+- Rust (stable)
+- Tauri prerequisites
 
-## クイックスタート（開発）
+## Quick Start (Dev)
 ```bash
 cd app
 npm install
 npm run tauri dev
 ```
 
-## ビルド
+## Build
 ```bash
 cd app
 npm run tauri build
 ```
 
-## E2E（Tauri）
+## E2E (Tauri)
 ```bash
 cd app
 npm run e2e:tauri
 ```
 
-## 依存関係監査
+## Dependency Audits
 ```bash
 cd app
 npm run audit:deps
 ```
 
-個別実行:
-```bash
-npm run audit:npm
-npm run audit:cargo
-```
+## Documentation
+- User manual (English): `user_manual.md`
+- User manual (Japanese): `docs/ja/user_manual.ja.md`
+- Viewer spec: `docs/VIEWER_SPEC.md`
+- Japanese README: `docs/ja/README.ja.md`
 
-## ドキュメント
-- ユーザーマニュアル: `user_manual.md`
+## Contributing
+See `docs/CONTRIBUTING.md`.
 
-## コントリビュート
-`CONTRIBUTING.md` を参照してください。
+## Security
+See `docs/SECURITY.md`.
 
-## セキュリティ
-`SECURITY.md` を参照してください。
+## License
+MIT. See `LICENSE`.
 
-## ライセンス
-MIT。`LICENSE` を参照してください。
-
-## AI生成コードに関する注記
-このリポジトリのコードは、人間の指示に基づき AI によって生成されています。
-人間は指示とレビューのみを行いました。
-AI を使用しているため、コードの一部または全部が著作権保護の対象外となる可能性があります。
+## AI-Generated Code Notice
+The code in this repository was generated with AI based on instructions provided by a human.
+The human contributor only provided direction and review.
+Because AI was used, some or all of the code may not be eligible for copyright protection.

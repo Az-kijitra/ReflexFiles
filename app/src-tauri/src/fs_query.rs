@@ -1,10 +1,10 @@
+use base64::Engine as _;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::hash::{Hash, Hasher};
 use std::sync::mpsc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use base64::Engine as _;
 
 use crate::error::{AppError, AppResult};
 use crate::types::{DirStats, Entry, EntryType, Properties, PropertyKind, SortKey, SortOrder};
@@ -164,8 +164,16 @@ pub(crate) fn fs_list_dir_impl(
             SortKey::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
             SortKey::Size => a.size.cmp(&b.size),
             SortKey::Type => {
-                let a_group = if matches!(a.entry_type, EntryType::Dir) { 0 } else { 1 };
-                let b_group = if matches!(b.entry_type, EntryType::Dir) { 0 } else { 1 };
+                let a_group = if matches!(a.entry_type, EntryType::Dir) {
+                    0
+                } else {
+                    1
+                };
+                let b_group = if matches!(b.entry_type, EntryType::Dir) {
+                    0
+                } else {
+                    1
+                };
                 a_group
                     .cmp(&b_group)
                     .then_with(|| a.ext.to_lowercase().cmp(&b.ext.to_lowercase()))
@@ -422,9 +430,8 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
 #[cfg(test)]
 mod tests {
     use super::{
-        cleanup_viewer_image_cache_dir, fs_read_image_data_url_impl,
-        fs_is_probably_text_impl, fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
-        infer_image_mime,
+        cleanup_viewer_image_cache_dir, fs_is_probably_text_impl, fs_read_image_data_url_impl,
+        fs_read_image_normalized_temp_path_impl, fs_read_text_impl, infer_image_mime,
     };
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
     use std::fs;
@@ -506,7 +513,10 @@ mod tests {
 
     #[test]
     fn infer_image_mime_detects_signature_and_extension() {
-        let png = infer_image_mime(Path::new("a.bin"), &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n']);
+        let png = infer_image_mime(
+            Path::new("a.bin"),
+            &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n'],
+        );
         assert_eq!(png, Some("image/png"));
         let jpeg = infer_image_mime(Path::new("a.bin"), &[0xFF, 0xD8, 0xFF, 0x00]);
         assert_eq!(jpeg, Some("image/jpeg"));
@@ -520,8 +530,8 @@ mod tests {
     fn fs_read_image_data_url_returns_data_url_for_supported_image() {
         let dir = unique_temp_dir("rf-fs-query-image");
         let path = write_temp_image(&dir, "a.jpg", ImageFormat::Jpeg);
-        let data_url =
-            fs_read_image_data_url_impl(path.to_string_lossy().to_string(), false).expect("data url");
+        let data_url = fs_read_image_data_url_impl(path.to_string_lossy().to_string(), false)
+            .expect("data url");
         assert!(data_url.starts_with("data:image/jpeg;base64,"));
         let _ = fs::remove_dir_all(dir);
     }

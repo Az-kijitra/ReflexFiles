@@ -204,4 +204,3 @@ pub struct HistoryFile {
 pub struct JumpListFile {
     pub jump_list: Vec<JumpItem>,
 }
-

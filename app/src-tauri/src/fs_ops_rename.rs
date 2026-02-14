@@ -1,7 +1,7 @@
-use std::fs;
-use std::time::Instant;
 use crate::fs_ops_mutate_helpers::{io_error_code, log_and_fail};
 use crate::fs_ops_preflight::preflight_rename;
+use std::fs;
+use std::time::Instant;
 
 #[tauri::command]
 pub fn fs_rename(path: String, new_name: String) -> Result<(), String> {

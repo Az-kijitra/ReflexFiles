@@ -83,6 +83,7 @@ export function buildPageActionsParams({ deps, properties, page, helpers }: Page
       scheduleUiSave: page.scheduleUiSave,
       getExternalAppAssociations: page.getExternalAppAssociations,
       getExternalAppsRaw: page.getExternalAppsRaw,
+      getUiLanguage: page.getUiLanguage,
       normalizeExternalApps: deps.normalizeExternalApps,
       openPath: deps.openPath,
       openUrl: deps.openUrl,

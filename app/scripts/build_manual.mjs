@@ -7,16 +7,36 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const repoRoot = path.resolve(__dirname, "..", "..");
-const inputPath = path.join(repoRoot, "user_manual.md");
 const staticDir = path.join(__dirname, "..", "static");
-const outputPath = path.join(staticDir, "user_manual.html");
-const outputMarkdownPath = path.join(staticDir, "user_manual.md");
-const logoSrc = path.join(repoRoot, "ReflexFiles.png");
-const logoDest = path.join(staticDir, "ReflexFiles.png");
 const resourcesDir = path.join(__dirname, "..", "src-tauri", "resources");
-const resourceManual = path.join(resourcesDir, "user_manual.html");
-const resourceManualMarkdown = path.join(resourcesDir, "user_manual.md");
-const resourceLogo = path.join(resourcesDir, "ReflexFiles.png");
+
+const manuals = [
+  {
+    id: "en",
+    lang: "en",
+    title: "ReflexFiles User Manual",
+    source: path.join(repoRoot, "user_manual.md"),
+    keymapHeadingHtmlCandidates: [
+      "<h2>Default Key Bindings</h2>",
+      "<h2>Key Bindings</h2>",
+    ],
+  },
+  {
+    id: "ja",
+    lang: "ja",
+    title: "ReflexFiles ユーザーマニュアル",
+    source: path.join(repoRoot, "docs", "ja", "user_manual.ja.md"),
+    keymapHeadingHtmlCandidates: [
+      "<h2>キー操作（既定）</h2>",
+      "<h2>キー一覧</h2>",
+    ],
+  },
+];
+
+const logoCandidates = [
+  path.join(repoRoot, "ReflexFiles.png"),
+  path.join(repoRoot, "docs", "ReflexFiles.png"),
+];
 
 const md = new MarkdownIt({
   html: false,
@@ -76,20 +96,22 @@ async function copyManualAssets(markdown) {
   }
 }
 
-async function main() {
-  const markdown = await fs.readFile(inputPath, "utf-8");
-  let body = md.render(markdown);
-  // Add anchors for in-manual navigation (e.g., Help -> Keymap).
-  body = body.replace(
-    "<h2>キー操作（既定）</h2>",
-    '<h2 id="keymap">キー操作（既定）</h2>'
-  );
-  const html = `<!doctype html>
-<html lang="ja">
+function injectManualAnchors(body, manual) {
+  for (const heading of manual.keymapHeadingHtmlCandidates) {
+    if (body.includes(heading)) {
+      return body.replace(heading, heading.replace("<h2>", '<h2 id="keymap">'));
+    }
+  }
+  return body;
+}
+
+function buildManualHtml(manual, body) {
+  return `<!doctype html>
+<html lang="${manual.lang}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ReflexFiles ユーザーマニュアル</title>
+    <title>${manual.title}</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -142,23 +164,81 @@ async function main() {
 ${body}
   </body>
 </html>`;
+}
+
+async function writeManualOutputs(manual, markdown, html) {
+  const htmlName = `user_manual.${manual.id}.html`;
+  const mdName = `user_manual.${manual.id}.md`;
+
   await fs.mkdir(staticDir, { recursive: true });
-  await fs.writeFile(outputPath, html, "utf-8");
-  await fs.writeFile(outputMarkdownPath, markdown, "utf-8");
-  await copyManualAssets(markdown);
-  try {
-    await fs.copyFile(logoSrc, logoDest);
-  } catch {
-    // Logo is optional; ignore if missing.
-  }
+  await fs.writeFile(path.join(staticDir, htmlName), html, "utf-8");
+  await fs.writeFile(path.join(staticDir, mdName), markdown, "utf-8");
+
   await fs.mkdir(resourcesDir, { recursive: true });
-  await fs.writeFile(resourceManual, html, "utf-8");
-  await fs.writeFile(resourceManualMarkdown, markdown, "utf-8");
-  try {
-    await fs.copyFile(logoSrc, resourceLogo);
-  } catch {
-    // Logo is optional; ignore if missing.
+  await fs.writeFile(path.join(resourcesDir, htmlName), html, "utf-8");
+  await fs.writeFile(path.join(resourcesDir, mdName), markdown, "utf-8");
+}
+
+async function writeCompatibilityAliases() {
+  const aliases = [
+    {
+      from: path.join(staticDir, "user_manual.en.html"),
+      to: path.join(staticDir, "user_manual.html"),
+    },
+    {
+      from: path.join(staticDir, "user_manual.en.md"),
+      to: path.join(staticDir, "user_manual.md"),
+    },
+    {
+      from: path.join(resourcesDir, "user_manual.en.html"),
+      to: path.join(resourcesDir, "user_manual.html"),
+    },
+    {
+      from: path.join(resourcesDir, "user_manual.en.md"),
+      to: path.join(resourcesDir, "user_manual.md"),
+    },
+  ];
+
+  for (const pair of aliases) {
+    await fs.copyFile(pair.from, pair.to);
   }
+}
+
+async function copyLogoIfPresent() {
+  let logoSource = null;
+  for (const candidate of logoCandidates) {
+    try {
+      await fs.access(candidate);
+      logoSource = candidate;
+      break;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!logoSource) {
+    return;
+  }
+
+  await fs.copyFile(logoSource, path.join(staticDir, "ReflexFiles.png"));
+  await fs.copyFile(logoSource, path.join(resourcesDir, "ReflexFiles.png"));
+}
+
+async function buildManual(manual) {
+  const markdown = await fs.readFile(manual.source, "utf-8");
+  let body = md.render(markdown);
+  body = injectManualAnchors(body, manual);
+  const html = buildManualHtml(manual, body);
+  await writeManualOutputs(manual, markdown, html);
+  await copyManualAssets(markdown);
+}
+
+async function main() {
+  for (const manual of manuals) {
+    await buildManual(manual);
+  }
+  await writeCompatibilityAliases();
+  await copyLogoIfPresent();
 }
 
 main().catch((err) => {

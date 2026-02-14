@@ -68,6 +68,7 @@ export function buildPageActionsPage(params: PageActionsPageParams) {
     scheduleUiSave: deps.scheduleUiSave,
     getExternalAppAssociations: () => resolve(state.externalAppAssociations),
     getExternalAppsRaw: () => resolve(state.externalApps),
+    getUiLanguage: () => resolve(state.ui_language),
     setAboutOpen: about.setAboutOpen,
     setFocusedIndex: selection.setFocusedIndex,
     setSelected: selection.setSelected,

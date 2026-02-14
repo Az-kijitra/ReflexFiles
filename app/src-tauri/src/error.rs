@@ -163,6 +163,9 @@ mod tests {
     fn app_error_code_uses_kind() {
         let err = AppError::with_kind(AppErrorKind::InvalidPath, "bad path");
         assert_eq!(err.code(), "invalid_path");
-        assert_eq!(format_error(AppErrorKind::Io, "disk"), "code=io_error; disk");
+        assert_eq!(
+            format_error(AppErrorKind::Io, "disk"),
+            "code=io_error; disk"
+        );
     }
 }

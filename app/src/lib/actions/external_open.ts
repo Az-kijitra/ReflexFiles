@@ -227,18 +227,33 @@ export function createExternalActions(ctx, helpers) {
     }
   }
 
+  function getManualLanguageId() {
+    const value = String(ctx.getUiLanguage?.() || "en").toLowerCase();
+    return value === "ja" ? "ja" : "en";
+  }
+
   async function resolveUserManualMarkdownPath() {
     const dir = await ctx.resourceDir();
     const normalized = String(dir).replace(/[\\\/]+$/, "");
     const hasResources = /[\\\/]resources$/i.test(normalized);
     const baseDir = hasResources ? normalized : await ctx.joinPath(normalized, "resources");
+    const lang = getManualLanguageId();
+    const preferredName = `user_manual.${lang}.md`;
+
     try {
-      return await ctx.joinPath(baseDir, "user_manual.md");
+      return await ctx.joinPath(baseDir, preferredName);
     } catch {
-      return await ctx.resolveResource("user_manual.md");
+      try {
+        return await ctx.resolveResource(preferredName);
+      } catch {
+        try {
+          return await ctx.joinPath(baseDir, "user_manual.md");
+        } catch {
+          return await ctx.resolveResource("user_manual.md");
+        }
+      }
     }
   }
-
   async function openKeymapHelp() {
     try {
       const resourcePath = await resolveUserManualMarkdownPath();

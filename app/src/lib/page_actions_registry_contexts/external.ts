@@ -3,6 +3,7 @@ import { AnyFn, Getter, Setter } from "./shared";
 export interface ExternalContext {
   normalizeExternalApps: AnyFn;
   getExternalAppsRaw: Getter<any[]>;
+  getUiLanguage: Getter<string>;
   getSelectedPaths: Getter<string[]>;
   getEntries: Getter<any[]>;
   getFocusedIndex: Getter<number>;

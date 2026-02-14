@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 use toml::Value;
 
-use crate::config_types::{AppConfig, HistoryFile, JumpItem, JumpListFile};
+use crate::config_types::{AppConfig, HistoryFile, JumpItem, JumpListFile, Language};
 
 fn appdata_base() -> PathBuf {
     std::env::var("APPDATA")
@@ -39,7 +39,12 @@ where
     toml::from_str::<T>(&contents).ok()
 }
 
-fn write_toml_with_header<T>(path: &PathBuf, header: &[&str], key: &str, value: &T) -> Result<(), String>
+fn write_toml_with_header<T>(
+    path: &PathBuf,
+    header: &[&str],
+    key: &str,
+    value: &T,
+) -> Result<(), String>
 where
     T: Serialize,
 {
@@ -59,6 +64,95 @@ where
 
 fn toml_string(value: &str) -> Value {
     Value::String(value.to_string())
+}
+fn localize_config_comments_to_en(mut text: String) -> String {
+    let replacements = [
+        (
+            "# ReflexFIles 設定ファイル\n",
+            "# ReflexFIles configuration file\n",
+        ),
+        (
+            "# 各項目の上に説明コメントがあります。\n\n",
+            "# Each setting includes a description comment above the key.\n\n",
+        ),
+        ("# --- 一般 ---\n", "# --- General ---\n"),
+        (
+            "# 設定ファイルのバージョン。\n",
+            "# Configuration file version.\n",
+        ),
+        ("# --- 表示/動作 ---\n", "# --- View/Behavior ---\n"),
+        (
+            "# フォルダ集計のタイムアウト(ms)。最小 500。\n",
+            "# Directory statistics timeout in ms. Minimum is 500.\n",
+        ),
+        (
+            "# 隠しファイルを表示するか (true/false)。\n",
+            "# Show hidden files (true/false).\n",
+        ),
+        (
+            "# サイズ列を表示するか (true/false)。\n",
+            "# Show size column (true/false).\n",
+        ),
+        (
+            "# タイムスタンプ列を表示するか (true/false)。\n",
+            "# Show timestamp column (true/false).\n",
+        ),
+        (
+            "# ツリービューを表示するか (true/false)。\n",
+            "# Show tree view (true/false).\n",
+        ),
+        (
+            "# 既定の並び替えキー: name | size | type | modified。\n",
+            "# Default sort key: name | size | type | modified.\n",
+        ),
+        (
+            "# 既定の並び順: asc | desc。\n",
+            "# Default sort order: asc | desc.\n",
+        ),
+        (
+            "# 起動時に開くパス (空で前回終了時のパス)。\n",
+            "# Path to open on startup (empty means last path on exit).\n",
+        ),
+        ("# --- UI ---\n", "# --- UI ---\n"),
+        ("# 主题: light | dark。\n", "# Theme: light | dark.\n"),
+        ("# 言語: ja | en。\n", "# Language: ja | en.\n"),
+        (
+            "# メインウィンドウ位置とサイズ。\n",
+            "# Main window position and size.\n",
+        ),
+        (
+            "# ビューアーウィンドウ位置とサイズ。\n",
+            "# Viewer window position and size.\n",
+        ),
+        ("# --- 履歴 ---\n", "# --- History ---\n"),
+        ("# 検索履歴 (最大 100)。\n", "# Search history (max 100).\n"),
+        ("# --- 外部ツール ---\n", "# --- External Tools ---\n"),
+        ("# Git クライアントのパス。\n", "# Git client path.\n"),
+        ("# VSCode のパス。\n", "# VS Code path.\n"),
+        (
+            "# 既定の関連付け (拡張子 -> アプリ ID)。\n",
+            "# Default associations (extension -> app id).\n",
+        ),
+        ("# 外部アプリ定義。\n", "# External app definitions.\n"),
+        ("# --- ログ ---\n", "# --- Logging ---\n"),
+        ("# ログファイルパス。\n", "# Log file path.\n"),
+        ("# ログ出力を有効化するか。\n", "# Enable log output.\n"),
+        ("# --- キーマップ ---\n", "# --- Keymap ---\n"),
+        (
+            "# プロファイル: windows | mac | linux | custom。\n",
+            "# Profile: windows | mac | linux | custom.\n",
+        ),
+        (
+            "# カスタムキーマップ (profile=custom のとき有効)。\n",
+            "# Custom keymap entries (used when profile=custom).\n",
+        ),
+    ];
+
+    for (from, to) in replacements {
+        text = text.replace(from, to);
+    }
+
+    text
 }
 
 pub fn load_history() -> Vec<String> {
@@ -165,14 +259,26 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     out.push_str(&format!("ui_window_y = {}\n", config.ui_window_y));
     out.push_str(&format!("ui_window_width = {}\n", config.ui_window_width));
     out.push_str(&format!("ui_window_height = {}\n", config.ui_window_height));
-    out.push_str(&format!("ui_window_maximized = {}\n\n", config.ui_window_maximized));
+    out.push_str(&format!(
+        "ui_window_maximized = {}\n\n",
+        config.ui_window_maximized
+    ));
 
     out.push_str("# ビューアーウィンドウ位置とサイズ。\n");
     out.push_str(&format!("viewer_window_x = {}\n", config.viewer_window_x));
     out.push_str(&format!("viewer_window_y = {}\n", config.viewer_window_y));
-    out.push_str(&format!("viewer_window_width = {}\n", config.viewer_window_width));
-    out.push_str(&format!("viewer_window_height = {}\n", config.viewer_window_height));
-    out.push_str(&format!("viewer_window_maximized = {}\n\n", config.viewer_window_maximized));
+    out.push_str(&format!(
+        "viewer_window_width = {}\n",
+        config.viewer_window_width
+    ));
+    out.push_str(&format!(
+        "viewer_window_height = {}\n",
+        config.viewer_window_height
+    ));
+    out.push_str(&format!(
+        "viewer_window_maximized = {}\n\n",
+        config.viewer_window_maximized
+    ));
 
     out.push_str("# --- 履歴 ---\n");
     out.push_str("# 検索履歴 (最大 100)。\n");
@@ -230,8 +336,11 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     }
     out.push('\n');
 
+    if !matches!(config.ui_language, Language::Ja) {
+        out = localize_config_comments_to_en(out);
+    }
+
     let mut file = fs::File::create(path).map_err(|e| e.to_string())?;
     file.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
-

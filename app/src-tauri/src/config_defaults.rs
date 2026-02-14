@@ -19,7 +19,7 @@ pub fn default_app_config() -> AppConfig {
         session_last_path: String::new(),
         history_search: vec![],
         ui_theme: Theme::Light,
-        ui_language: Language::En,
+        ui_language: default_language(),
         ui_window_x: 0,
         ui_window_y: 0,
         ui_window_width: 0,
@@ -41,6 +41,23 @@ pub fn default_app_config() -> AppConfig {
     }
 }
 
+fn default_language() -> Language {
+    for key in [
+        "RF_UI_LANGUAGE",
+        "LANGUAGE",
+        "LC_ALL",
+        "LC_MESSAGES",
+        "LANG",
+    ] {
+        if let Ok(value) = std::env::var(key) {
+            let v = value.to_ascii_lowercase();
+            if v.starts_with("ja") || v.contains("_ja") || v.contains("-ja") {
+                return Language::Ja;
+            }
+        }
+    }
+    Language::En
+}
 pub fn normalize_config(mut config: AppConfig) -> AppConfig {
     if config.config_version == 0 {
         config.config_version = 1;
@@ -64,7 +81,7 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
         config.ui_theme = Theme::default();
     }
     if matches!(config.ui_language, Language::Unknown) {
-        config.ui_language = Language::default();
+        config.ui_language = default_language();
     }
     if matches!(config.input_keymap_profile, KeymapProfile::Unknown) {
         config.input_keymap_profile = KeymapProfile::default();
@@ -108,4 +125,3 @@ fn local_app_data_base() -> PathBuf {
 fn normalized_path_text(value: &str) -> String {
     value.replace('/', "\\").to_ascii_lowercase()
 }
-

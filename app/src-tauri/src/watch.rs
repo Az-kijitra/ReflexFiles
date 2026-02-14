@@ -12,10 +12,13 @@ struct WatchState {
     path: Option<PathBuf>,
 }
 
-static WATCH_STATE: Lazy<Mutex<WatchState>> = Lazy::new(|| WatchState {
-    watcher: None,
-    path: None,
-}.into());
+static WATCH_STATE: Lazy<Mutex<WatchState>> = Lazy::new(|| {
+    WatchState {
+        watcher: None,
+        path: None,
+    }
+    .into()
+});
 
 #[tauri::command]
 pub fn fs_watch_start(app: tauri::AppHandle, path: String) -> Result<(), String> {
@@ -38,10 +41,8 @@ pub fn fs_watch_start(app: tauri::AppHandle, path: String) -> Result<(), String>
                 }
                 for changed in event.paths {
                     if let Some(parent) = changed.parent() {
-                        let _ = app_handle.emit(
-                            EVENT_FS_CHANGED,
-                            parent.to_string_lossy().to_string(),
-                        );
+                        let _ =
+                            app_handle.emit(EVENT_FS_CHANGED, parent.to_string_lossy().to_string());
                     } else {
                         let _ = app_handle.emit(EVENT_FS_CHANGED, path.clone());
                     }

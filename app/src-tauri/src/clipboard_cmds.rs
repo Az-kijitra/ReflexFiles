@@ -7,8 +7,7 @@ pub fn clipboard_set_files(
     cut: bool,
     effect: Option<String>,
 ) -> Result<(), String> {
-    clipboard_set_files_impl(paths, cut, effect)
-        .map_err(|err| format_error(AppErrorKind::Io, err))
+    clipboard_set_files_impl(paths, cut, effect).map_err(|err| format_error(AppErrorKind::Io, err))
 }
 
 #[tauri::command]

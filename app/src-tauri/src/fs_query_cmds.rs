@@ -1,6 +1,6 @@
 use crate::fs_query::{
-    fs_dir_stats_impl, fs_get_properties_impl, fs_list_dir_impl, fs_read_image_data_url_impl,
-    fs_is_probably_text_impl, fs_read_text_impl,
+    fs_dir_stats_impl, fs_get_properties_impl, fs_is_probably_text_impl, fs_list_dir_impl,
+    fs_read_image_data_url_impl, fs_read_text_impl,
 };
 use crate::types::{DirStats, Entry, Properties};
 

@@ -70,12 +70,16 @@ fn set_drop_effect(cut: bool, effect: Option<String>) -> Result<(), String> {
         Some("move") => 2,
         Some("link") => 4,
         _ => {
-            if cut { 2 } else { 1 }
+            if cut {
+                2
+            } else {
+                1
+            }
         }
     }; // COPY=1, MOVE=2, LINK=4
     unsafe {
-        let hglobal = GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<u32>())
-            .map_err(|e| format!("{e:?}"))?;
+        let hglobal =
+            GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<u32>()).map_err(|e| format!("{e:?}"))?;
         if hglobal.0.is_null() {
             return Err("failed to allocate global memory".to_string());
         }
@@ -85,8 +89,7 @@ fn set_drop_effect(cut: bool, effect: Option<String>) -> Result<(), String> {
         }
         *ptr = effect;
         let _ = GlobalUnlock(hglobal);
-        SetClipboardData(format, Some(HANDLE(hglobal.0)))
-            .map_err(|e| format!("{e:?}"))?;
+        SetClipboardData(format, Some(HANDLE(hglobal.0))).map_err(|e| format!("{e:?}"))?;
     }
     Ok(())
 }

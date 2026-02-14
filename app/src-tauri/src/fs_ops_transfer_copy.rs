@@ -18,7 +18,11 @@ pub struct CopyPair {
 }
 
 #[tauri::command]
-pub fn fs_copy(app: AppHandle, items: Vec<String>, destination: String) -> Result<OpSummary, String> {
+pub fn fs_copy(
+    app: AppHandle,
+    items: Vec<String>,
+    destination: String,
+) -> Result<OpSummary, String> {
     let started = Instant::now();
     reset_cancel_request();
     let dest = match preflight_transfer(&items, &destination) {

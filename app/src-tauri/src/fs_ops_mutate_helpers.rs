@@ -58,12 +58,7 @@ pub fn move_recursively(from: &Path, to: &Path) -> io::Result<()> {
     }
 }
 
-pub fn record_failure(
-    failures: &mut Vec<OpFailure>,
-    item: &str,
-    code: &str,
-    err: &str,
-) {
+pub fn record_failure(failures: &mut Vec<OpFailure>, item: &str, code: &str, err: &str) {
     failures.push(OpFailure {
         path: item.to_string(),
         code: code.to_string(),
@@ -84,8 +79,11 @@ pub fn io_error_code(err: &io::Error) -> &'static str {
 
 pub fn undo_trash_root() -> Result<PathBuf, String> {
     let config_path = crate::config::config_path();
-    let base = config_path
-        .parent()
-        .ok_or_else(|| crate::error::format_error(crate::error::AppErrorKind::InvalidPath, "config path invalid"))?;
+    let base = config_path.parent().ok_or_else(|| {
+        crate::error::format_error(
+            crate::error::AppErrorKind::InvalidPath,
+            "config path invalid",
+        )
+    })?;
     Ok(base.join("undo_trash"))
 }
