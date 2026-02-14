@@ -59,6 +59,9 @@ ReflexViewer is integrated into ReflexFiles and opens compatible files in a dedi
 ### Viewer shortcuts
 - `Esc`: Close viewer
 - `Ctrl+Q`: Close viewer
+- `Alt+Left` / `Alt+Right`: Previous/next file in the same folder
+- `Ctrl+PageUp` / `Ctrl+PageDown`: Previous/next file in the same folder
+- `Prev` / `Next` buttons: Previous/next file in the same folder
 - `Ctrl+O`: Open file chooser
 - `Ctrl+F`: Open search panel (text/markdown)
 - Arrow keys / `PageUp` / `PageDown`: Scroll

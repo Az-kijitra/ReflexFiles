@@ -82,6 +82,9 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 ### 基本操作（ビューアー）
 - **Esc**: ビューアーを閉じる
 - **Ctrl+Q**: ビューアーを閉じる
+- **Alt+Left / Alt+Right**: 同じフォルダ内の前/次ファイルへ移動
+- **Ctrl+PageUp / Ctrl+PageDown**: 同じフォルダ内の前/次ファイルへ移動
+- **Prev / Next ボタン**: 同じフォルダ内の前/次ファイルへ移動
 - **Ctrl+O**: ファイルを選択して開く
 - **Ctrl+F**: 検索パネルを開く（テキスト/Markdown）
 - **Ctrl + ホイール / Ctrl+Plus / Ctrl+Minus / Ctrl+0**: 拡大縮小（画像表示、または Markdown HTML 表示）

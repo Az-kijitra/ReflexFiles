@@ -45,6 +45,10 @@
   let imageContainer = $state();
   let hljsCore = /** @type {any} */ (null);
   let highlightRuntimePromise = /** @type {Promise<void> | null} */ (null);
+  let siblingFilePaths = $state(/** @type {string[]} */ ([]));
+  let siblingFileIndex = $state(-1);
+  let siblingDirPath = $state("");
+  let siblingRefreshToken = 0;
 
   async function ensureHighlightRuntimeLoaded() {
     if (hljsCore) {
@@ -291,6 +295,155 @@
   /**
    * @param {string} path
    */
+  function getParentPath(path) {
+    const value = String(path || "");
+    const slashIndex = Math.max(value.lastIndexOf("\\"), value.lastIndexOf("/"));
+    if (slashIndex <= 0) {
+      return "";
+    }
+    return value.slice(0, slashIndex);
+  }
+
+  /**
+   * @param {string} path
+   */
+  function normalizePathForCompare(path) {
+    let value = String(path || "");
+    if (!value) {
+      return "";
+    }
+    if (value.startsWith("\\\\?\\")) {
+      value = value.slice(4);
+    }
+    if (value.startsWith("//?/")) {
+      value = value.slice(4);
+    }
+    return value.replaceAll("/", "\\").toLowerCase();
+  }
+
+  /**
+   * @param {string} path
+   */
+  function syncSiblingIndex(path) {
+    const targetPath = String(path || "");
+    if (!targetPath || !siblingFilePaths.length) {
+      siblingFileIndex = -1;
+      return false;
+    }
+
+    const targetDir = getParentPath(targetPath);
+    if (
+      !targetDir ||
+      normalizePathForCompare(targetDir) !== normalizePathForCompare(siblingDirPath)
+    ) {
+      siblingFileIndex = -1;
+      return false;
+    }
+
+    const targetKey = normalizePathForCompare(targetPath);
+    const index = siblingFilePaths.findIndex(
+      (candidate) => normalizePathForCompare(candidate) === targetKey
+    );
+    siblingFileIndex = index;
+    return index >= 0;
+  }
+
+  /**
+   * @param {string} path
+   */
+  async function refreshSiblingFiles(path) {
+    const targetPath = String(path || "");
+    const dirPath = getParentPath(targetPath);
+
+    const token = ++siblingRefreshToken;
+    siblingFilePaths = [];
+    siblingFileIndex = -1;
+    siblingDirPath = dirPath;
+
+    if (!targetPath || !dirPath) {
+      return;
+    }
+
+    try {
+      const entries = await invoke("fs_list_dir", {
+        path: dirPath,
+        showHidden: true,
+        sortKey: "name",
+        sortOrder: "asc",
+      });
+      if (token !== siblingRefreshToken) {
+        return;
+      }
+
+      const files = Array.isArray(entries)
+        ? entries
+            .filter((entry) => String(entry?.type || "").toLowerCase() === "file")
+            .map((entry) => String(entry?.path || ""))
+            .filter((value) => value.length > 0)
+        : [];
+
+      siblingFilePaths = files;
+      siblingFileIndex = files.findIndex(
+        (candidate) => normalizePathForCompare(candidate) === normalizePathForCompare(targetPath)
+      );
+
+      if (siblingFileIndex < 0) {
+        siblingFilePaths = [...files, targetPath];
+        siblingFileIndex = siblingFilePaths.length - 1;
+      }
+    } catch {
+      if (token !== siblingRefreshToken) {
+        return;
+      }
+      siblingFilePaths = [targetPath];
+      siblingFileIndex = 0;
+    }
+  }
+
+  function hasPrevSiblingFile() {
+    return siblingFileIndex > 0;
+  }
+
+  function hasNextSiblingFile() {
+    return siblingFileIndex >= 0 && siblingFileIndex < siblingFilePaths.length - 1;
+  }
+
+  function getSiblingPositionText() {
+    if (siblingFileIndex < 0 || siblingFilePaths.length === 0) {
+      return "-- / --";
+    }
+    return `${siblingFileIndex + 1} / ${siblingFilePaths.length}`;
+  }
+
+  /**
+   * @param {-1 | 1} delta
+   */
+  function moveSiblingFile(delta) {
+    if (!siblingFilePaths.length || siblingFileIndex < 0) {
+      return;
+    }
+    const nextIndex = siblingFileIndex + delta;
+    if (nextIndex < 0 || nextIndex >= siblingFilePaths.length) {
+      return;
+    }
+    const nextPath = siblingFilePaths[nextIndex];
+    if (!nextPath) {
+      return;
+    }
+    if (normalizePathForCompare(nextPath) === normalizePathForCompare(currentPath)) {
+      return;
+    }
+    void openPath(nextPath);
+  }
+
+  function openPreviousSiblingFile() {
+    moveSiblingFile(-1);
+  }
+
+  function openNextSiblingFile() {
+    moveSiblingFile(1);
+  }
+
   function syncTitle(path) {
     const base = "ReflexViewer";
     if (!path) {
@@ -739,8 +892,15 @@
       } catch {
         // ignore session storage errors
       }
+      if (!syncSiblingIndex(currentPath)) {
+        void refreshSiblingFiles(currentPath);
+      }
     }
     if (!currentPath) {
+      siblingRefreshToken += 1;
+      siblingFilePaths = [];
+      siblingFileIndex = -1;
+      siblingDirPath = "";
       currentKind = "empty";
       resetView();
       loading = false;
@@ -841,6 +1001,32 @@
     const onKeydown = (event) => {
       if (scrollByKey(event)) {
         return;
+      }
+
+      if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.altKey) {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          openPreviousSiblingFile();
+          return;
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          openNextSiblingFile();
+          return;
+        }
+      }
+
+      if (!event.shiftKey && !event.altKey && (event.ctrlKey || event.metaKey)) {
+        if (event.key === "PageUp") {
+          event.preventDefault();
+          openPreviousSiblingFile();
+          return;
+        }
+        if (event.key === "PageDown") {
+          event.preventDefault();
+          openNextSiblingFile();
+          return;
+        }
       }
 
       if ((event.ctrlKey || event.metaKey) && currentKind === "markdown" && markdownViewMode === "html") {
@@ -962,6 +1148,11 @@
 </script>
 
 <main class="viewer-root" class:image-mode={currentKind === "image"} bind:this={rootContainer}>
+  <div class="file-nav-controls">
+    <button type="button" onclick={openPreviousSiblingFile} disabled={!hasPrevSiblingFile()}>Prev</button>
+    <span class="file-nav-position">{getSiblingPositionText()}</span>
+    <button type="button" onclick={openNextSiblingFile} disabled={!hasNextSiblingFile()}>Next</button>
+  </div>
   {#if loading}
     <div class="loading">Loading...</div>
   {:else if currentKind === "image"}
@@ -1157,6 +1348,48 @@
     height: auto;
     max-width: none;
     max-height: none;
+    user-select: none;
+  }
+
+  .file-nav-controls {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 15;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .file-nav-controls button {
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #e2e8f0;
+    padding: 5px 9px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .file-nav-controls button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .file-nav-controls button:hover:not(:disabled) {
+    background: #334155;
+  }
+
+  .file-nav-position {
+    min-width: 68px;
+    text-align: center;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #e2e8f0;
+    font-size: 12px;
+    line-height: 1;
+    padding: 7px 8px;
     user-select: none;
   }
 
