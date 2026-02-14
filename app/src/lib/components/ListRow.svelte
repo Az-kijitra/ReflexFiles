@@ -85,10 +85,11 @@
     box-sizing: border-box;
     font-family: ui-monospace, "Cascadia Mono", "Consolas", "Menlo", "Monaco", "Courier New",
       monospace;
+    font-size: 12px;
   }
 
   .time {
-    font-size: 12px;
+    font-size: 11px;
     text-align: right;
     color: var(--ui-muted);
     white-space: nowrap;
@@ -108,7 +109,7 @@
 
   .size {
     text-align: right;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--ui-muted);
     white-space: nowrap;
     overflow: hidden;
