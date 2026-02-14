@@ -10,10 +10,12 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const inputPath = path.join(repoRoot, "user_manual.md");
 const staticDir = path.join(__dirname, "..", "static");
 const outputPath = path.join(staticDir, "user_manual.html");
+const outputMarkdownPath = path.join(staticDir, "user_manual.md");
 const logoSrc = path.join(repoRoot, "ReflexFiles.png");
 const logoDest = path.join(staticDir, "ReflexFiles.png");
 const resourcesDir = path.join(__dirname, "..", "src-tauri", "resources");
 const resourceManual = path.join(resourcesDir, "user_manual.html");
+const resourceManualMarkdown = path.join(resourcesDir, "user_manual.md");
 const resourceLogo = path.join(resourcesDir, "ReflexFiles.png");
 
 const md = new MarkdownIt({
@@ -142,6 +144,7 @@ ${body}
 </html>`;
   await fs.mkdir(staticDir, { recursive: true });
   await fs.writeFile(outputPath, html, "utf-8");
+  await fs.writeFile(outputMarkdownPath, markdown, "utf-8");
   await copyManualAssets(markdown);
   try {
     await fs.copyFile(logoSrc, logoDest);
@@ -150,6 +153,7 @@ ${body}
   }
   await fs.mkdir(resourcesDir, { recursive: true });
   await fs.writeFile(resourceManual, html, "utf-8");
+  await fs.writeFile(resourceManualMarkdown, markdown, "utf-8");
   try {
     await fs.copyFile(logoSrc, resourceLogo);
   } catch {

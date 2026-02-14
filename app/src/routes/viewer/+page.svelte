@@ -19,6 +19,9 @@
   let highlightedTextHtml = $state("");
   let highlightedTextLines = $state(/** @type {string[]} */ ([]));
   let markdownHtml = $state("");
+  let markdownViewMode = $state("html");
+  let markdownArticleEl = $state();
+  let pendingMarkdownJumpHeading = $state("");
   let imageSrc = $state("");
   let imageLoadError = $state("");
   let imageZoom = $state(1);
@@ -258,8 +261,97 @@
     highlightedTextHtml = "";
     highlightedTextLines = [];
     markdownHtml = "";
+    markdownViewMode = "html";
+    pendingMarkdownJumpHeading = "";
     error = "";
     resetImageView();
+  }
+
+  /**
+   * @param {string} value
+   */
+  function normalizeMatchText(value) {
+    return String(value || "").replace(/\s+/g, "").toLowerCase();
+  }
+
+  /**
+   * @param {string} line
+   */
+  function extractHeadingText(line) {
+    return String(line).replace(/^#{1,6}\s*/, "").trim();
+  }
+
+  /**
+   * @param {string} markdownSource
+   * @param {string} jumpHint
+   */
+  function resolveMarkdownJumpHeading(markdownSource, jumpHint) {
+    const hint = String(jumpHint || "").trim();
+    if (!hint) {
+      return "";
+    }
+
+    const normalizedHint = hint.toLowerCase();
+    if (normalizedHint === "keymap" || hint === "キー一覧") {
+      const lines = String(markdownSource || "").split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("#")) {
+          continue;
+        }
+        const heading = extractHeadingText(trimmed);
+        const normalized = heading.toLowerCase();
+        if (
+          normalized.includes("keymap") ||
+          normalized.includes("keyboard") ||
+          heading.includes("キー操作") ||
+          heading.includes("キー一覧")
+        ) {
+          return heading;
+        }
+      }
+      return "キー操作";
+    }
+
+    return hint;
+  }
+
+  /**
+   * @param {string} headingText
+   */
+  async function focusMarkdownHeading(headingText) {
+    const heading = String(headingText || "").trim();
+    if (!heading) {
+      return false;
+    }
+
+    await tick();
+    const root = markdownArticleEl;
+    if (!root) {
+      return false;
+    }
+
+    const targetNorm = normalizeMatchText(heading);
+    const elements = root.querySelectorAll("h1, h2, h3, h4, h5, h6");
+    for (const element of elements) {
+      const currentNorm = normalizeMatchText(element.textContent || "");
+      if (!currentNorm) {
+        continue;
+      }
+      if (currentNorm.includes(targetNorm) || targetNorm.includes(currentNorm)) {
+        element.scrollIntoView({ block: "start", inline: "nearest" });
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * @param {"html" | "text"} mode
+   */
+  function setMarkdownViewMode(mode) {
+    markdownViewMode = mode;
   }
 
   /**
@@ -519,7 +611,8 @@
   /**
    * @param {string} path
    */
-  async function openPath(path) {
+  async function openPath(path, options = undefined) {
+    const jumpHint = String(options?.jumpHint || "");
     currentPath = String(path || "");
     syncTitle(currentPath);
     if (currentPath) {
@@ -539,6 +632,7 @@
     resetView();
     loading = true;
     currentKind = detectKind(currentPath);
+    pendingMarkdownJumpHeading = "";
 
     try {
       if (currentKind === "image") {
@@ -578,12 +672,20 @@
 
       if (currentKind === "markdown") {
         markdownHtml = markdown.render(textContent);
+        pendingMarkdownJumpHeading = resolveMarkdownJumpHeading(textContent, jumpHint);
       }
     } catch (e) {
       error = String(e);
       currentKind = "error";
     } finally {
       loading = false;
+      if (currentKind === "markdown" && pendingMarkdownJumpHeading) {
+        const heading = pendingMarkdownJumpHeading;
+        pendingMarkdownJumpHeading = "";
+        // Ensure markdown DOM is rendered after Loading... is dismissed.
+        await tick();
+        await focusMarkdownHeading(heading);
+      }
     }
   }
 
@@ -600,7 +702,11 @@
     const unlistenPromise = listen("viewer:open-path", (event) => {
       const payload = event?.payload;
       const path = typeof payload === "string" ? payload : payload?.path;
-      void openPath(path || "");
+      const jumpHint =
+        typeof payload === "string"
+          ? ""
+          : String(payload?.jumpHint || payload?.jump_hint || "");
+      void openPath(path || "", { jumpHint });
     });
 
     /**
@@ -666,20 +772,42 @@
     window.addEventListener("resize", onResize);
 
     const initialPath = getInitialPathFromUrl();
-    if (initialPath) {
-      void openPath(initialPath);
-    } else {
-      void invoke("viewer_take_pending_path")
-        .then((path) => {
-          const resolved = path || getLastPathFromSession();
-          return openPath(resolved || "");
-        })
-        .catch((e) => {
-          error = String(e);
-          currentKind = "error";
-          loading = false;
-        });
-    }
+    const openInitialPath = async () => {
+      if (initialPath) {
+        await openPath(initialPath);
+        return;
+      }
+
+      try {
+        const pending = await invoke("viewer_take_pending_open");
+        const pendingPath = pending?.path || "";
+        const pendingJumpHint = String(pending?.jumpHint || pending?.jump_hint || "");
+        if (pendingPath) {
+          await openPath(pendingPath, { jumpHint: pendingJumpHint });
+          return;
+        }
+      } catch {
+        // fallback to older command
+        try {
+          const legacyPath = await invoke("viewer_take_pending_path");
+          if (legacyPath) {
+            await openPath(legacyPath);
+            return;
+          }
+        } catch {
+          // ignore and continue to session fallback
+        }
+      }
+
+      const fallbackPath = getLastPathFromSession();
+      await openPath(fallbackPath || "");
+    };
+
+    void openInitialPath().catch((e) => {
+      error = String(e);
+      currentKind = "error";
+      loading = false;
+    });
 
     return () => {
       window.removeEventListener("keydown", onKeydown);
@@ -736,7 +864,30 @@
     {#if error}
       <pre class="error">{error}</pre>
     {:else}
-      <article class="markdown">{@html markdownHtml}</article>
+      <div class="markdown-view-controls">
+        <button
+          type="button"
+          class:selected={markdownViewMode === "html"}
+          onclick={() => setMarkdownViewMode("html")}
+        >HTML</button>
+        <button
+          type="button"
+          class:selected={markdownViewMode === "text"}
+          onclick={() => setMarkdownViewMode("text")}
+        >Text</button>
+      </div>
+      {#if markdownViewMode === "html"}
+        <article class="markdown" bind:this={markdownArticleEl}>{@html markdownHtml}</article>
+      {:else}
+        <div class="text-lines markdown-text-lines" aria-label="Markdown Source Lines">
+          {#each textLines as line, index}
+            <div class="text-line">
+              <span class="line-number">{index + 1}</span>
+              <pre class="text line-code">{line || " "}</pre>
+            </div>
+          {/each}
+        </div>
+      {/if}
     {/if}
   {:else if currentKind === "text"}
     {#if error}
@@ -934,6 +1085,39 @@
     overflow: visible;
   }
 
+  .markdown-view-controls {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 14;
+    display: flex;
+    gap: 6px;
+  }
+
+  .markdown-view-controls button {
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #e2e8f0;
+    padding: 5px 9px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .markdown-view-controls button:hover {
+    background: #334155;
+  }
+
+  .markdown-view-controls button.selected {
+    background: #0b60d1;
+    border-color: #0b60d1;
+    color: #f8fafc;
+  }
+
+  .markdown-text-lines {
+    padding-top: 42px;
+  }
+
   .code-highlight {
     white-space: pre;
     word-break: normal;
@@ -957,7 +1141,7 @@
   .markdown {
     max-width: 980px;
     margin: 0 auto;
-    padding: 20px 24px 32px;
+    padding: 54px 24px 32px;
     color: #111827;
     background: #ffffff;
     min-height: 100%;

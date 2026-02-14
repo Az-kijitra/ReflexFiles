@@ -1,6 +1,6 @@
 use crate::fs_query::{
     fs_dir_stats_impl, fs_get_properties_impl, fs_list_dir_impl, fs_read_image_data_url_impl,
-    fs_read_text_impl,
+    fs_is_probably_text_impl, fs_read_text_impl,
 };
 use crate::types::{DirStats, Entry, Properties};
 
@@ -18,6 +18,12 @@ pub fn fs_list_dir(
 #[tauri::command]
 pub fn fs_read_text(path: String, max_bytes: usize) -> Result<String, String> {
     fs_read_text_impl(path, max_bytes).map_err(|err| format!("code={}; {}", err.code(), err))
+}
+
+#[tauri::command]
+pub fn fs_is_probably_text(path: String, sample_bytes: usize) -> Result<bool, String> {
+    fs_is_probably_text_impl(path, sample_bytes)
+        .map_err(|err| format!("code={}; {}", err.code(), err))
 }
 
 #[tauri::command]

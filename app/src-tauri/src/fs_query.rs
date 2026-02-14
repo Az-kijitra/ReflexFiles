@@ -198,6 +198,47 @@ pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<Str
     Ok(text)
 }
 
+pub(crate) fn fs_is_probably_text_impl(path: String, sample_bytes: usize) -> AppResult<bool> {
+    let max = sample_bytes.max(1);
+    let file = fs::File::open(&path)?;
+    let mut limited = file.take(max as u64);
+    let mut data = Vec::with_capacity(max.min(64 * 1024));
+    limited.read_to_end(&mut data)?;
+
+    if data.is_empty() {
+        return Ok(true);
+    }
+
+    // UTF BOMs should be treated as text even when containing NUL bytes.
+    if data.starts_with(&[0xEF, 0xBB, 0xBF]) // UTF-8 BOM
+        || data.starts_with(&[0xFF, 0xFE]) // UTF-16 LE BOM
+        || data.starts_with(&[0xFE, 0xFF]) // UTF-16 BE BOM
+        || data.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) // UTF-32 LE BOM
+        || data.starts_with(&[0x00, 0x00, 0xFE, 0xFF])
+    // UTF-32 BE BOM
+    {
+        return Ok(true);
+    }
+
+    if data.contains(&0x00) {
+        return Ok(false);
+    }
+
+    let control_count = data
+        .iter()
+        .filter(|&&b| {
+            (b < 0x20 && b != b'\t' && b != b'\n' && b != b'\r' && b != 0x0C && b != 0x08)
+                || b == 0x7F
+        })
+        .count();
+    let control_ratio = (control_count as f64) / (data.len() as f64);
+    if control_ratio > 0.10 {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
 fn infer_image_mime(path: &Path, bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n']) {
         return Some("image/png");
@@ -382,7 +423,8 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
 mod tests {
     use super::{
         cleanup_viewer_image_cache_dir, fs_read_image_data_url_impl,
-        fs_read_image_normalized_temp_path_impl, fs_read_text_impl, infer_image_mime,
+        fs_is_probably_text_impl, fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
+        infer_image_mime,
     };
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
     use std::fs;
@@ -428,6 +470,37 @@ mod tests {
         let path = write_temp_file(&dir, "a.txt", b"abcdef");
         let text = fs_read_text_impl(path.to_string_lossy().to_string(), 3).expect("read text");
         assert_eq!(text, "abc");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_is_probably_text_detects_ascii_text() {
+        let dir = unique_temp_dir("rf-fs-query-text-like");
+        let path = write_temp_file(&dir, "a.unknown", b"hello\nworld\t123");
+        let is_text =
+            fs_is_probably_text_impl(path.to_string_lossy().to_string(), 4096).expect("is text");
+        assert!(is_text);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_is_probably_text_rejects_binary_with_nul() {
+        let dir = unique_temp_dir("rf-fs-query-binary-like");
+        let path = write_temp_file(&dir, "a.bin", &[0x01, 0x02, 0x00, 0x03, 0x04]);
+        let is_text =
+            fs_is_probably_text_impl(path.to_string_lossy().to_string(), 4096).expect("is text");
+        assert!(!is_text);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_is_probably_text_accepts_utf16_bom() {
+        let dir = unique_temp_dir("rf-fs-query-utf16-like");
+        // UTF-16 LE BOM + "a" + LF
+        let path = write_temp_file(&dir, "a.dat", &[0xFF, 0xFE, b'a', 0x00, b'\n', 0x00]);
+        let is_text =
+            fs_is_probably_text_impl(path.to_string_lossy().to_string(), 4096).expect("is text");
+        assert!(is_text);
         let _ = fs::remove_dir_all(dir);
     }
 

@@ -130,18 +130,42 @@ export function createExternalActions(ctx, helpers) {
     }
     return VIEWER_MARKDOWN_EXTS.has(ext) || VIEWER_IMAGE_EXTS.has(ext) || VIEWER_CODE_EXTS.has(ext);
   }
+
   /** @param {string} path */
-  async function openViewerWindow(path) {
-    await ctx.invoke("open_viewer", { path });
+  async function isProbablyTextByContent(path) {
+    try {
+      const result = await ctx.invoke("fs_is_probably_text", { path, sampleBytes: 65536 });
+      return !!result;
+    } catch {
+      return false;
+    }
   }
-  /** @param {import("$lib/types").Entry} entry */
-  async function openEntry(entry) {
+
+  /**
+   * @param {string} path
+   * @param {string | undefined} jumpHint
+   */
+  async function openViewerWindow(path, jumpHint = undefined) {
+    await ctx.invoke("open_viewer", { path, jumpHint, jump_hint: jumpHint });
+  }
+
+  /** @param {string} path */
+  async function openAssociatedApp(path) {
+    await ctx.openPath(path);
+  }
+
+  /**
+   * @param {import("$lib/types").Entry} entry
+   * @param {{ forceAssociatedApp?: boolean }} [options]
+   */
+  async function openEntry(entry, options = undefined) {
     if (!entry) return;
     if (entry.type === "dir") {
       await ctx.loadDir(entry.path);
       return;
     }
-    if (isViewerTarget(entry)) {
+    const forceAssociatedApp = !!options?.forceAssociatedApp;
+    if (!forceAssociatedApp && isViewerTarget(entry)) {
       try {
         await openViewerWindow(entry.path);
         return;
@@ -150,17 +174,20 @@ export function createExternalActions(ctx, helpers) {
         return;
       }
     }
-    const app = resolveExternalApp(entry);
-    if (app) {
-      try {
-        await ctx.invoke("external_open_with_app", { path: entry.path, app });
-        return;
-      } catch (err) {
-        showError(err);
+    if (!forceAssociatedApp) {
+      const contentLooksText = await isProbablyTextByContent(entry.path);
+      if (contentLooksText) {
+        try {
+          await openViewerWindow(entry.path);
+          return;
+        } catch (err) {
+          showError(err);
+          return;
+        }
       }
     }
     try {
-      await ctx.openPath(entry.path);
+      await openAssociatedApp(entry.path);
     } catch (err) {
       showError(err);
     }
@@ -244,78 +271,33 @@ export function createExternalActions(ctx, helpers) {
     }
   }
 
-  function toFileUrl(path) {
-    const normalized = String(path).replace(/\\/g, "/");
-    if (/^[a-z]+:\/\//i.test(normalized)) return normalized;
-    if (normalized.startsWith("/")) return `file://${normalized}`;
-    return `file:///${normalized}`;
-  }
-
-  async function openUserManualWithFragment(fragment) {
-    let lastError = null;
-    const base = window.location?.origin || "";
-    const baseIsHttp = /^https?:\/\//i.test(base);
-    const isTauriLocalhost = /tauri\.localhost$/i.test(base);
-    if (baseIsHttp && !isTauriLocalhost) {
-      try {
-        await ctx.openUrl(`${base}/user_manual.html#${fragment}`);
-        return;
-      } catch (err) {
-        lastError = err;
-      }
-    }
-    try {
-      const resourcePath = await resolveUserManualPath();
-      const url = `${toFileUrl(resourcePath)}#${fragment}`;
-      await ctx.openUrl(encodeURI(url));
-      return;
-    } catch (err) {
-      lastError = err;
-    }
-    if (lastError) {
-      showError(lastError);
-    }
-  }
-
-  async function openKeymapHelp() {
-    await openUserManualWithFragment("keymap");
-  }
-
-  async function resolveUserManualPath() {
+  async function resolveUserManualMarkdownPath() {
     const dir = await ctx.resourceDir();
     const normalized = String(dir).replace(/[\\\/]+$/, "");
     const hasResources = /[\\\/]resources$/i.test(normalized);
     const baseDir = hasResources ? normalized : await ctx.joinPath(normalized, "resources");
     try {
-      return await ctx.joinPath(baseDir, "user_manual.html");
+      return await ctx.joinPath(baseDir, "user_manual.md");
     } catch {
-      return await ctx.resolveResource("user_manual.html");
+      return await ctx.resolveResource("user_manual.md");
+    }
+  }
+
+  async function openKeymapHelp() {
+    try {
+      const resourcePath = await resolveUserManualMarkdownPath();
+      await openViewerWindow(resourcePath, "keymap");
+    } catch (err) {
+      showError(err);
     }
   }
 
   async function openUserManual() {
-    let lastError = null;
-    const base = window.location?.origin || "";
-    const baseIsHttp = /^https?:\/\//i.test(base);
-    const isTauriLocalhost = /tauri\.localhost$/i.test(base);
-    if (baseIsHttp && !isTauriLocalhost) {
-      try {
-        await ctx.openUrl(`${base}/user_manual.html`);
-        return;
-      } catch (err) {
-        lastError = err;
-      }
-    }
     try {
-      const resourcePath = await resolveUserManualPath();
-      const url = toFileUrl(resourcePath);
-      await ctx.openUrl(encodeURI(url));
-      return;
+      const resourcePath = await resolveUserManualMarkdownPath();
+      await openViewerWindow(resourcePath);
     } catch (err) {
-      lastError = err;
-    }
-    if (lastError) {
-      showError(lastError);
+      showError(err);
     }
   }
 

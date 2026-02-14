@@ -2,6 +2,7 @@ use crate::config::{config_path, load_config, save_config, save_history, save_ju
 use crate::error::{format_error, AppErrorKind};
 use crate::types::{AppConfig, JumpItem, SortKey, SortOrder, Theme};
 use tauri::Manager;
+use tauri_plugin_opener::OpenerExt;
 
 fn persist_config(config: &AppConfig) -> Result<(), String> {
     save_history(&config.history_paths)
@@ -32,11 +33,10 @@ pub fn config_get_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn config_open_in_editor() -> Result<(), String> {
+pub fn config_open_in_editor(app: tauri::AppHandle) -> Result<(), String> {
     let (_, path) = ensure_config()?;
-    std::process::Command::new("notepad.exe")
-        .arg(&path)
-        .spawn()
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<&str>)
         .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
     Ok(())
 }

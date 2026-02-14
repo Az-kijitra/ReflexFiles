@@ -37,11 +37,13 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 "###;
 
-static VIEWER_PENDING_PATH: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+static VIEWER_PENDING_OPEN: Lazy<Mutex<Option<ViewerOpenPayload>>> = Lazy::new(|| Mutex::new(None));
 
 #[derive(Clone, Serialize)]
-struct ViewerOpenPayload {
+#[serde(rename_all = "camelCase")]
+pub struct ViewerOpenPayload {
     path: String,
+    jump_hint: Option<String>,
 }
 
 fn normalize_windows_verbatim_path(path: &str) -> String {
@@ -67,29 +69,31 @@ fn normalize_file_path(path: &str) -> Result<String, String> {
         .map(|p| normalize_windows_verbatim_path(&p.to_string_lossy()))
 }
 
-fn set_pending_path(path: Option<String>) -> Result<(), String> {
-    let mut guard = VIEWER_PENDING_PATH
+fn set_pending_open(payload: Option<ViewerOpenPayload>) -> Result<(), String> {
+    let mut guard = VIEWER_PENDING_OPEN
         .lock()
         .map_err(|_| "viewer pending path lock poisoned".to_string())?;
-    *guard = path;
+    *guard = payload;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn open_viewer(app: tauri::AppHandle, path: String) -> Result<(), String> {
+pub async fn open_viewer(
+    app: tauri::AppHandle,
+    path: String,
+    jump_hint: Option<String>,
+) -> Result<(), String> {
     let resolved = normalize_file_path(&path)?;
-    set_pending_path(Some(resolved.clone()))?;
+    let payload = ViewerOpenPayload {
+        path: resolved.clone(),
+        jump_hint,
+    };
+    set_pending_open(Some(payload.clone()))?;
 
     if let Some(window) = app.get_webview_window(VIEWER_LABEL) {
         let _ = window.show();
         let _ = window.set_focus();
-        let _ = app.emit_to(
-            VIEWER_LABEL,
-            VIEWER_EVENT_OPEN_PATH,
-            ViewerOpenPayload {
-                path: resolved.clone(),
-            },
-        );
+        let _ = app.emit_to(VIEWER_LABEL, VIEWER_EVENT_OPEN_PATH, payload);
         return Ok(());
     }
 
@@ -114,13 +118,21 @@ pub async fn close_viewer(app: tauri::AppHandle) -> Result<(), String> {
             .close()
             .map_err(|e| format!("failed to close viewer window: {e}"))?;
     }
-    set_pending_path(None)?;
+    set_pending_open(None)?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn viewer_take_pending_path() -> Result<Option<String>, String> {
-    let mut guard = VIEWER_PENDING_PATH
+    let mut guard = VIEWER_PENDING_OPEN
+        .lock()
+        .map_err(|_| "viewer pending path lock poisoned".to_string())?;
+    Ok(guard.take().map(|payload| payload.path))
+}
+
+#[tauri::command]
+pub async fn viewer_take_pending_open() -> Result<Option<ViewerOpenPayload>, String> {
+    let mut guard = VIEWER_PENDING_OPEN
         .lock()
         .map_err(|_| "viewer pending path lock poisoned".to_string())?;
     Ok(guard.take())

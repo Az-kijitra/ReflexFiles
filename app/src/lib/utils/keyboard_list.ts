@@ -207,11 +207,24 @@ export function handleListKey(event, ctx) {
     ctx.toggleSelection(ctx.focusedIndex, true);
     return true;
   }
+  const isShiftEnterOpen =
+    event.shiftKey &&
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    (event.key === "Enter" || event.code === "Enter" || event.code === "NumpadEnter");
+  if (isShiftEnterOpen) {
+    event.preventDefault();
+    const entry = ctx.entries[ctx.focusedIndex];
+    if (!entry) return true;
+    ctx.openEntry(entry, { forceAssociatedApp: true });
+    return true;
+  }
   if (ctx.matchesAction(event, "open")) {
     event.preventDefault();
     const entry = ctx.entries[ctx.focusedIndex];
     if (!entry) return true;
-    ctx.openEntry(entry);
+    ctx.openEntry(entry, { forceAssociatedApp: !!event.shiftKey });
     return true;
   }
   if (ctx.matchesAction(event, "rename")) {
