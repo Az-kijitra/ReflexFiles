@@ -48,6 +48,16 @@ pub struct AppConfig {
     pub ui_window_height: u32,
     #[serde(rename = "ui_window_maximized")]
     pub ui_window_maximized: bool,
+    #[serde(rename = "viewer_window_x")]
+    pub viewer_window_x: i32,
+    #[serde(rename = "viewer_window_y")]
+    pub viewer_window_y: i32,
+    #[serde(rename = "viewer_window_width")]
+    pub viewer_window_width: u32,
+    #[serde(rename = "viewer_window_height")]
+    pub viewer_window_height: u32,
+    #[serde(rename = "viewer_window_maximized")]
+    pub viewer_window_maximized: bool,
     #[serde(rename = "input_keymap_profile", alias = "keymap_profile")]
     pub input_keymap_profile: KeymapProfile,
     #[serde(rename = "input_keymap_custom", alias = "keymap_custom")]
@@ -194,3 +204,4 @@ pub struct HistoryFile {
 pub struct JumpListFile {
     pub jump_list: Vec<JumpItem>,
 }
+

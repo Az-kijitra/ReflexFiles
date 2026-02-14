@@ -25,6 +25,11 @@ pub fn default_app_config() -> AppConfig {
         ui_window_width: 0,
         ui_window_height: 0,
         ui_window_maximized: false,
+        viewer_window_x: 0,
+        viewer_window_y: 0,
+        viewer_window_width: 0,
+        viewer_window_height: 0,
+        viewer_window_maximized: false,
         input_keymap_profile: KeymapProfile::Windows,
         input_keymap_custom: HashMap::new(),
         external_associations: HashMap::new(),
@@ -103,3 +108,4 @@ fn local_app_data_base() -> PathBuf {
 fn normalized_path_text(value: &str) -> String {
     value.replace('/', "\\").to_ascii_lowercase()
 }
+

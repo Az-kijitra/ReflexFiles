@@ -160,12 +160,19 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "ui_language = {}\n\n",
         Value::String(config.ui_language.as_str().to_string())
     ));
-    out.push_str("# ウィンドウ位置とサイズ。\n");
+    out.push_str("# メインウィンドウ位置とサイズ。\n");
     out.push_str(&format!("ui_window_x = {}\n", config.ui_window_x));
     out.push_str(&format!("ui_window_y = {}\n", config.ui_window_y));
     out.push_str(&format!("ui_window_width = {}\n", config.ui_window_width));
     out.push_str(&format!("ui_window_height = {}\n", config.ui_window_height));
     out.push_str(&format!("ui_window_maximized = {}\n\n", config.ui_window_maximized));
+
+    out.push_str("# ビューアーウィンドウ位置とサイズ。\n");
+    out.push_str(&format!("viewer_window_x = {}\n", config.viewer_window_x));
+    out.push_str(&format!("viewer_window_y = {}\n", config.viewer_window_y));
+    out.push_str(&format!("viewer_window_width = {}\n", config.viewer_window_width));
+    out.push_str(&format!("viewer_window_height = {}\n", config.viewer_window_height));
+    out.push_str(&format!("viewer_window_maximized = {}\n\n", config.viewer_window_maximized));
 
     out.push_str("# --- 履歴 ---\n");
     out.push_str("# 検索履歴 (最大 100)。\n");
@@ -227,3 +234,4 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     file.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
+

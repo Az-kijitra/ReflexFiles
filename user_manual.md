@@ -75,6 +75,31 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
 ![alt text](docs/screenshot/path.png)
 ---
 
+## ReflexViewer（プレビュー / コード表示）
+ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer で表示されます。
+
+### 主な表示モード
+- **Markdown Preview**: Markdown を整形済み HTML として表示
+- **Text（Markdown Source）**: Markdown のソース表示（シンタックス色分け対応）
+- **Source Code Highlight**: C/C++/Rust/JavaScript/TypeScript/Python/JSON などの色分け表示
+- **Image Viewer**: PNG/JPEG/BMP を表示（拡大縮小・パン対応）
+
+### 基本操作（ビューアー）
+- **Esc**: ビューアーを閉じる
+- **Ctrl+Q**: ビューアーを閉じる
+- **Ctrl+O**: ファイルを選択して開く
+- **Ctrl+F**: 検索パネルを開く（テキスト/Markdown）
+- **Ctrl + ホイール / Ctrl+Plus / Ctrl+Minus / Ctrl+0**: 拡大縮小（画像表示、または Markdown HTML 表示）
+
+### 画面イメージ（差し替え予定）
+#### Markdown Preview 画面
+![Markdown Preview 画面](docs/screenshot/markdown_preview.png)
+
+#### ソースコードハイライト画面
+![ソースコードハイライト画面](docs/screenshot/source_code.png)
+
+---
+
 ## 機能一覧（詳細）
 - **ツリービュー**
   - クリック / キーボードで展開・移動
@@ -292,3 +317,4 @@ external_apps = [
 ### 参考: キー割り当て
 既定キーの一覧は、**ヘルプ → キー一覧** から確認できます。  
 `config.toml` に既定キー一覧は出力されません。変更したい場合は `input_keymap_custom` を使用してください。
+

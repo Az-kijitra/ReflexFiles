@@ -10,6 +10,10 @@
   const IMAGE_ZOOM_MAX = 8;
   const IMAGE_ZOOM_STEP = 1.2;
   const IMAGE_VIEW_PADDING = 32;
+  const MARKDOWN_HTML_ZOOM_STORAGE_KEY = "__rf_viewer_markdown_html_zoom";
+  const MARKDOWN_HTML_ZOOM_MIN = 0.6;
+  const MARKDOWN_HTML_ZOOM_MAX = 2.5;
+  const MARKDOWN_HTML_ZOOM_STEP = 1.1;
 
   let currentPath = $state("");
   let currentKind = $state("empty");
@@ -20,6 +24,8 @@
   let highlightedTextLines = $state(/** @type {string[]} */ ([]));
   let markdownHtml = $state("");
   let markdownViewMode = $state("html");
+  let markdownHtmlZoom = $state(1);
+  let markdownHighlightedLines = $state(/** @type {string[]} */ ([]));
   let markdownArticleEl = $state();
   let pendingMarkdownJumpHeading = $state("");
   let imageSrc = $state("");
@@ -139,6 +145,14 @@
     return true;
   }
 
+  function canUseMarkdownTextHighlight() {
+    if (currentKind !== "markdown") return false;
+    if (markdownViewMode !== "text") return false;
+    if (!textContent) return false;
+    if (textContent.length > SYNTAX_HIGHLIGHT_MAX_CHARS) return false;
+    return true;
+  }
+
   function refreshSyntaxHighlight() {
     if (!canUseSyntaxHighlight()) {
       highlightedTextHtml = "";
@@ -172,6 +186,38 @@
     } catch {
       highlightedTextHtml = "";
       highlightedTextLines = [];
+    }
+  }
+
+  function refreshMarkdownTextHighlight() {
+    if (!canUseMarkdownTextHighlight()) {
+      markdownHighlightedLines = [];
+      return;
+    }
+
+    if (!hljsCore) {
+      markdownHighlightedLines = [];
+      void ensureHighlightRuntimeLoaded()
+        .then(() => {
+          if (canUseMarkdownTextHighlight()) {
+            refreshMarkdownTextHighlight();
+          }
+        })
+        .catch(() => {
+          markdownHighlightedLines = [];
+        });
+      return;
+    }
+
+    try {
+      const rendered = hljsCore.highlight(textContent, {
+        language: "markdown",
+        ignoreIllegals: true,
+      }).value;
+      const lines = rendered.split("\n");
+      markdownHighlightedLines = lines.length > 0 ? lines : [""];
+    } catch {
+      markdownHighlightedLines = [];
     }
   }
 
@@ -260,6 +306,7 @@
     textLanguage = "";
     highlightedTextHtml = "";
     highlightedTextLines = [];
+    markdownHighlightedLines = [];
     markdownHtml = "";
     markdownViewMode = "html";
     pendingMarkdownJumpHeading = "";
@@ -352,6 +399,59 @@
    */
   function setMarkdownViewMode(mode) {
     markdownViewMode = mode;
+    if (mode === "text") {
+      refreshMarkdownTextHighlight();
+    }
+  }
+
+  /**
+   * @param {unknown} value
+   */
+  function normalizeMarkdownHtmlZoom(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return 1;
+    }
+    return Math.min(MARKDOWN_HTML_ZOOM_MAX, Math.max(MARKDOWN_HTML_ZOOM_MIN, numeric));
+  }
+
+  function saveMarkdownHtmlZoom() {
+    try {
+      localStorage.setItem(MARKDOWN_HTML_ZOOM_STORAGE_KEY, String(markdownHtmlZoom));
+    } catch {
+      // ignore persistence errors
+    }
+  }
+
+  /**
+   * @param {number} nextZoom
+   * @param {boolean} persist
+   */
+  function setMarkdownHtmlZoom(nextZoom, persist = true) {
+    const normalized = normalizeMarkdownHtmlZoom(nextZoom);
+    markdownHtmlZoom = Math.round(normalized * 1000) / 1000;
+    if (persist) {
+      saveMarkdownHtmlZoom();
+    }
+  }
+
+  /**
+   * @param {number} factor
+   */
+  function zoomMarkdownHtmlBy(factor) {
+    setMarkdownHtmlZoom(markdownHtmlZoom * factor);
+  }
+
+  function resetMarkdownHtmlZoom() {
+    setMarkdownHtmlZoom(1);
+  }
+
+  function getMarkdownHtmlZoomText() {
+    return `${Math.round(markdownHtmlZoom * 100)}%`;
+  }
+
+  function getMarkdownHtmlStyle() {
+    return `font-size: ${Math.round(markdownHtmlZoom * 100)}%;`;
   }
 
   /**
@@ -499,6 +599,24 @@
     const factor = event.deltaY < 0 ? IMAGE_ZOOM_STEP : 1 / IMAGE_ZOOM_STEP;
     imageZoomMode = "custom";
     void setImageZoom(imageZoom * factor);
+  }
+
+  /**
+   * @param {WheelEvent} event
+   */
+  function handleMarkdownHtmlWheel(event) {
+    if (currentKind !== "markdown" || markdownViewMode !== "html") {
+      return;
+    }
+    if (!(event.ctrlKey || event.metaKey)) {
+      return;
+    }
+    event.preventDefault();
+    if (event.deltaY < 0) {
+      zoomMarkdownHtmlBy(MARKDOWN_HTML_ZOOM_STEP);
+    } else if (event.deltaY > 0) {
+      zoomMarkdownHtmlBy(1 / MARKDOWN_HTML_ZOOM_STEP);
+    }
   }
 
   /**
@@ -673,6 +791,7 @@
       if (currentKind === "markdown") {
         markdownHtml = markdown.render(textContent);
         pendingMarkdownJumpHeading = resolveMarkdownJumpHeading(textContent, jumpHint);
+        refreshMarkdownTextHighlight();
       }
     } catch (e) {
       error = String(e);
@@ -709,12 +828,37 @@
       void openPath(path || "", { jumpHint });
     });
 
+    try {
+      const saved = localStorage.getItem(MARKDOWN_HTML_ZOOM_STORAGE_KEY);
+      setMarkdownHtmlZoom(normalizeMarkdownHtmlZoom(saved), false);
+    } catch {
+      setMarkdownHtmlZoom(1, false);
+    }
+
     /**
      * @param {KeyboardEvent} event
      */
     const onKeydown = (event) => {
       if (scrollByKey(event)) {
         return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && currentKind === "markdown" && markdownViewMode === "html") {
+        if (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") {
+          event.preventDefault();
+          zoomMarkdownHtmlBy(MARKDOWN_HTML_ZOOM_STEP);
+          return;
+        }
+        if (event.key === "-" || event.key === "_" || event.code === "NumpadSubtract") {
+          event.preventDefault();
+          zoomMarkdownHtmlBy(1 / MARKDOWN_HTML_ZOOM_STEP);
+          return;
+        }
+        if (event.key === "0" || event.code === "Numpad0") {
+          event.preventDefault();
+          resetMarkdownHtmlZoom();
+          return;
+        }
       }
 
       if ((event.ctrlKey || event.metaKey) && currentKind === "image") {
@@ -875,18 +1019,42 @@
           class:selected={markdownViewMode === "text"}
           onclick={() => setMarkdownViewMode("text")}
         >Text</button>
+        {#if markdownViewMode === "html"}
+          <span class="markdown-zoom-label">{getMarkdownHtmlZoomText()}</span>
+          <button type="button" onclick={() => zoomMarkdownHtmlBy(1 / MARKDOWN_HTML_ZOOM_STEP)}>-</button>
+          <button type="button" onclick={resetMarkdownHtmlZoom}>100%</button>
+          <button type="button" onclick={() => zoomMarkdownHtmlBy(MARKDOWN_HTML_ZOOM_STEP)}>+</button>
+        {/if}
       </div>
       {#if markdownViewMode === "html"}
-        <article class="markdown" bind:this={markdownArticleEl}>{@html markdownHtml}</article>
+        <article
+          class="markdown"
+          bind:this={markdownArticleEl}
+          style={getMarkdownHtmlStyle()}
+          onwheel={handleMarkdownHtmlWheel}
+        >
+          {@html markdownHtml}
+        </article>
       {:else}
-        <div class="text-lines markdown-text-lines" aria-label="Markdown Source Lines">
-          {#each textLines as line, index}
-            <div class="text-line">
-              <span class="line-number">{index + 1}</span>
-              <pre class="text line-code">{line || " "}</pre>
-            </div>
-          {/each}
-        </div>
+        {#if markdownHighlightedLines.length > 0}
+          <div class="text-lines markdown-text-lines" aria-label="Markdown Source Lines">
+            {#each markdownHighlightedLines as lineHtml, index}
+              <div class="text-line">
+                <span class="line-number">{index + 1}</span>
+                <pre class="text line-code code-highlight"><code class="hljs language-markdown">{@html lineHtml || " "}</code></pre>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="text-lines markdown-text-lines" aria-label="Markdown Source Lines">
+            {#each textLines as line, index}
+              <div class="text-line">
+                <span class="line-number">{index + 1}</span>
+                <pre class="text line-code">{line || " "}</pre>
+              </div>
+            {/each}
+          </div>
+        {/if}
       {/if}
     {/if}
   {:else if currentKind === "text"}
@@ -1114,6 +1282,20 @@
     color: #f8fafc;
   }
 
+  .markdown-zoom-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 56px;
+    padding: 0 6px;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #e2e8f0;
+    font-size: 12px;
+    user-select: none;
+  }
+
   .markdown-text-lines {
     padding-top: 42px;
   }
@@ -1132,6 +1314,26 @@
     font-size: inherit;
     line-height: inherit;
     white-space: pre;
+  }
+
+  .code-highlight :global(.hljs-section) {
+    color: #60a5fa;
+    font-weight: 700;
+  }
+
+  .code-highlight :global(.hljs-bullet) {
+    color: #f87171;
+    font-weight: 700;
+  }
+
+  .code-highlight :global(.hljs-strong) {
+    color: #f8fafc;
+    font-weight: 700;
+  }
+
+  .code-highlight :global(.hljs-emphasis) {
+    color: #cbd5e1;
+    font-style: italic;
   }
 
   .error {

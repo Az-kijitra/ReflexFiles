@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Emitter;
 use tauri::Manager;
+use tauri::{PhysicalPosition, PhysicalSize, WebviewWindow, WindowEvent};
 
 const VIEWER_LABEL: &str = "viewer";
 const VIEWER_EVENT_OPEN_PATH: &str = "viewer:open-path";
@@ -77,6 +78,59 @@ fn set_pending_open(payload: Option<ViewerOpenPayload>) -> Result<(), String> {
     Ok(())
 }
 
+fn apply_viewer_window_state(window: &WebviewWindow) {
+    let config = crate::config::load_config();
+
+    if config.viewer_window_width > 0 && config.viewer_window_height > 0 {
+        let _ = window.set_size(PhysicalSize::new(
+            config.viewer_window_width,
+            config.viewer_window_height,
+        ));
+        let _ = window.set_position(PhysicalPosition::new(
+            config.viewer_window_x,
+            config.viewer_window_y,
+        ));
+    }
+
+    if config.viewer_window_maximized {
+        let _ = window.maximize();
+    }
+}
+
+fn persist_viewer_window_state(window: &WebviewWindow) -> Result<(), String> {
+    let mut config = crate::config::load_config();
+    let maximized = window
+        .is_maximized()
+        .map_err(|e| format!("failed to query viewer maximized state: {e}"))?;
+    config.viewer_window_maximized = maximized;
+
+    if !maximized {
+        if let Ok(pos) = window.outer_position() {
+            config.viewer_window_x = pos.x;
+            config.viewer_window_y = pos.y;
+        }
+        if let Ok(size) = window.outer_size() {
+            config.viewer_window_width = size.width;
+            config.viewer_window_height = size.height;
+        }
+    }
+
+    crate::config::save_config(&config)
+        .map_err(|e| format!("failed to save viewer window state: {e}"))
+}
+
+fn install_viewer_window_state_handlers(window: &WebviewWindow) {
+    let window_for_events = window.clone();
+    window.on_window_event(move |event| {
+        if matches!(
+            event,
+            WindowEvent::CloseRequested { .. } | WindowEvent::Destroyed
+        ) {
+            let _ = persist_viewer_window_state(&window_for_events);
+        }
+    });
+}
+
 #[tauri::command]
 pub async fn open_viewer(
     app: tauri::AppHandle,
@@ -97,16 +151,22 @@ pub async fn open_viewer(
         return Ok(());
     }
 
-    tauri::WebviewWindowBuilder::new(
+    let window = tauri::WebviewWindowBuilder::new(
         &app,
         VIEWER_LABEL,
         tauri::WebviewUrl::App("index.html".into()),
     )
     .title("ReflexViewer")
     .inner_size(1024.0, 768.0)
+    .visible(false)
     .initialization_script(VIEWER_INIT_SCRIPT)
     .build()
     .map_err(|e| format!("failed to open viewer window: {e}"))?;
+
+    apply_viewer_window_state(&window);
+    install_viewer_window_state_handlers(&window);
+    let _ = window.show();
+    let _ = window.set_focus();
 
     Ok(())
 }
@@ -114,6 +174,7 @@ pub async fn open_viewer(
 #[tauri::command]
 pub async fn close_viewer(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(VIEWER_LABEL) {
+        let _ = persist_viewer_window_state(&window);
         window
             .close()
             .map_err(|e| format!("failed to close viewer window: {e}"))?;
