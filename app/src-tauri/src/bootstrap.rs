@@ -33,6 +33,7 @@ pub fn run() {
             crate::fs_ops_create::fs_create,
             crate::fs_ops_rename::fs_rename,
             crate::fs_query_cmds::fs_read_text,
+            crate::fs_query_cmds::fs_read_image_data_url,
             crate::fs_ops_archive::zip_create,
             crate::fs_ops_archive::zip_extract,
             crate::fs_query_cmds::fs_get_properties,
@@ -54,6 +55,9 @@ pub fn run() {
             crate::external_apps_cmds::external_open_git_client,
             crate::external_apps_cmds::external_open_custom,
             crate::system_cmds::app_exit,
+            crate::viewer_cmds::open_viewer,
+            crate::viewer_cmds::close_viewer,
+            crate::viewer_cmds::viewer_take_pending_path,
             crate::watch::fs_watch_start,
             crate::watch::fs_watch_stop
         ])

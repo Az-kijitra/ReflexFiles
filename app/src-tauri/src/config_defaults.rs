@@ -43,7 +43,10 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
     if config.perf_dir_stats_timeout_ms < 500 {
         config.perf_dir_stats_timeout_ms = 500;
     }
-    if config.log_path.trim().is_empty() {
+    let legacy = legacy_default_log_path().to_string_lossy().to_string();
+    if config.log_path.trim().is_empty()
+        || normalized_path_text(&config.log_path) == normalized_path_text(&legacy)
+    {
         config.log_path = default_log_path().to_string_lossy().to_string();
     }
     if matches!(config.view_sort_key, SortKey::Unknown) {
@@ -76,9 +79,27 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
 }
 
 pub fn default_log_path() -> PathBuf {
+    local_app_data_base()
+        .join("ReflexViewer")
+        .join("logs")
+        .join("app.log")
+}
+
+fn legacy_default_log_path() -> PathBuf {
     let base = config_path()
         .parent()
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
     base.join("app.log")
+}
+
+fn local_app_data_base() -> PathBuf {
+    std::env::var("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .or_else(|_| std::env::var("APPDATA").map(PathBuf::from))
+        .unwrap_or_else(|_| PathBuf::from("."))
+}
+
+fn normalized_path_text(value: &str) -> String {
+    value.replace('/', "\\").to_ascii_lowercase()
 }

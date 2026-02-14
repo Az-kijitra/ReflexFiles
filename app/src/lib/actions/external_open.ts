@@ -1,6 +1,11 @@
 import { getParentPath } from "$lib/utils/path";
 import { STATUS_LONG_MS, STATUS_SHORT_MS } from "$lib/ui_durations";
 import { formatError } from "$lib/utils/error_format";
+const VIEWER_MARKDOWN_EXTS = new Set(["md", "markdown"]);
+const VIEWER_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "bmp"]);
+const VIEWER_CODE_EXTS = new Set([
+  "txt", "log", "json", "c", "h", "cpp", "cc", "cxx", "hpp", "hh", "hxx", "rs", "js", "ts", "py"
+]);
 
 /**
  * @param {object} ctx
@@ -103,11 +108,47 @@ export function createExternalActions(ctx, helpers) {
   }
 
   /** @param {import("$lib/types").Entry} entry */
+  function detectEntryExtension(entry) {
+    if (!entry || entry.type !== "file") return "";
+    const ext = String(entry.ext || "").toLowerCase();
+    if (ext) {
+      return ext.startsWith(".") ? ext.slice(1) : ext;
+    }
+    const lowerName = String(entry.name || "").toLowerCase();
+    const dot = lowerName.lastIndexOf(".");
+    if (dot < 0 || dot === lowerName.length - 1) {
+      return "";
+    }
+    return lowerName.slice(dot + 1);
+  }
+
+  /** @param {import("$lib/types").Entry} entry */
+  function isViewerTarget(entry) {
+    const ext = detectEntryExtension(entry);
+    if (!ext) {
+      return false;
+    }
+    return VIEWER_MARKDOWN_EXTS.has(ext) || VIEWER_IMAGE_EXTS.has(ext) || VIEWER_CODE_EXTS.has(ext);
+  }
+  /** @param {string} path */
+  async function openViewerWindow(path) {
+    await ctx.invoke("open_viewer", { path });
+  }
+  /** @param {import("$lib/types").Entry} entry */
   async function openEntry(entry) {
     if (!entry) return;
     if (entry.type === "dir") {
       await ctx.loadDir(entry.path);
       return;
+    }
+    if (isViewerTarget(entry)) {
+      try {
+        await openViewerWindow(entry.path);
+        return;
+      } catch (err) {
+        showError(err);
+        return;
+      }
     }
     const app = resolveExternalApp(entry);
     if (app) {
@@ -286,6 +327,15 @@ export function createExternalActions(ctx, helpers) {
     ctx.setAboutOpen(false);
   }
 
+
+  async function closeViewer() {
+    try {
+      await ctx.invoke("close_viewer");
+    } catch (err) {
+      showError(err);
+    }
+  }
+
   return {
     getExternalApps,
     getTargetEntry,
@@ -302,5 +352,6 @@ export function createExternalActions(ctx, helpers) {
     openUserManual,
     openAbout,
     closeAbout,
+    closeViewer,
   };
 }

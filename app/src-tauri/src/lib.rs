@@ -24,6 +24,7 @@ mod fs_query;
 mod fs_query_cmds;
 mod utils;
 mod bootstrap;
+mod viewer_cmds;
 mod system_cmds;
 mod error;
 

@@ -1,0 +1,783 @@
+<script>
+  import { onMount, tick } from "svelte";
+  import MarkdownIt from "markdown-it";
+  import { invoke, listen } from "$lib/tauri_client";
+
+  const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
+  const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+  const IMAGE_ZOOM_MIN = 0.01;
+  const IMAGE_ZOOM_MAX = 8;
+  const IMAGE_ZOOM_STEP = 1.2;
+  const IMAGE_VIEW_PADDING = 32;
+
+  let currentPath = $state("");
+  let currentKind = $state("empty");
+  let textContent = $state("");
+  let markdownHtml = $state("");
+  let imageSrc = $state("");
+  let imageLoadError = $state("");
+  let imageZoom = $state(1);
+  let imageZoomMode = $state("fit");
+  let imageNaturalWidth = $state(0);
+  let imageNaturalHeight = $state(0);
+  let imagePanning = $state(false);
+  let imagePanStartX = $state(0);
+  let imagePanStartY = $state(0);
+  let imagePanScrollLeft = $state(0);
+  let imagePanScrollTop = $state(0);
+  let error = $state("");
+  let loading = $state(false);
+  let rootContainer = $state();
+  let imageContainer = $state();
+
+  /**
+   * @param {number} value
+   */
+  function clampImageZoom(value) {
+    return Math.min(IMAGE_ZOOM_MAX, Math.max(IMAGE_ZOOM_MIN, value));
+  }
+
+  function resetImageView() {
+    imageSrc = "";
+    imageLoadError = "";
+    imageZoom = 1;
+    imageZoomMode = "fit";
+    imageNaturalWidth = 0;
+    imageNaturalHeight = 0;
+    imagePanning = false;
+  }
+
+  /**
+   * @param {string} path
+   */
+  function detectKind(path) {
+    const normalized = String(path || "").toLowerCase();
+    if (normalized.endsWith(".md") || normalized.endsWith(".markdown")) {
+      return "markdown";
+    }
+    if (
+      normalized.endsWith(".png") ||
+      normalized.endsWith(".jpg") ||
+      normalized.endsWith(".jpeg") ||
+      normalized.endsWith(".bmp")
+    ) {
+      return "image";
+    }
+    return "text";
+  }
+
+  function getInitialPathFromUrl() {
+    try {
+      const url = new URL(window.location.href);
+      return url.searchParams.get("path") || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function getLastPathFromSession() {
+    try {
+      return sessionStorage.getItem("__rf_viewer_last_path") || "";
+    } catch {
+      return "";
+    }
+  }
+
+  /**
+   * @param {string} path
+   */
+  function fileTail(path) {
+    const normalized = String(path || "").replaceAll("\\", "/");
+    const parts = normalized.split("/");
+    return parts[parts.length - 1] || normalized;
+  }
+
+  /**
+   * @param {string} path
+   */
+  function syncTitle(path) {
+    const base = "ReflexViewer";
+    if (!path) {
+      document.title = base;
+      return;
+    }
+    document.title = `${base} - ${fileTail(path)}`;
+  }
+
+  function resetView() {
+    textContent = "";
+    markdownHtml = "";
+    error = "";
+    resetImageView();
+  }
+
+  /**
+   * @param {string} path
+   */
+  function isJpegPath(path) {
+    const value = String(path || "").toLowerCase();
+    return value.endsWith(".jpg") || value.endsWith(".jpeg");
+  }
+
+  function getActiveScrollContainer() {
+    if (currentKind === "image") {
+      return imageContainer || rootContainer;
+    }
+    return rootContainer;
+  }
+
+  /**
+   * @param {KeyboardEvent} event
+   */
+  function scrollByKey(event) {
+    const container = getActiveScrollContainer();
+    if (!container) {
+      return false;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return false;
+    }
+
+    const target = event.target;
+    if (target instanceof HTMLElement) {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return false;
+      }
+    }
+
+    const lineStep = event.shiftKey ? 240 : 72;
+    switch (event.key) {
+      case "ArrowUp":
+        event.preventDefault();
+        container.scrollBy({ top: -lineStep, left: 0, behavior: "auto" });
+        return true;
+      case "ArrowDown":
+        event.preventDefault();
+        container.scrollBy({ top: lineStep, left: 0, behavior: "auto" });
+        return true;
+      case "ArrowLeft":
+        event.preventDefault();
+        container.scrollBy({ top: 0, left: -lineStep, behavior: "auto" });
+        return true;
+      case "ArrowRight":
+        event.preventDefault();
+        container.scrollBy({ top: 0, left: lineStep, behavior: "auto" });
+        return true;
+      case "PageUp":
+        event.preventDefault();
+        container.scrollBy({
+          top: -Math.max(120, container.clientHeight - 80),
+          left: 0,
+          behavior: "auto",
+        });
+        return true;
+      case "PageDown":
+        event.preventDefault();
+        container.scrollBy({
+          top: Math.max(120, container.clientHeight - 80),
+          left: 0,
+          behavior: "auto",
+        });
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * @param {number} nextZoom
+   * @param {boolean} keepCenter
+   */
+  async function setImageZoom(nextZoom, keepCenter = true) {
+    if (!imageContainer || !imageNaturalWidth || !imageNaturalHeight) {
+      imageZoom = clampImageZoom(nextZoom);
+      return;
+    }
+
+    const container = imageContainer;
+    const prevZoom = imageZoom;
+    const clamped = clampImageZoom(nextZoom);
+
+    const centerX = container.scrollLeft + container.clientWidth / 2;
+    const centerY = container.scrollTop + container.clientHeight / 2;
+
+    imageZoom = clamped;
+    await tick();
+
+    if (keepCenter && prevZoom > 0) {
+      const ratio = clamped / prevZoom;
+      const nextCenterX = centerX * ratio;
+      const nextCenterY = centerY * ratio;
+      container.scrollLeft = Math.max(0, nextCenterX - container.clientWidth / 2);
+      container.scrollTop = Math.max(0, nextCenterY - container.clientHeight / 2);
+    }
+  }
+
+  function getFitZoomValue() {
+    if (!imageContainer || !imageNaturalWidth || !imageNaturalHeight) {
+      return 1;
+    }
+    const availableWidth = Math.max(1, imageContainer.clientWidth - IMAGE_VIEW_PADDING);
+    const availableHeight = Math.max(1, imageContainer.clientHeight - IMAGE_VIEW_PADDING);
+    const fitZoom = Math.min(availableWidth / imageNaturalWidth, availableHeight / imageNaturalHeight);
+    return clampImageZoom(fitZoom);
+  }
+
+  async function fitImageToWindow() {
+    imageZoomMode = "fit";
+    await tick();
+    await setImageZoom(getFitZoomValue(), false);
+  }
+
+  /**
+   * @param {number} percent
+   */
+  async function setImageZoomPreset(percent) {
+    imageZoomMode = "custom";
+    await setImageZoom(percent / 100);
+  }
+
+  /**
+   * @param {WheelEvent} event
+   */
+  function handleImageWheel(event) {
+    if (currentKind !== "image") {
+      return;
+    }
+    if (!(event.ctrlKey || event.metaKey)) {
+      return;
+    }
+
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? IMAGE_ZOOM_STEP : 1 / IMAGE_ZOOM_STEP;
+    imageZoomMode = "custom";
+    void setImageZoom(imageZoom * factor);
+  }
+
+  /**
+   * @param {MouseEvent} event
+   */
+  function handleImageDoubleClick(event) {
+    event.preventDefault();
+    void setImageZoomPreset(100);
+  }
+
+  /**
+   * @param {Event} event
+   */
+  function handleImageLoad(event) {
+    const img = /** @type {HTMLImageElement} */ (event.currentTarget);
+    imageLoadError = "";
+    imageNaturalWidth = img.naturalWidth || 0;
+    imageNaturalHeight = img.naturalHeight || 0;
+    if (imageZoomMode === "fit") {
+      void fitImageToWindow();
+    }
+  }
+
+  function handleImageError() {
+    imageLoadError = "画像を表示できませんでした。";
+  }
+
+  /**
+   * @param {PointerEvent} event
+   */
+  function handleImagePointerDown(event) {
+    if (currentKind !== "image" || event.button !== 0 || !imageContainer || imageLoadError) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const onControls = target.closest(".image-controls");
+    const onFrame = target.closest(".image-frame");
+    if (onControls || !onFrame) {
+      return;
+    }
+
+    imagePanning = true;
+    imagePanStartX = event.clientX;
+    imagePanStartY = event.clientY;
+    imagePanScrollLeft = imageContainer.scrollLeft;
+    imagePanScrollTop = imageContainer.scrollTop;
+
+    try {
+      /** @type {Element} */ (event.currentTarget).setPointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture failure
+    }
+
+    event.preventDefault();
+  }
+
+  /**
+   * @param {PointerEvent} event
+   */
+  function handleImagePointerMove(event) {
+    if (!imagePanning || !imageContainer) {
+      return;
+    }
+
+    const deltaX = event.clientX - imagePanStartX;
+    const deltaY = event.clientY - imagePanStartY;
+    imageContainer.scrollLeft = imagePanScrollLeft - deltaX;
+    imageContainer.scrollTop = imagePanScrollTop - deltaY;
+  }
+
+  /**
+   * @param {PointerEvent} event
+   */
+  function endImagePan(event) {
+    if (!imagePanning) {
+      return;
+    }
+
+    imagePanning = false;
+    try {
+      /** @type {Element} */ (event.currentTarget).releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore pointer capture failure
+    }
+  }
+
+  function getImageInlineStyle() {
+    if (!imageNaturalWidth || !imageNaturalHeight) {
+      return "";
+    }
+    const width = Math.max(1, Number((imageNaturalWidth * imageZoom).toFixed(3)));
+    const height = Math.max(1, Number((imageNaturalHeight * imageZoom).toFixed(3)));
+    return `width: ${width}px; height: ${height}px;`;
+  }
+
+  function getImageStatusText() {
+    const zoomText = `${Math.round(imageZoom * 100)}%`;
+    const modeText = imageZoomMode === "fit" ? " (Fit)" : "";
+    if (!imageNaturalWidth || !imageNaturalHeight) {
+      return `${zoomText}${modeText}`;
+    }
+    return `${imageNaturalWidth}x${imageNaturalHeight} | ${zoomText}${modeText}`;
+  }
+
+  /**
+   * @param {string} path
+   */
+  async function openPath(path) {
+    currentPath = String(path || "");
+    syncTitle(currentPath);
+    if (currentPath) {
+      try {
+        sessionStorage.setItem("__rf_viewer_last_path", currentPath);
+      } catch {
+        // ignore session storage errors
+      }
+    }
+    if (!currentPath) {
+      currentKind = "empty";
+      resetView();
+      loading = false;
+      return;
+    }
+
+    resetView();
+    loading = true;
+    currentKind = detectKind(currentPath);
+
+    try {
+      if (currentKind === "image") {
+        // JPEG is rendered more reliably after normalization.
+        if (isJpegPath(currentPath)) {
+          try {
+            const dataUrl = await invoke("fs_read_image_data_url", {
+              path: currentPath,
+              normalize: true,
+            });
+            imageSrc = String(dataUrl || "");
+            return;
+          } catch {
+            // fall through
+          }
+        }
+
+        try {
+          const dataUrl = await invoke("fs_read_image_data_url", { path: currentPath, normalize: false });
+          imageSrc = String(dataUrl || "");
+          return;
+        } catch {
+          const dataUrl = await invoke("fs_read_image_data_url", { path: currentPath, normalize: true });
+          imageSrc = String(dataUrl || "");
+        }
+        return;
+      }
+
+      const rawText = await invoke("fs_read_text", {
+        path: currentPath,
+        maxBytes: MAX_TEXT_BYTES,
+      });
+      textContent = String(rawText ?? "");
+
+      if (currentKind === "markdown") {
+        markdownHtml = markdown.render(textContent);
+      }
+    } catch (e) {
+      error = String(e);
+      currentKind = "error";
+    } finally {
+      loading = false;
+    }
+  }
+
+  function closeWindow() {
+    void invoke("close_viewer").catch(() => {
+      // ignore close failure from viewer
+    });
+  }
+
+  onMount(() => {
+    /**
+     * @param {{ payload?: string | { path?: string } }} event
+     */
+    const unlistenPromise = listen("viewer:open-path", (event) => {
+      const payload = event?.payload;
+      const path = typeof payload === "string" ? payload : payload?.path;
+      void openPath(path || "");
+    });
+
+    /**
+     * @param {KeyboardEvent} event
+     */
+    const onKeydown = (event) => {
+      if (scrollByKey(event)) {
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && currentKind === "image") {
+        if (event.key === "+" || event.key === "=") {
+          event.preventDefault();
+          imageZoomMode = "custom";
+          void setImageZoom(imageZoom * IMAGE_ZOOM_STEP);
+          return;
+        }
+
+        if (event.key === "-" || event.key === "_") {
+          event.preventDefault();
+          imageZoomMode = "custom";
+          void setImageZoom(imageZoom / IMAGE_ZOOM_STEP);
+          return;
+        }
+
+        if (event.key === "0") {
+          event.preventDefault();
+          void setImageZoomPreset(100);
+          return;
+        }
+
+        if (event.key === "9") {
+          event.preventDefault();
+          void fitImageToWindow();
+          return;
+        }
+
+        if (event.key === "2") {
+          event.preventDefault();
+          void setImageZoomPreset(200);
+          return;
+        }
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeWindow();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "q") {
+        event.preventDefault();
+        closeWindow();
+      }
+    };
+
+    const onResize = () => {
+      if (currentKind === "image" && imageZoomMode === "fit") {
+        void fitImageToWindow();
+      }
+    };
+
+    window.addEventListener("keydown", onKeydown);
+    window.addEventListener("resize", onResize);
+
+    const initialPath = getInitialPathFromUrl();
+    if (initialPath) {
+      void openPath(initialPath);
+    } else {
+      void invoke("viewer_take_pending_path")
+        .then((path) => {
+          const resolved = path || getLastPathFromSession();
+          return openPath(resolved || "");
+        })
+        .catch((e) => {
+          error = String(e);
+          currentKind = "error";
+          loading = false;
+        });
+    }
+
+    return () => {
+      window.removeEventListener("keydown", onKeydown);
+      window.removeEventListener("resize", onResize);
+      void unlistenPromise.then((fn) => fn());
+    };
+  });
+</script>
+
+<main class="viewer-root" class:image-mode={currentKind === "image"} bind:this={rootContainer}>
+  {#if loading}
+    <div class="loading">Loading...</div>
+  {:else if currentKind === "image"}
+    {#if error}
+      <pre class="error">{error}</pre>
+    {:else}
+      <div
+        class="image-scroll"
+        role="region"
+        aria-label="Image Viewer"
+        class:panning={imagePanning}
+        class:fit-mode={imageZoomMode === "fit"}
+        bind:this={imageContainer}
+        onwheel={handleImageWheel}
+        ondblclick={handleImageDoubleClick}
+        onpointerdown={handleImagePointerDown}
+        onpointermove={handleImagePointerMove}
+        onpointerup={endImagePan}
+        onpointercancel={endImagePan}
+      >
+        {#if imageLoadError}
+          <pre class="error image-error">{imageLoadError}</pre>
+        {:else}
+          <div class="image-frame">
+            <img
+              src={imageSrc}
+              alt=""
+              draggable="false"
+              onerror={handleImageError}
+              onload={handleImageLoad}
+              style={getImageInlineStyle()}
+            />
+          </div>
+          <div class="image-controls">
+            <button type="button" onpointerdown={(event) => event.stopPropagation()} onclick={fitImageToWindow}>Fit</button>
+            <button type="button" onpointerdown={(event) => event.stopPropagation()} onclick={() => setImageZoomPreset(100)}>100%</button>
+            <button type="button" onpointerdown={(event) => event.stopPropagation()} onclick={() => setImageZoomPreset(200)}>200%</button>
+          </div>
+          <div class="image-zoom-indicator">{getImageStatusText()}</div>
+        {/if}
+      </div>
+    {/if}
+  {:else if currentKind === "markdown"}
+    {#if error}
+      <pre class="error">{error}</pre>
+    {:else}
+      <article class="markdown">{@html markdownHtml}</article>
+    {/if}
+  {:else if currentKind === "text"}
+    {#if error}
+      <pre class="error">{error}</pre>
+    {:else}
+      <pre class="text">{textContent}</pre>
+    {/if}
+  {:else if currentKind === "error"}
+    <pre class="error">{error}</pre>
+  {:else}
+    <div class="empty">No file selected</div>
+  {/if}
+</main>
+
+<style>
+  :global(html),
+  :global(body) {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  :global(body) {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #0f172a;
+    color: #e5e7eb;
+  }
+
+  .viewer-root {
+    width: 100vw;
+    height: 100vh;
+    overflow: auto;
+    background: #0f172a;
+  }
+
+  .viewer-root.image-mode {
+    overflow: hidden;
+  }
+
+  .loading,
+  .empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e1;
+    font-size: 14px;
+  }
+
+  .image-scroll {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #0b1220;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .image-scroll.fit-mode {
+    overflow: hidden;
+  }
+
+  .image-scroll.panning {
+    cursor: grabbing;
+  }
+
+  .image-frame {
+    min-width: 100%;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+
+  .image-scroll img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+    user-select: none;
+  }
+
+  .image-controls {
+    position: fixed;
+    right: 12px;
+    bottom: 44px;
+    display: flex;
+    gap: 6px;
+    z-index: 12;
+  }
+
+  .image-controls button {
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #e2e8f0;
+    padding: 5px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .image-controls button:hover {
+    background: #334155;
+  }
+
+  .image-zoom-indicator {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 12px;
+    line-height: 1;
+    padding: 6px 8px;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .image-error {
+    color: #fca5a5;
+    background: transparent;
+  }
+
+  .text,
+  .error {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 12px;
+    box-sizing: border-box;
+  }
+
+  .text {
+    color: #e5e7eb;
+  }
+
+  .error {
+    color: #fca5a5;
+  }
+
+  .markdown {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 20px 24px 32px;
+    color: #111827;
+    background: #ffffff;
+    min-height: 100%;
+    box-sizing: border-box;
+    line-height: 1.65;
+  }
+
+  .markdown :global(h1),
+  .markdown :global(h2),
+  .markdown :global(h3) {
+    margin: 0.9em 0 0.45em;
+    line-height: 1.25;
+  }
+
+  .markdown :global(p) {
+    margin: 0.5em 0;
+  }
+
+  .markdown :global(ul),
+  .markdown :global(ol) {
+    margin: 0.5em 0;
+    padding-left: 1.35em;
+  }
+
+  .markdown :global(code) {
+    font-family: Consolas, "Cascadia Mono", monospace;
+    background: #e5e7eb;
+    padding: 0.08em 0.3em;
+    border-radius: 4px;
+  }
+
+  .markdown :global(pre) {
+    background: #e5e7eb;
+    padding: 10px 12px;
+    border-radius: 6px;
+    overflow: auto;
+  }
+
+  .markdown :global(pre code) {
+    background: transparent;
+    padding: 0;
+  }
+</style>

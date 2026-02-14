@@ -1,11 +1,81 @@
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::hash::{Hash, Hasher};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use base64::Engine as _;
 
 use crate::error::{AppError, AppResult};
 use crate::types::{DirStats, Entry, EntryType, Properties, PropertyKind, SortKey, SortOrder};
 use crate::utils::{is_hidden, system_time_to_rfc3339};
+
+const IMAGE_CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
+const IMAGE_CACHE_MAX_FILES: usize = 400;
+const IMAGE_CACHE_MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+
+#[derive(Debug)]
+struct CacheEntryMeta {
+    path: PathBuf,
+    modified: SystemTime,
+    size: u64,
+}
+
+fn cleanup_viewer_image_cache_dir(dir: &Path) {
+    let now = SystemTime::now();
+    let mut entries: Vec<CacheEntryMeta> = Vec::new();
+
+    let Ok(iter) = fs::read_dir(dir) else {
+        return;
+    };
+
+    for item in iter.flatten() {
+        let path = item.path();
+        let Ok(meta) = item.metadata() else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        if !path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("png"))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        let modified = meta.modified().unwrap_or(UNIX_EPOCH);
+        if now
+            .duration_since(modified)
+            .map(|d| d.as_secs() > IMAGE_CACHE_MAX_AGE_SECS)
+            .unwrap_or(false)
+        {
+            let _ = fs::remove_file(&path);
+            continue;
+        }
+
+        entries.push(CacheEntryMeta {
+            path,
+            modified,
+            size: meta.len(),
+        });
+    }
+
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.modified));
+
+    let mut total_size = 0u64;
+    for (idx, entry) in entries.into_iter().enumerate() {
+        let over_count = idx >= IMAGE_CACHE_MAX_FILES;
+        let over_size = total_size.saturating_add(entry.size) > IMAGE_CACHE_MAX_TOTAL_BYTES;
+        if over_count || over_size {
+            let _ = fs::remove_file(&entry.path);
+            continue;
+        }
+        total_size = total_size.saturating_add(entry.size);
+    }
+}
 
 fn entry_from_path(path: PathBuf) -> AppResult<Entry> {
     let metadata = fs::metadata(&path)?;
@@ -115,14 +185,114 @@ pub(crate) fn fs_list_dir_impl(
 }
 
 pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<String> {
-    let data = fs::read(&path)?;
-    let slice = if data.len() > max_bytes {
-        &data[..max_bytes]
-    } else {
-        &data[..]
-    };
-    let text = String::from_utf8_lossy(slice).to_string();
+    if max_bytes == 0 {
+        return Ok(String::new());
+    }
+
+    let file = fs::File::open(&path)?;
+    let mut limited = file.take(max_bytes as u64);
+    let mut data = Vec::with_capacity(max_bytes.min(1024 * 1024));
+    limited.read_to_end(&mut data)?;
+
+    let text = String::from_utf8_lossy(&data).to_string();
     Ok(text)
+}
+
+fn infer_image_mime(path: &Path, bytes: &[u8]) -> Option<&'static str> {
+    if bytes.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n']) {
+        return Some("image/png");
+    }
+    if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some("image/jpeg");
+    }
+    if bytes.len() >= 2 && bytes[0] == b'B' && bytes[1] == b'M' {
+        return Some("image/bmp");
+    }
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("png") => Some("image/png"),
+        Some("jpg" | "jpeg") => Some("image/jpeg"),
+        Some("bmp") => Some("image/bmp"),
+        _ => None,
+    }
+}
+
+pub(crate) fn fs_read_image_data_url_impl(path: String, normalize: bool) -> AppResult<String> {
+    if normalize {
+        // Reuse cached normalized PNG path when available.
+        let normalized_path = fs_read_image_normalized_temp_path_impl(path)?;
+        let out = fs::read(&normalized_path)?;
+        let body = base64::engine::general_purpose::STANDARD.encode(out);
+        return Ok(format!("data:image/png;base64,{body}"));
+    }
+
+    let path_buf = PathBuf::from(&path);
+    let bytes = fs::read(&path_buf)?;
+    let mime = infer_image_mime(&path_buf, &bytes)
+        .ok_or_else(|| AppError::msg("unsupported image mime".to_string()))?;
+    let body = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Ok(format!("data:{mime};base64,{body}"))
+}
+
+pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult<String> {
+    let mut dir = std::env::temp_dir();
+    dir.push("reflexfiles-viewer-image-cache");
+    fs::create_dir_all(&dir)?;
+    cleanup_viewer_image_cache_dir(&dir);
+
+    let path_buf = PathBuf::from(&path);
+    let metadata = fs::metadata(&path_buf)?;
+    let modified_nanos = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let canonical = fs::canonicalize(&path_buf).unwrap_or(path_buf.clone());
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    canonical.to_string_lossy().hash(&mut hasher);
+    metadata.len().hash(&mut hasher);
+    modified_nanos.hash(&mut hasher);
+    let cache_key = format!("{:016x}", hasher.finish());
+
+    let mut out_path = dir.clone();
+    out_path.push(format!("{cache_key}.png"));
+    if out_path.exists() {
+        return Ok(out_path.to_string_lossy().to_string());
+    }
+
+    let bytes = fs::read(&path_buf)?;
+    let image = image::load_from_memory(&bytes).map_err(|e| AppError::msg(e.to_string()))?;
+
+    let mut out = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut out);
+    image
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .map_err(|e| AppError::msg(e.to_string()))?;
+
+    let mut tmp_path = dir;
+    tmp_path.push(format!(
+        "{cache_key}.{}.{}.tmp",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| AppError::msg(e.to_string()))?
+            .as_nanos()
+    ));
+    fs::write(&tmp_path, out)?;
+    match fs::rename(&tmp_path, &out_path) {
+        Ok(_) => {}
+        Err(_) => {
+            let _ = fs::remove_file(&tmp_path);
+        }
+    }
+
+    Ok(out_path.to_string_lossy().to_string())
 }
 
 pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
