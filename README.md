@@ -39,6 +39,18 @@ cd app
 npm run e2e:tauri
 ```
 
+## 依存関係監査
+```bash
+cd app
+npm run audit:deps
+```
+
+個別実行:
+```bash
+npm run audit:npm
+npm run audit:cargo
+```
+
 ## ドキュメント
 - ユーザーマニュアル: `user_manual.md`
 

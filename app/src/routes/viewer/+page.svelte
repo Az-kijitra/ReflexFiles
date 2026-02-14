@@ -5,6 +5,7 @@
 
   const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
   const MAX_TEXT_BYTES = 2 * 1024 * 1024;
+  const SYNTAX_HIGHLIGHT_MAX_CHARS = 1_000_000;
   const IMAGE_ZOOM_MIN = 0.01;
   const IMAGE_ZOOM_MAX = 8;
   const IMAGE_ZOOM_STEP = 1.2;
@@ -13,6 +14,10 @@
   let currentPath = $state("");
   let currentKind = $state("empty");
   let textContent = $state("");
+  let textLines = $state(/** @type {string[]} */ ([]));
+  let textLanguage = $state("");
+  let highlightedTextHtml = $state("");
+  let highlightedTextLines = $state(/** @type {string[]} */ ([]));
   let markdownHtml = $state("");
   let imageSrc = $state("");
   let imageLoadError = $state("");
@@ -29,6 +34,148 @@
   let loading = $state(false);
   let rootContainer = $state();
   let imageContainer = $state();
+  let hljsCore = /** @type {any} */ (null);
+  let highlightRuntimePromise = /** @type {Promise<void> | null} */ (null);
+
+  async function ensureHighlightRuntimeLoaded() {
+    if (hljsCore) {
+      return;
+    }
+    if (!highlightRuntimePromise) {
+      highlightRuntimePromise = (async () => {
+        const [
+          coreModule,
+          cModule,
+          cppModule,
+          rustModule,
+          jsModule,
+          tsModule,
+          pyModule,
+          jsonModule,
+          markdownModule,
+        ] = await Promise.all([
+          import("highlight.js/lib/core"),
+          import("highlight.js/lib/languages/c"),
+          import("highlight.js/lib/languages/cpp"),
+          import("highlight.js/lib/languages/rust"),
+          import("highlight.js/lib/languages/javascript"),
+          import("highlight.js/lib/languages/typescript"),
+          import("highlight.js/lib/languages/python"),
+          import("highlight.js/lib/languages/json"),
+          import("highlight.js/lib/languages/markdown"),
+          import("highlight.js/styles/github-dark.css"),
+        ]);
+        const next = coreModule.default;
+        if (!globalThis.__rfViewerHighlightLanguagesRegistered) {
+          next.registerLanguage("c", cModule.default);
+          next.registerLanguage("cpp", cppModule.default);
+          next.registerLanguage("rust", rustModule.default);
+          next.registerLanguage("javascript", jsModule.default);
+          next.registerLanguage("typescript", tsModule.default);
+          next.registerLanguage("python", pyModule.default);
+          next.registerLanguage("json", jsonModule.default);
+          next.registerLanguage("markdown", markdownModule.default);
+          globalThis.__rfViewerHighlightLanguagesRegistered = true;
+        }
+        hljsCore = next;
+      })().catch((error) => {
+        highlightRuntimePromise = null;
+        throw error;
+      });
+    }
+    await highlightRuntimePromise;
+  }
+
+  /**
+   * @param {string} path
+   */
+  function detectTextLanguage(path) {
+    const value = String(path || "");
+    const dot = value.lastIndexOf(".");
+    if (dot < 0 || dot === value.length - 1) {
+      return "";
+    }
+    const ext = value.slice(dot + 1).toLowerCase();
+    switch (ext) {
+      case "c":
+      case "h":
+        return "c";
+      case "cpp":
+      case "cc":
+      case "cxx":
+      case "hpp":
+      case "hh":
+      case "hxx":
+        return "cpp";
+      case "rs":
+        return "rust";
+      case "js":
+      case "mjs":
+      case "cjs":
+        return "javascript";
+      case "ts":
+      case "tsx":
+        return "typescript";
+      case "py":
+        return "python";
+      case "json":
+        return "json";
+      case "md":
+      case "markdown":
+        return "markdown";
+      default:
+        return "";
+    }
+  }
+
+  function canUseSyntaxHighlight() {
+    if (currentKind !== "text") return false;
+    if (!textLanguage) return false;
+    if (!textContent) return false;
+    if (textContent.length > SYNTAX_HIGHLIGHT_MAX_CHARS) return false;
+    return true;
+  }
+
+  function refreshSyntaxHighlight() {
+    if (!canUseSyntaxHighlight()) {
+      highlightedTextHtml = "";
+      highlightedTextLines = [];
+      return;
+    }
+
+    if (!hljsCore) {
+      highlightedTextHtml = "";
+      highlightedTextLines = [];
+      void ensureHighlightRuntimeLoaded()
+        .then(() => {
+          if (canUseSyntaxHighlight()) {
+            refreshSyntaxHighlight();
+          }
+        })
+        .catch(() => {
+          highlightedTextHtml = "";
+          highlightedTextLines = [];
+        });
+      return;
+    }
+
+    try {
+      highlightedTextHtml = hljsCore.highlight(textContent, {
+        language: textLanguage,
+        ignoreIllegals: true,
+      }).value;
+      const lines = highlightedTextHtml.split("\n");
+      highlightedTextLines = lines.length > 0 ? lines : [""];
+    } catch {
+      highlightedTextHtml = "";
+      highlightedTextLines = [];
+    }
+  }
+
+  function rebuildTextLines() {
+    const lines = String(textContent).split("\n");
+    textLines = lines.length > 0 ? lines : [""];
+  }
 
   /**
    * @param {number} value
@@ -106,6 +253,10 @@
 
   function resetView() {
     textContent = "";
+    textLines = [""];
+    textLanguage = "";
+    highlightedTextHtml = "";
+    highlightedTextLines = [];
     markdownHtml = "";
     error = "";
     resetImageView();
@@ -421,6 +572,9 @@
         maxBytes: MAX_TEXT_BYTES,
       });
       textContent = String(rawText ?? "");
+      rebuildTextLines();
+      textLanguage = currentKind === "text" ? detectTextLanguage(currentPath) : "";
+      refreshSyntaxHighlight();
 
       if (currentKind === "markdown") {
         markdownHtml = markdown.render(textContent);
@@ -587,8 +741,24 @@
   {:else if currentKind === "text"}
     {#if error}
       <pre class="error">{error}</pre>
+    {:else if highlightedTextHtml}
+      <div class="text-lines" aria-label="Text Lines">
+        {#each highlightedTextLines as lineHtml, index}
+          <div class="text-line">
+            <span class="line-number">{index + 1}</span>
+            <pre class="text line-code code-highlight"><code class={`hljs language-${textLanguage}`}>{@html lineHtml || " "}</code></pre>
+          </div>
+        {/each}
+      </div>
     {:else}
-      <pre class="text">{textContent}</pre>
+      <div class="text-lines" aria-label="Text Lines">
+        {#each textLines as line, index}
+          <div class="text-line">
+            <span class="line-number">{index + 1}</span>
+            <pre class="text line-code">{line || " "}</pre>
+          </div>
+        {/each}
+      </div>
     {/if}
   {:else if currentKind === "error"}
     <pre class="error">{error}</pre>
@@ -728,6 +898,56 @@
 
   .text {
     color: #e5e7eb;
+  }
+
+  .text-lines {
+    width: max-content;
+    min-width: 100%;
+    padding: 8px 0;
+    box-sizing: border-box;
+  }
+
+  .text-line {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    align-items: start;
+  }
+
+  .line-number {
+    display: block;
+    margin: 0;
+    padding: 0 10px 0 0;
+    border-right: 1px solid #334155;
+    background: #111827;
+    color: #94a3b8;
+    text-align: right;
+    font-family: Consolas, "Cascadia Mono", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    user-select: none;
+  }
+
+  .line-code {
+    padding: 0 12px;
+    white-space: pre;
+    word-break: normal;
+    overflow: visible;
+  }
+
+  .code-highlight {
+    white-space: pre;
+    word-break: normal;
+  }
+
+  .code-highlight :global(.hljs) {
+    display: block;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    white-space: pre;
   }
 
   .error {

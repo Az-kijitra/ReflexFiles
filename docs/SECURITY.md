@@ -11,3 +11,27 @@ Security fixes will be applied to the latest released version.
 ## Response Targets
 - Initial response: within 7 days
 - Status update: within 14 days
+
+## Dependency Audits
+Dependency vulnerability checks should be run at least:
+- before releases
+- when dependencies are updated
+- on a regular schedule (at least weekly)
+
+Run (from repository root):
+```bash
+cd app
+npm run audit:npm
+npm run audit:cargo
+```
+
+Run both in one command:
+```bash
+cd app
+npm run audit:deps
+```
+
+If `cargo audit` is not installed:
+```bash
+cargo install cargo-audit
+```

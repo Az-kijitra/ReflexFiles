@@ -121,3 +121,48 @@ pub fn ensure_error_string(message: impl Into<String>) -> String {
         format_unknown(message)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ensure_error_string, format_error, AppError, AppErrorKind};
+
+    #[test]
+    fn from_io_maps_to_expected_kind() {
+        assert_eq!(
+            AppErrorKind::from_io(std::io::ErrorKind::NotFound),
+            AppErrorKind::NotFound
+        );
+        assert_eq!(
+            AppErrorKind::from_io(std::io::ErrorKind::PermissionDenied),
+            AppErrorKind::Permission
+        );
+        assert_eq!(
+            AppErrorKind::from_io(std::io::ErrorKind::AlreadyExists),
+            AppErrorKind::Conflict
+        );
+        assert_eq!(
+            AppErrorKind::from_io(std::io::ErrorKind::InvalidInput),
+            AppErrorKind::InvalidPath
+        );
+    }
+
+    #[test]
+    fn ensure_error_string_adds_code_when_missing() {
+        let value = ensure_error_string("hello");
+        assert!(value.starts_with("code=unknown; "));
+        assert!(value.ends_with("hello"));
+    }
+
+    #[test]
+    fn ensure_error_string_keeps_existing_code_prefix() {
+        let value = ensure_error_string("code=not_found; missing");
+        assert_eq!(value, "code=not_found; missing");
+    }
+
+    #[test]
+    fn app_error_code_uses_kind() {
+        let err = AppError::with_kind(AppErrorKind::InvalidPath, "bad path");
+        assert_eq!(err.code(), "invalid_path");
+        assert_eq!(format_error(AppErrorKind::Io, "disk"), "code=io_error; disk");
+    }
+}

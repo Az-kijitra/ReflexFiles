@@ -377,3 +377,135 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
         Err(err) => Err(AppError::msg(err.to_string())),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        cleanup_viewer_image_cache_dir, fs_read_image_data_url_impl,
+        fs_read_image_normalized_temp_path_impl, fs_read_text_impl, infer_image_mime,
+    };
+    use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let mut dir = std::env::temp_dir();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        dir.push(format!("{prefix}-{}-{stamp}", std::process::id()));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    fn write_temp_file(dir: &Path, name: &str, bytes: &[u8]) -> PathBuf {
+        let path = dir.join(name);
+        fs::write(&path, bytes).expect("write temp file");
+        path
+    }
+
+    fn write_temp_image(dir: &Path, name: &str, format: ImageFormat) -> PathBuf {
+        let path = dir.join(name);
+        let pixels = ImageBuffer::from_fn(4, 3, |x, y| {
+            if (x + y) % 2 == 0 {
+                Rgb([240, 40, 40])
+            } else {
+                Rgb([40, 120, 240])
+            }
+        });
+        let image = DynamicImage::ImageRgb8(pixels);
+        image
+            .save_with_format(&path, format)
+            .expect("write temp image");
+        path
+    }
+
+    #[test]
+    fn fs_read_text_respects_max_bytes() {
+        let dir = unique_temp_dir("rf-fs-query-text");
+        let path = write_temp_file(&dir, "a.txt", b"abcdef");
+        let text = fs_read_text_impl(path.to_string_lossy().to_string(), 3).expect("read text");
+        assert_eq!(text, "abc");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn infer_image_mime_detects_signature_and_extension() {
+        let png = infer_image_mime(Path::new("a.bin"), &[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n']);
+        assert_eq!(png, Some("image/png"));
+        let jpeg = infer_image_mime(Path::new("a.bin"), &[0xFF, 0xD8, 0xFF, 0x00]);
+        assert_eq!(jpeg, Some("image/jpeg"));
+        let bmp = infer_image_mime(Path::new("a.bin"), &[b'B', b'M', 0x00]);
+        assert_eq!(bmp, Some("image/bmp"));
+        let by_ext = infer_image_mime(Path::new("a.jpeg"), &[0x00]);
+        assert_eq!(by_ext, Some("image/jpeg"));
+    }
+
+    #[test]
+    fn fs_read_image_data_url_returns_data_url_for_supported_image() {
+        let dir = unique_temp_dir("rf-fs-query-image");
+        let path = write_temp_image(&dir, "a.jpg", ImageFormat::Jpeg);
+        let data_url =
+            fs_read_image_data_url_impl(path.to_string_lossy().to_string(), false).expect("data url");
+        assert!(data_url.starts_with("data:image/jpeg;base64,"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_read_image_data_url_fails_for_unknown_mime() {
+        let dir = unique_temp_dir("rf-fs-query-unknown-mime");
+        let path = write_temp_file(&dir, "a.bin", &[0x11, 0x22, 0x33, 0x44]);
+        let result = fs_read_image_data_url_impl(path.to_string_lossy().to_string(), false);
+        assert!(result.is_err());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_read_image_normalized_temp_path_is_stable_for_same_source() {
+        let dir = unique_temp_dir("rf-fs-query-normalized");
+        let path = write_temp_image(&dir, "a.jpg", ImageFormat::Jpeg);
+
+        let first = fs_read_image_normalized_temp_path_impl(path.to_string_lossy().to_string())
+            .expect("first normalized path");
+        let second = fs_read_image_normalized_temp_path_impl(path.to_string_lossy().to_string())
+            .expect("second normalized path");
+        assert_eq!(first, second);
+        assert!(Path::new(&first).exists());
+        let _ = fs::remove_file(first);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn cleanup_viewer_image_cache_dir_keeps_png_count_limit_and_non_png() {
+        let dir = unique_temp_dir("rf-fs-query-cache-cleanup");
+        for idx in 0..405 {
+            let name = format!("p{idx:03}.png");
+            let _ = write_temp_file(&dir, &name, &[idx as u8]);
+        }
+        let _ = write_temp_file(&dir, "keep.txt", b"keep");
+
+        cleanup_viewer_image_cache_dir(&dir);
+
+        let mut png_count = 0usize;
+        let mut txt_exists = false;
+        for entry in fs::read_dir(&dir).expect("read dir").flatten() {
+            let path = entry.path();
+            let ext = path
+                .extension()
+                .and_then(|v| v.to_str())
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            if ext == "png" {
+                png_count += 1;
+            }
+            if path.file_name().and_then(|v| v.to_str()) == Some("keep.txt") {
+                txt_exists = true;
+            }
+        }
+        assert!(png_count <= 400);
+        assert!(txt_exists);
+        let _ = fs::remove_dir_all(dir);
+    }
+}
