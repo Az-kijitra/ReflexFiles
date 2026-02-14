@@ -38,6 +38,7 @@ npm run e2e:tauri
 
 ## Documentation
 - User manual: `user_manual.md`
+- Viewer spec: `docs/VIEWER_SPEC.md`
 
 ## Contributing
 See `CONTRIBUTING.md`.

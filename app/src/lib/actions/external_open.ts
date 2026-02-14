@@ -1,9 +1,9 @@
 import { getParentPath } from "$lib/utils/path";
 import { STATUS_LONG_MS, STATUS_SHORT_MS } from "$lib/ui_durations";
 import { formatError } from "$lib/utils/error_format";
-const VIEWER_MARKDOWN_EXTS = new Set(["md", "markdown"]);
-const VIEWER_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "bmp"]);
-const VIEWER_CODE_EXTS = new Set([
+const VIEWER_SUPPORTED_EXTS = new Set([
+  "md", "markdown",
+  "png", "jpg", "jpeg", "bmp",
   "txt", "log", "json", "c", "h", "cpp", "cc", "cxx", "hpp", "hh", "hxx", "rs", "js", "ts", "py"
 ]);
 
@@ -64,50 +64,6 @@ export function createExternalActions(ctx, helpers) {
   }
 
   /** @param {import("$lib/types").Entry} entry */
-  function resolveExternalApp(entry) {
-    if (!entry || entry.type !== "file") return "";
-    const associations = ctx.getExternalAppAssociations();
-    if (!associations || typeof associations !== "object") return "";
-    const name = entry.name.toLowerCase();
-    let ext = (entry.ext || "").toLowerCase();
-    if (!ext) {
-      const dot = name.lastIndexOf(".");
-      ext = dot > 0 ? name.slice(dot) : "";
-    }
-    let exact = "";
-    let wildcard = "";
-    let wildcardLen = -1;
-    for (const [patternRaw, app] of Object.entries(associations)) {
-      if (!patternRaw || !app) continue;
-      const pattern = patternRaw.toLowerCase();
-      if (pattern.startsWith("*.")) {
-        const suffix = pattern.slice(1);
-        if (name.endsWith(suffix) && suffix.length > wildcardLen) {
-          wildcard = app;
-          wildcardLen = suffix.length;
-        }
-        continue;
-      }
-      if (pattern.startsWith(".")) {
-        if (ext && ext === pattern) {
-          exact = app;
-          break;
-        }
-        if (name.endsWith(pattern) && pattern.length > wildcardLen) {
-          wildcard = app;
-          wildcardLen = pattern.length;
-        }
-        continue;
-      }
-      if (name === pattern) {
-        exact = app;
-        break;
-      }
-    }
-    return exact || wildcard || "";
-  }
-
-  /** @param {import("$lib/types").Entry} entry */
   function detectEntryExtension(entry) {
     if (!entry || entry.type !== "file") return "";
     const ext = String(entry.ext || "").toLowerCase();
@@ -128,7 +84,7 @@ export function createExternalActions(ctx, helpers) {
     if (!ext) {
       return false;
     }
-    return VIEWER_MARKDOWN_EXTS.has(ext) || VIEWER_IMAGE_EXTS.has(ext) || VIEWER_CODE_EXTS.has(ext);
+    return VIEWER_SUPPORTED_EXTS.has(ext);
   }
 
   /** @param {string} path */
@@ -205,7 +161,7 @@ export function createExternalActions(ctx, helpers) {
       setStatusMessage(ctx.t("status.no_selection"));
       return;
     }
-    openEntry(target);
+    void openEntry(target);
   }
 
   function openParentForSelection() {
@@ -308,7 +264,6 @@ export function createExternalActions(ctx, helpers) {
   function closeAbout() {
     ctx.setAboutOpen(false);
   }
-
 
   async function closeViewer() {
     try {
