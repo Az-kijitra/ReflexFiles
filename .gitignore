@@ -19,3 +19,6 @@ app/src-tauri/resources/docs/
 # Local WebDriver binaries
 msedgedriver.exe
 docs/msedgedriver.exe
+
+# Generated local large-file test data
+testdata/generated/

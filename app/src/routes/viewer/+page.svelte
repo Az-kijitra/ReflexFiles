@@ -6,10 +6,38 @@
   const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
   const MAX_TEXT_BYTES = 2 * 1024 * 1024;
   const SYNTAX_HIGHLIGHT_MAX_CHARS = 1_000_000;
+  const LARGE_TEXT_THRESHOLD_BYTES = 10 * 1024 * 1024;
+  const LARGE_TEXT_LINE_THRESHOLD = 120_000;
   const IMAGE_ZOOM_MIN = 0.01;
   const IMAGE_ZOOM_MAX = 8;
   const IMAGE_ZOOM_STEP = 1.2;
   const IMAGE_VIEW_PADDING = 32;
+  const VIRTUAL_LINE_HEIGHT_PX = 20;
+  const VIRTUAL_SCROLL_MAX_PX = 20_000_000;
+  const VIRTUAL_PROFILE_STORAGE_KEY = "__rf_viewer_virtual_profile";
+  const VIRTUAL_PROFILE_TABLE = {
+    responsive: {
+      overscanLines: 180,
+      minRequestLines: 1200,
+      maxRequestLines: 4000,
+      highlightMaxLines: 1600,
+      highlightLineMaxChars: 12000,
+    },
+    balanced: {
+      overscanLines: 100,
+      minRequestLines: 600,
+      maxRequestLines: 3000,
+      highlightMaxLines: 1200,
+      highlightLineMaxChars: 8192,
+    },
+    memory: {
+      overscanLines: 60,
+      minRequestLines: 300,
+      maxRequestLines: 1500,
+      highlightMaxLines: 800,
+      highlightLineMaxChars: 4096,
+    },
+  };
   const MARKDOWN_HTML_ZOOM_STORAGE_KEY = "__rf_viewer_markdown_html_zoom";
   const MARKDOWN_HTML_ZOOM_MIN = 0.6;
   const MARKDOWN_HTML_ZOOM_MAX = 2.5;
@@ -22,6 +50,18 @@
   let textLanguage = $state("");
   let highlightedTextHtml = $state("");
   let highlightedTextLines = $state(/** @type {string[]} */ ([]));
+  let virtualTextMode = $state(false);
+  let virtualTextStartLine = $state(0);
+  let virtualTextLines = $state(/** @type {string[]} */ ([]));
+  let virtualTextHighlightedLines = $state(/** @type {string[]} */ ([]));
+  let virtualTextTotalLines = $state(1);
+  let virtualTextFileSize = $state(0);
+  let virtualTextScrollTop = $state(0);
+  let virtualTextViewportHeight = $state(0);
+  let virtualTextRequestToken = 0;
+  let virtualTextContainer = $state();
+  let virtualChunkRaf = 0;
+  let virtualProfile = $state("balanced");
   let markdownHtml = $state("");
   let markdownViewMode = $state("html");
   let markdownHtmlZoom = $state(1);
@@ -49,6 +89,48 @@
   let siblingFileIndex = $state(-1);
   let siblingDirPath = $state("");
   let siblingRefreshToken = 0;
+  function normalizeVirtualProfile(value) {
+    const key = String(value || "").trim().toLowerCase();
+    if (key === "responsive" || key === "balanced" || key === "memory") {
+      return key;
+    }
+    return "balanced";
+  }
+
+  function getVirtualProfileConfig() {
+    const key = normalizeVirtualProfile(virtualProfile);
+    return VIRTUAL_PROFILE_TABLE[key] || VIRTUAL_PROFILE_TABLE.balanced;
+  }
+
+  function saveVirtualProfile() {
+    try {
+      localStorage.setItem(VIRTUAL_PROFILE_STORAGE_KEY, normalizeVirtualProfile(virtualProfile));
+    } catch {
+      // ignore persistence errors
+    }
+  }
+
+  function setVirtualProfile(profile, persist = true) {
+    virtualProfile = normalizeVirtualProfile(profile);
+    if (persist) {
+      saveVirtualProfile();
+    }
+    if (virtualTextMode) {
+      refreshVirtualTextHighlight();
+      scheduleVirtualChunkLoad(true);
+    }
+  }
+
+  function getVirtualProfileLabel(profile) {
+    const key = normalizeVirtualProfile(profile);
+    if (key === "responsive") {
+      return "Fast";
+    }
+    if (key === "memory") {
+      return "Memory";
+    }
+    return "Balanced";
+  }
 
   async function ensureHighlightRuntimeLoaded() {
     if (hljsCore) {
@@ -141,6 +223,13 @@
     }
   }
 
+  function getVirtualHighlightLanguage() {
+    if (currentKind === "markdown") {
+      return "markdown";
+    }
+    return textLanguage;
+  }
+
   function canUseSyntaxHighlight() {
     if (currentKind !== "text") return false;
     if (!textLanguage) return false;
@@ -152,8 +241,18 @@
   function canUseMarkdownTextHighlight() {
     if (currentKind !== "markdown") return false;
     if (markdownViewMode !== "text") return false;
+    if (virtualTextMode) return false;
     if (!textContent) return false;
     if (textContent.length > SYNTAX_HIGHLIGHT_MAX_CHARS) return false;
+    return true;
+  }
+
+  function canUseVirtualTextHighlight() {
+    if (!virtualTextMode) return false;
+    if (!virtualTextLines.length) return false;
+    if (!getVirtualHighlightLanguage()) return false;
+    const cfg = getVirtualProfileConfig();
+    if (virtualTextLines.length > cfg.highlightMaxLines) return false;
     return true;
   }
 
@@ -233,6 +332,194 @@
   /**
    * @param {number} value
    */
+  function resetVirtualTextView() {
+    virtualTextMode = false;
+    virtualTextStartLine = 0;
+    virtualTextLines = [];
+    virtualTextHighlightedLines = [];
+    virtualTextTotalLines = 1;
+    virtualTextFileSize = 0;
+    virtualTextScrollTop = 0;
+    virtualTextViewportHeight = 0;
+    virtualTextRequestToken += 1;
+    if (virtualChunkRaf) {
+      cancelAnimationFrame(virtualChunkRaf);
+      virtualChunkRaf = 0;
+    }
+  }
+
+  function isVirtualTextActive() {
+    if (!virtualTextMode) {
+      return false;
+    }
+    if (currentKind === "text") {
+      return true;
+    }
+    if (currentKind === "markdown" && markdownViewMode === "text") {
+      return true;
+    }
+    return false;
+  }
+
+  function getVirtualScrollScale() {
+    const rawHeight = Math.max(1, virtualTextTotalLines) * VIRTUAL_LINE_HEIGHT_PX;
+    return Math.max(1, rawHeight / VIRTUAL_SCROLL_MAX_PX);
+  }
+
+  function getVirtualViewportRange() {
+    const scale = getVirtualScrollScale();
+    const scrollTop = Math.max(0, virtualTextScrollTop);
+    const viewport = Math.max(1, virtualTextViewportHeight || virtualTextContainer?.clientHeight || 1);
+    const firstVisibleLine = Math.floor((scrollTop * scale) / VIRTUAL_LINE_HEIGHT_PX);
+    const visibleLines = Math.max(1, Math.ceil((viewport * scale) / VIRTUAL_LINE_HEIGHT_PX));
+    const cfg = getVirtualProfileConfig();
+    const overscan = Math.max(0, Number(cfg.overscanLines) || 0);
+    const startLine = Math.max(0, firstVisibleLine - overscan);
+    const endLine = Math.min(
+      Math.max(1, virtualTextTotalLines),
+      firstVisibleLine + visibleLines + overscan
+    );
+    return { startLine, endLine };
+  }
+
+  function refreshVirtualTextHighlight() {
+    if (!canUseVirtualTextHighlight()) {
+      virtualTextHighlightedLines = [];
+      return;
+    }
+
+    if (!hljsCore) {
+      virtualTextHighlightedLines = [];
+      void ensureHighlightRuntimeLoaded()
+        .then(() => {
+          if (canUseVirtualTextHighlight()) {
+            refreshVirtualTextHighlight();
+          }
+        })
+        .catch(() => {
+          virtualTextHighlightedLines = [];
+        });
+      return;
+    }
+
+    const language = getVirtualHighlightLanguage();
+    if (!language) {
+      virtualTextHighlightedLines = [];
+      return;
+    }
+
+    try {
+      virtualTextHighlightedLines = virtualTextLines.map((line) => {
+        const raw = String(line ?? "");
+        const cfg = getVirtualProfileConfig();
+        if (raw.length > cfg.highlightLineMaxChars) {
+          return "";
+        }
+        return hljsCore.highlight(raw, {
+          language,
+          ignoreIllegals: true,
+        }).value;
+      });
+    } catch {
+      virtualTextHighlightedLines = [];
+    }
+  }
+
+  async function loadVirtualChunkForViewport(force = false) {
+    if (!virtualTextMode || !currentPath) {
+      return;
+    }
+
+    const totalLines = Math.max(1, Number(virtualTextTotalLines) || 1);
+    const { startLine, endLine } = getVirtualViewportRange();
+    const cfg = getVirtualProfileConfig();
+    const minRequestLines = Math.max(1, Number(cfg.minRequestLines) || 1);
+    const maxRequestLines = Math.max(minRequestLines, Number(cfg.maxRequestLines) || minRequestLines);
+    const desiredCount = Math.max(minRequestLines, endLine - startLine);
+    let requestCount = Math.min(maxRequestLines, desiredCount);
+    let requestStart = Math.max(0, startLine);
+
+    if (requestStart + requestCount > totalLines) {
+      requestStart = Math.max(0, totalLines - requestCount);
+      requestCount = Math.max(1, totalLines - requestStart);
+    }
+
+    const loadedStart = virtualTextStartLine;
+    const loadedEnd = loadedStart + virtualTextLines.length;
+    const requestEnd = requestStart + requestCount;
+    if (!force && virtualTextLines.length > 0 && requestStart >= loadedStart && requestEnd <= loadedEnd) {
+      return;
+    }
+
+    const token = ++virtualTextRequestToken;
+    const chunk = await invoke("fs_read_text_viewport_lines", {
+      path: currentPath,
+      startLine: requestStart,
+      lineCount: requestCount,
+    });
+    if (token !== virtualTextRequestToken) {
+      return;
+    }
+
+    const nextLines = Array.isArray(chunk?.lines) ? chunk.lines.map((line) => String(line ?? "")) : [];
+    virtualTextStartLine = Number(chunk?.startLine ?? requestStart) || requestStart;
+    virtualTextTotalLines = Math.max(1, Number(chunk?.totalLines ?? totalLines) || totalLines);
+    virtualTextLines = nextLines.length > 0 ? nextLines : [""];
+    refreshVirtualTextHighlight();
+  }
+
+  function scheduleVirtualChunkLoad(force = false) {
+    if (!virtualTextMode) {
+      return;
+    }
+    if (force) {
+      if (virtualChunkRaf) {
+        cancelAnimationFrame(virtualChunkRaf);
+        virtualChunkRaf = 0;
+      }
+      void loadVirtualChunkForViewport(true).catch((err) => {
+        error = String(err);
+        currentKind = "error";
+      });
+      return;
+    }
+    if (virtualChunkRaf) {
+      return;
+    }
+    virtualChunkRaf = requestAnimationFrame(() => {
+      virtualChunkRaf = 0;
+      void loadVirtualChunkForViewport(false).catch((err) => {
+        error = String(err);
+        currentKind = "error";
+      });
+    });
+  }
+
+  /**
+   * @param {Event} event
+   */
+  function handleVirtualTextScroll(event) {
+    const target = /** @type {HTMLElement | null} */ (event.currentTarget);
+    if (!target) {
+      return;
+    }
+    virtualTextScrollTop = target.scrollTop;
+    virtualTextViewportHeight = target.clientHeight;
+    scheduleVirtualChunkLoad(false);
+  }
+
+  function getVirtualTextSpacerStyle() {
+    const scale = getVirtualScrollScale();
+    const rawHeight = Math.max(1, virtualTextTotalLines) * VIRTUAL_LINE_HEIGHT_PX;
+    const scaledHeight = Math.max(1, rawHeight / scale);
+    return `height: ${Math.round(scaledHeight)}px;`;
+  }
+
+  function getVirtualTextLinesStyle() {
+    const scale = getVirtualScrollScale();
+    const top = (Math.max(0, virtualTextStartLine) * VIRTUAL_LINE_HEIGHT_PX) / scale;
+    return `transform: translateY(${Math.max(0, Math.round(top))}px);`;
+  }
   function clampImageZoom(value) {
     return Math.min(IMAGE_ZOOM_MAX, Math.max(IMAGE_ZOOM_MIN, value));
   }
@@ -459,6 +746,7 @@
     textLanguage = "";
     highlightedTextHtml = "";
     highlightedTextLines = [];
+    resetVirtualTextView();
     markdownHighlightedLines = [];
     markdownHtml = "";
     markdownViewMode = "html";
@@ -492,7 +780,7 @@
     }
 
     const normalizedHint = hint.toLowerCase();
-    if (normalizedHint === "keymap" || hint === "キー一覧") {
+    if (normalizedHint === "keymap" || hint === "\u30ad\u30fc\u4e00\u89a7") {
       const lines = String(markdownSource || "").split(/\r?\n/);
       for (const line of lines) {
         const trimmed = line.trim();
@@ -504,13 +792,13 @@
         if (
           normalized.includes("keymap") ||
           normalized.includes("keyboard") ||
-          heading.includes("キー操作") ||
-          heading.includes("キー一覧")
+          heading.includes("\u30ad\u30fc\u64cd\u4f5c") ||
+          heading.includes("\u30ad\u30fc\u4e00\u89a7")
         ) {
           return heading;
         }
       }
-      return "キー操作";
+      return "\u30ad\u30fc\u64cd\u4f5c";
     }
 
     return hint;
@@ -551,9 +839,16 @@
    * @param {"html" | "text"} mode
    */
   function setMarkdownViewMode(mode) {
+    if (virtualTextMode && mode === "html") {
+      return;
+    }
     markdownViewMode = mode;
     if (mode === "text") {
-      refreshMarkdownTextHighlight();
+      if (virtualTextMode) {
+        scheduleVirtualChunkLoad(true);
+      } else {
+        refreshMarkdownTextHighlight();
+      }
     }
   }
 
@@ -618,6 +913,9 @@
   function getActiveScrollContainer() {
     if (currentKind === "image") {
       return imageContainer || rootContainer;
+    }
+    if (isVirtualTextActive()) {
+      return virtualTextContainer || rootContainer;
     }
     return rootContainer;
   }
@@ -794,7 +1092,7 @@
   }
 
   function handleImageError() {
-    imageLoadError = "画像を表示できませんでした。";
+    imageLoadError = "\u753b\u50cf\u3092\u8868\u793a\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002";
   }
 
   /**
@@ -939,13 +1237,44 @@
         return;
       }
 
+      const viewportInfoRaw = await invoke("fs_text_viewport_info", {
+        path: currentPath,
+      });
+      const viewportFileSize = Math.max(0, Number(viewportInfoRaw?.fileSize ?? 0) || 0);
+      const viewportTotalLines = Math.max(1, Number(viewportInfoRaw?.totalLines ?? 1) || 1);
+      const useVirtualText =
+        viewportFileSize >= LARGE_TEXT_THRESHOLD_BYTES || viewportTotalLines >= LARGE_TEXT_LINE_THRESHOLD;
+
+      textLanguage = currentKind === "markdown" ? "markdown" : detectTextLanguage(currentPath);
+
+      if (useVirtualText) {
+        virtualTextMode = true;
+        virtualTextFileSize = viewportFileSize;
+        virtualTextTotalLines = viewportTotalLines;
+        virtualTextStartLine = 0;
+        virtualTextLines = [];
+        virtualTextHighlightedLines = [];
+        if (currentKind === "markdown") {
+          markdownViewMode = "text";
+        }
+        await tick();
+        if (virtualTextContainer) {
+          virtualTextScrollTop = virtualTextContainer.scrollTop;
+          virtualTextViewportHeight = virtualTextContainer.clientHeight;
+        } else {
+          virtualTextScrollTop = 0;
+          virtualTextViewportHeight = rootContainer?.clientHeight || 1;
+        }
+        await loadVirtualChunkForViewport(true);
+        return;
+      }
+
       const rawText = await invoke("fs_read_text", {
         path: currentPath,
         maxBytes: MAX_TEXT_BYTES,
       });
       textContent = String(rawText ?? "");
       rebuildTextLines();
-      textLanguage = currentKind === "text" ? detectTextLanguage(currentPath) : "";
       refreshSyntaxHighlight();
 
       if (currentKind === "markdown") {
@@ -995,12 +1324,37 @@
       setMarkdownHtmlZoom(1, false);
     }
 
+    try {
+      const savedProfile = localStorage.getItem(VIRTUAL_PROFILE_STORAGE_KEY);
+      setVirtualProfile(normalizeVirtualProfile(savedProfile), false);
+    } catch {
+      setVirtualProfile("balanced", false);
+    }
+
     /**
      * @param {KeyboardEvent} event
      */
     const onKeydown = (event) => {
       if (scrollByKey(event)) {
         return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && isVirtualTextActive()) {
+        if (event.key === "1") {
+          event.preventDefault();
+          setVirtualProfile("responsive");
+          return;
+        }
+        if (event.key === "2") {
+          event.preventDefault();
+          setVirtualProfile("balanced");
+          return;
+        }
+        if (event.key === "3") {
+          event.preventDefault();
+          setVirtualProfile("memory");
+          return;
+        }
       }
 
       if (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.altKey) {
@@ -1096,6 +1450,11 @@
       if (currentKind === "image" && imageZoomMode === "fit") {
         void fitImageToWindow();
       }
+      if (virtualTextMode && virtualTextContainer) {
+        virtualTextViewportHeight = virtualTextContainer.clientHeight;
+        virtualTextScrollTop = virtualTextContainer.scrollTop;
+        scheduleVirtualChunkLoad(false);
+      }
     };
 
     window.addEventListener("keydown", onKeydown);
@@ -1142,17 +1501,29 @@
     return () => {
       window.removeEventListener("keydown", onKeydown);
       window.removeEventListener("resize", onResize);
+      if (virtualChunkRaf) {
+        cancelAnimationFrame(virtualChunkRaf);
+        virtualChunkRaf = 0;
+      }
       void unlistenPromise.then((fn) => fn());
     };
   });
 </script>
 
-<main class="viewer-root" class:image-mode={currentKind === "image"} bind:this={rootContainer}>
+<main class="viewer-root" class:image-mode={currentKind === "image"} class:virtual-text-mode={isVirtualTextActive()} bind:this={rootContainer}>
   <div class="file-nav-controls">
     <button type="button" onclick={openPreviousSiblingFile} disabled={!hasPrevSiblingFile()}>Prev</button>
     <span class="file-nav-position">{getSiblingPositionText()}</span>
     <button type="button" onclick={openNextSiblingFile} disabled={!hasNextSiblingFile()}>Next</button>
   </div>
+  {#if isVirtualTextActive()}
+    <div class="virtual-profile-controls">
+      <span class="virtual-profile-label">Prefetch: {getVirtualProfileLabel(virtualProfile)}</span>
+      <button type="button" class:selected={virtualProfile === "responsive"} onclick={() => setVirtualProfile("responsive")}>Fast</button>
+      <button type="button" class:selected={virtualProfile === "balanced"} onclick={() => setVirtualProfile("balanced")}>Balanced</button>
+      <button type="button" class:selected={virtualProfile === "memory"} onclick={() => setVirtualProfile("memory")}>Memory</button>
+    </div>
+  {/if}
   {#if loading}
     <div class="loading">Loading...</div>
   {:else if currentKind === "image"}
@@ -1203,6 +1574,7 @@
         <button
           type="button"
           class:selected={markdownViewMode === "html"}
+          disabled={virtualTextMode}
           onclick={() => setMarkdownViewMode("html")}
         >HTML</button>
         <button
@@ -1226,6 +1598,33 @@
         >
           {@html markdownHtml}
         </article>
+      {:else if virtualTextMode}
+        <div
+          class="text-virtual-scroll markdown-text-lines"
+          aria-label="Markdown Source Lines"
+          bind:this={virtualTextContainer}
+          onscroll={handleVirtualTextScroll}
+        >
+          <div class="text-virtual-spacer" style={getVirtualTextSpacerStyle()}>
+            <div class="text-virtual-lines" style={getVirtualTextLinesStyle()}>
+              {#if virtualTextHighlightedLines.length > 0}
+                {#each virtualTextHighlightedLines as lineHtml, index}
+                  <div class="text-line">
+                    <span class="line-number">{virtualTextStartLine + index + 1}</span>
+                    <pre class="text line-code code-highlight"><code class="hljs language-markdown">{@html lineHtml || " "}</code></pre>
+                  </div>
+                {/each}
+              {:else}
+                {#each virtualTextLines as line, index}
+                  <div class="text-line">
+                    <span class="line-number">{virtualTextStartLine + index + 1}</span>
+                    <pre class="text line-code">{line || " "}</pre>
+                  </div>
+                {/each}
+              {/if}
+            </div>
+          </div>
+        </div>
       {:else}
         {#if markdownHighlightedLines.length > 0}
           <div class="text-lines markdown-text-lines" aria-label="Markdown Source Lines">
@@ -1251,6 +1650,33 @@
   {:else if currentKind === "text"}
     {#if error}
       <pre class="error">{error}</pre>
+    {:else if virtualTextMode}
+      <div
+        class="text-virtual-scroll"
+        aria-label="Text Lines"
+        bind:this={virtualTextContainer}
+        onscroll={handleVirtualTextScroll}
+      >
+        <div class="text-virtual-spacer" style={getVirtualTextSpacerStyle()}>
+          <div class="text-virtual-lines" style={getVirtualTextLinesStyle()}>
+            {#if virtualTextHighlightedLines.length > 0}
+              {#each virtualTextHighlightedLines as lineHtml, index}
+                <div class="text-line">
+                  <span class="line-number">{virtualTextStartLine + index + 1}</span>
+                  <pre class="text line-code code-highlight"><code class={`hljs language-${getVirtualHighlightLanguage()}`}>{@html lineHtml || " "}</code></pre>
+                </div>
+              {/each}
+            {:else}
+              {#each virtualTextLines as line, index}
+                <div class="text-line">
+                  <span class="line-number">{virtualTextStartLine + index + 1}</span>
+                  <pre class="text line-code">{line || " "}</pre>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        </div>
+      </div>
     {:else if highlightedTextHtml}
       <div class="text-lines" aria-label="Text Lines">
         {#each highlightedTextLines as lineHtml, index}
@@ -1300,6 +1726,10 @@
   }
 
   .viewer-root.image-mode {
+    overflow: hidden;
+  }
+
+  .viewer-root.virtual-text-mode {
     overflow: hidden;
   }
 
@@ -1393,6 +1823,47 @@
     user-select: none;
   }
 
+  .virtual-profile-controls {
+    position: fixed;
+    top: 44px;
+    left: 10px;
+    z-index: 15;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 6px;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.9);
+  }
+
+  .virtual-profile-label {
+    color: #cbd5e1;
+    font-size: 12px;
+    user-select: none;
+    padding-right: 2px;
+  }
+
+  .virtual-profile-controls button {
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.86);
+    color: #e2e8f0;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .virtual-profile-controls button:hover {
+    background: #334155;
+  }
+
+  .virtual-profile-controls button.selected {
+    background: #0b60d1;
+    border-color: #0b60d1;
+    color: #f8fafc;
+  }
+
   .image-controls {
     position: fixed;
     right: 12px;
@@ -1443,7 +1914,7 @@
     word-break: break-word;
     font-family: Consolas, "Cascadia Mono", monospace;
     font-size: 13px;
-    line-height: 1.45;
+    line-height: 20px;
     padding: 12px;
     box-sizing: border-box;
   }
@@ -1459,10 +1930,32 @@
     box-sizing: border-box;
   }
 
+  .text-virtual-scroll {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .text-virtual-spacer {
+    width: max-content;
+    min-width: 100%;
+    position: relative;
+  }
+
+  .text-virtual-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: max-content;
+    min-width: 100%;
+    will-change: transform;
+  }
+
   .text-line {
     display: grid;
     grid-template-columns: 72px 1fr;
     align-items: start;
+    min-height: 20px;
   }
 
   .line-number {
@@ -1475,7 +1968,7 @@
     text-align: right;
     font-family: Consolas, "Cascadia Mono", monospace;
     font-size: 13px;
-    line-height: 1.45;
+    line-height: 20px;
     user-select: none;
   }
 
@@ -1484,6 +1977,7 @@
     white-space: pre;
     word-break: normal;
     overflow: visible;
+    line-height: 20px;
   }
 
   .markdown-view-controls {

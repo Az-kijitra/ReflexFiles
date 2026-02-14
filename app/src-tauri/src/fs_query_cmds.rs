@@ -1,6 +1,7 @@
 use crate::fs_query::{
     fs_dir_stats_impl, fs_get_properties_impl, fs_is_probably_text_impl, fs_list_dir_impl,
-    fs_read_image_data_url_impl, fs_read_text_impl,
+    fs_read_image_data_url_impl, fs_read_text_impl, fs_read_text_viewport_lines_impl,
+    fs_text_viewport_info_impl, TextViewportChunk, TextViewportInfo,
 };
 use crate::types::{DirStats, Entry, Properties};
 
@@ -40,4 +41,18 @@ pub fn fs_get_properties(path: String) -> Result<Properties, String> {
 #[tauri::command]
 pub fn fs_dir_stats(path: String, timeout_ms: u64) -> Result<DirStats, String> {
     fs_dir_stats_impl(path, timeout_ms).map_err(|err| format!("code={}; {}", err.code(), err))
+}
+#[tauri::command]
+pub fn fs_text_viewport_info(path: String) -> Result<TextViewportInfo, String> {
+    fs_text_viewport_info_impl(path).map_err(|err| format!("code={}; {}", err.code(), err))
+}
+
+#[tauri::command]
+pub fn fs_read_text_viewport_lines(
+    path: String,
+    start_line: usize,
+    line_count: usize,
+) -> Result<TextViewportChunk, String> {
+    fs_read_text_viewport_lines_impl(path, start_line, line_count)
+        .map_err(|err| format!("code={}; {}", err.code(), err))
 }

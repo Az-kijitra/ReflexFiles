@@ -1,9 +1,12 @@
 use base64::Engine as _;
+use once_cell::sync::Lazy;
+use serde::Serialize;
+use std::collections::HashMap;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::Read;
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
+use std::sync::{mpsc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::error::{AppError, AppResult};
@@ -13,6 +16,37 @@ use crate::utils::{is_hidden, system_time_to_rfc3339};
 const IMAGE_CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
 const IMAGE_CACHE_MAX_FILES: usize = 400;
 const IMAGE_CACHE_MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+const TEXT_INDEX_LINE_STEP: usize = 1024;
+const TEXT_VIEWPORT_MAX_LINES: usize = 4000;
+const TEXT_INDEX_CACHE_MAX_ENTRIES: usize = 16;
+
+#[derive(Clone, Debug)]
+struct SparseLineIndex {
+    file_size: u64,
+    modified_nanos: u128,
+    line_step: usize,
+    total_lines: usize,
+    offsets: Vec<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextViewportInfo {
+    pub file_size: u64,
+    pub total_lines: usize,
+    pub line_step: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextViewportChunk {
+    pub start_line: usize,
+    pub total_lines: usize,
+    pub lines: Vec<String>,
+}
+
+static TEXT_INDEX_CACHE: Lazy<Mutex<HashMap<String, SparseLineIndex>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug)]
 struct CacheEntryMeta {
@@ -247,6 +281,167 @@ pub(crate) fn fs_is_probably_text_impl(path: String, sample_bytes: usize) -> App
     Ok(true)
 }
 
+fn text_index_signature(path: &Path) -> AppResult<(u64, u128)> {
+    let metadata = fs::metadata(path)?;
+    let modified_nanos = metadata
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    Ok((metadata.len(), modified_nanos))
+}
+
+fn text_index_cache_key(path: &Path) -> String {
+    path.to_string_lossy().to_lowercase()
+}
+
+fn build_sparse_line_index(path: &Path, file_size: u64, modified_nanos: u128) -> AppResult<SparseLineIndex> {
+    let mut reader = BufReader::new(fs::File::open(path)?);
+    let mut buf = Vec::with_capacity(4096);
+    let mut offset = 0u64;
+    let mut line_count = 0usize;
+    let mut offsets = vec![0u64];
+
+    loop {
+        buf.clear();
+        let read = reader.read_until(b'\n', &mut buf)?;
+        if read == 0 {
+            break;
+        }
+        offset = offset.saturating_add(read as u64);
+        line_count = line_count.saturating_add(1);
+        if line_count % TEXT_INDEX_LINE_STEP == 0 {
+            offsets.push(offset);
+        }
+    }
+
+    let total_lines = if line_count == 0 { 1 } else { line_count };
+
+    Ok(SparseLineIndex {
+        file_size,
+        modified_nanos,
+        line_step: TEXT_INDEX_LINE_STEP,
+        total_lines,
+        offsets,
+    })
+}
+
+fn get_or_build_sparse_line_index(path: &Path) -> AppResult<SparseLineIndex> {
+    let key = text_index_cache_key(path);
+    let (file_size, modified_nanos) = text_index_signature(path)?;
+
+    if let Ok(cache) = TEXT_INDEX_CACHE.lock() {
+        if let Some(index) = cache.get(&key) {
+            if index.file_size == file_size && index.modified_nanos == modified_nanos {
+                return Ok(index.clone());
+            }
+        }
+    }
+
+    let built = build_sparse_line_index(path, file_size, modified_nanos)?;
+
+    if let Ok(mut cache) = TEXT_INDEX_CACHE.lock() {
+        if cache.len() >= TEXT_INDEX_CACHE_MAX_ENTRIES {
+            cache.clear();
+        }
+        cache.insert(key, built.clone());
+    }
+
+    Ok(built)
+}
+
+fn decode_line_bytes(bytes: &[u8]) -> String {
+    let mut end = bytes.len();
+    if end > 0 && bytes[end - 1] == b'\n' {
+        end -= 1;
+    }
+    if end > 0 && bytes[end - 1] == b'\r' {
+        end -= 1;
+    }
+    String::from_utf8_lossy(&bytes[..end]).to_string()
+}
+
+pub(crate) fn fs_text_viewport_info_impl(path: String) -> AppResult<TextViewportInfo> {
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
+    }
+    if !path_buf.is_file() {
+        return Err(AppError::msg(format!("not a file: {}", path_buf.display())));
+    }
+
+    let index = get_or_build_sparse_line_index(&path_buf)?;
+    Ok(TextViewportInfo {
+        file_size: index.file_size,
+        total_lines: index.total_lines,
+        line_step: index.line_step,
+    })
+}
+
+pub(crate) fn fs_read_text_viewport_lines_impl(
+    path: String,
+    start_line: usize,
+    line_count: usize,
+) -> AppResult<TextViewportChunk> {
+    let path_buf = PathBuf::from(&path);
+    if !path_buf.exists() {
+        return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
+    }
+    if !path_buf.is_file() {
+        return Err(AppError::msg(format!("not a file: {}", path_buf.display())));
+    }
+
+    let index = get_or_build_sparse_line_index(&path_buf)?;
+    let total_lines = index.total_lines.max(1);
+    let safe_start = start_line.min(total_lines.saturating_sub(1));
+    let mut requested = line_count.max(1).min(TEXT_VIEWPORT_MAX_LINES);
+    if safe_start + requested > total_lines {
+        requested = total_lines - safe_start;
+    }
+
+    if index.file_size == 0 {
+        return Ok(TextViewportChunk {
+            start_line: 0,
+            total_lines,
+            lines: vec![String::new()],
+        });
+    }
+
+    let block_index = safe_start / index.line_step;
+    let block_line = block_index * index.line_step;
+    let block_offset = *index.offsets.get(block_index).unwrap_or(&0u64);
+
+    let mut reader = BufReader::new(fs::File::open(&path_buf)?);
+    reader.seek(SeekFrom::Start(block_offset))?;
+
+    let mut buf = Vec::with_capacity(4096);
+
+    for _ in block_line..safe_start {
+        buf.clear();
+        let read = reader.read_until(b'\n', &mut buf)?;
+        if read == 0 {
+            break;
+        }
+    }
+
+    let mut lines = Vec::with_capacity(requested);
+    while lines.len() < requested {
+        buf.clear();
+        let read = reader.read_until(b'\n', &mut buf)?;
+        if read == 0 {
+            break;
+        }
+        lines.push(decode_line_bytes(&buf));
+    }
+
+    Ok(TextViewportChunk {
+        start_line: safe_start,
+        total_lines,
+        lines,
+    })
+}
+
 fn infer_image_mime(path: &Path, bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n']) {
         return Some("image/png");
@@ -431,7 +626,8 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
 mod tests {
     use super::{
         cleanup_viewer_image_cache_dir, fs_is_probably_text_impl, fs_read_image_data_url_impl,
-        fs_read_image_normalized_temp_path_impl, fs_read_text_impl, infer_image_mime,
+        fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
+        fs_read_text_viewport_lines_impl, fs_text_viewport_info_impl, infer_image_mime,
     };
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
     use std::fs;
@@ -477,6 +673,56 @@ mod tests {
         let path = write_temp_file(&dir, "a.txt", b"abcdef");
         let text = fs_read_text_impl(path.to_string_lossy().to_string(), 3).expect("read text");
         assert_eq!(text, "abc");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_text_viewport_info_and_lines_work_for_large_text() {
+        let dir = unique_temp_dir("rf-fs-query-viewport");
+        let path = dir.join("large.txt");
+
+        let mut text = String::new();
+        for i in 0..5000 {
+            text.push_str(&format!("line-{i:05}\n"));
+        }
+        fs::write(&path, text.as_bytes()).expect("write viewport sample");
+
+        let info = fs_text_viewport_info_impl(path.to_string_lossy().to_string())
+            .expect("viewport info");
+        assert!(info.file_size > 0);
+        assert_eq!(info.total_lines, 5000);
+
+        let chunk = fs_read_text_viewport_lines_impl(
+            path.to_string_lossy().to_string(),
+            1234,
+            5,
+        )
+        .expect("viewport chunk");
+
+        assert_eq!(chunk.start_line, 1234);
+        assert_eq!(chunk.total_lines, 5000);
+        assert_eq!(chunk.lines.len(), 5);
+        assert_eq!(chunk.lines[0], "line-01234");
+        assert_eq!(chunk.lines[4], "line-01238");
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_text_viewport_empty_file_returns_single_empty_line() {
+        let dir = unique_temp_dir("rf-fs-query-viewport-empty");
+        let path = write_temp_file(&dir, "empty.txt", b"");
+
+        let info = fs_text_viewport_info_impl(path.to_string_lossy().to_string())
+            .expect("viewport info empty");
+        assert_eq!(info.total_lines, 1);
+
+        let chunk = fs_read_text_viewport_lines_impl(path.to_string_lossy().to_string(), 0, 10)
+            .expect("viewport empty chunk");
+        assert_eq!(chunk.start_line, 0);
+        assert_eq!(chunk.total_lines, 1);
+        assert_eq!(chunk.lines, vec![String::new()]);
+
         let _ = fs::remove_dir_all(dir);
     }
 

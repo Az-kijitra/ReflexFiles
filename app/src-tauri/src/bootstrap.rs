@@ -33,6 +33,8 @@ pub fn run() {
             crate::fs_ops_create::fs_create,
             crate::fs_ops_rename::fs_rename,
             crate::fs_query_cmds::fs_read_text,
+            crate::fs_query_cmds::fs_text_viewport_info,
+            crate::fs_query_cmds::fs_read_text_viewport_lines,
             crate::fs_query_cmds::fs_is_probably_text,
             crate::fs_query_cmds::fs_read_image_data_url,
             crate::fs_ops_archive::zip_create,
