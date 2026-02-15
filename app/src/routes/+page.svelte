@@ -441,30 +441,66 @@
 
   const KNOWN_SHORTCUT_CONFLICTS = {
     [normalizeKeyString("Ctrl+Alt+G")]: "settings.shortcut_conflict_google_drive",
+    [normalizeKeyString("Ctrl+Shift+Esc")]: "settings.shortcut_conflict_task_manager",
+    [normalizeKeyString("Alt+Shift")]: "settings.shortcut_conflict_input_switch",
+    [normalizeKeyString("Ctrl+Alt+ArrowUp")]: "settings.shortcut_conflict_display_driver",
+    [normalizeKeyString("Ctrl+Alt+ArrowDown")]: "settings.shortcut_conflict_display_driver",
+    [normalizeKeyString("Ctrl+Alt+ArrowLeft")]: "settings.shortcut_conflict_display_driver",
+    [normalizeKeyString("Ctrl+Alt+ArrowRight")]: "settings.shortcut_conflict_display_driver",
   };
 
   function collectSettingsShortcutConflicts() {
-    const next = [];
-    const seen = new Set();
+    const knownItems = [];
+    const knownSeen = new Set();
+    const bindingActions = new Map();
+
     for (const action of KEYMAP_ACTIONS) {
       const bindings = keymapBindings.getActionBindings(action.id);
       for (const binding of bindings) {
         const normalized = normalizeKeyString(binding);
+        if (!normalized) continue;
+
         const reasonKey = KNOWN_SHORTCUT_CONFLICTS[normalized];
-        if (!reasonKey) continue;
-        const dedupeKey = `${action.id}:${normalized}`;
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
-        next.push(
-          t("settings.shortcut_conflict_item", {
-            binding: normalized,
-            action: t(action.labelKey),
-            reason: t(reasonKey),
-          })
-        );
+        if (reasonKey) {
+          const dedupeKey = `${action.id}:${normalized}:${reasonKey}`;
+          if (!knownSeen.has(dedupeKey)) {
+            knownSeen.add(dedupeKey);
+            knownItems.push(
+              t("settings.shortcut_conflict_item", {
+                binding: normalized,
+                action: t(action.labelKey),
+                reason: t(reasonKey),
+              })
+            );
+          }
+        }
+
+        const current = bindingActions.get(normalized) || [];
+        if (!current.includes(action.id)) {
+          current.push(action.id);
+        }
+        bindingActions.set(normalized, current);
       }
     }
-    settingsShortcutConflicts = next;
+
+    const internalItems = [];
+    for (const [binding, actionIds] of bindingActions.entries()) {
+      if (!Array.isArray(actionIds) || actionIds.length <= 1) continue;
+      const actionLabels = actionIds
+        .map((id) => {
+          const meta = KEYMAP_ACTIONS.find((entry) => entry.id === id);
+          return meta ? t(meta.labelKey) : id;
+        })
+        .join(", ");
+      internalItems.push(
+        t("settings.shortcut_conflict_internal_item", {
+          binding,
+          actions: actionLabels,
+        })
+      );
+    }
+
+    settingsShortcutConflicts = [...knownItems, ...internalItems];
   }
 
   async function openSettingsModal() {
@@ -549,15 +585,68 @@
     }
   }
 
-  async function exportDiagnosticReport() {
+  async function createSettingsBackup() {
     settingsReporting = true;
     settingsReportMessage = "";
     settingsReportIsError = false;
     try {
-      const reportPath = await invoke("config_generate_diagnostic_report", {
-        openAfterWrite: true,
+      const backupPath = await invoke("config_create_backup");
+      settingsReportMessage = t("settings.backup_ok", { path: String(backupPath || "") });
+      actions.setStatusMessage(t("settings.backup_ready"), 1800);
+    } catch (err) {
+      settingsReportIsError = true;
+      settingsReportMessage = t("settings.backup_failed", {
+        error: formatError(err, "unknown error", t),
       });
-      settingsReportMessage = t("settings.report_ok", { path: String(reportPath || "") });
+    } finally {
+      settingsReporting = false;
+    }
+  }
+
+  async function restoreSettingsBackup() {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm(t("settings.restore_confirm"));
+      if (!ok) return;
+    }
+
+    settingsReporting = true;
+    settingsReportMessage = "";
+    settingsReportIsError = false;
+    try {
+      const restored = await invoke("config_restore_latest_backup");
+      settingsInitial = normalizeSettingsConfig(restored || {});
+      state.ui_theme = settingsInitial.ui_theme;
+      state.ui_language = settingsInitial.ui_language;
+      state.ui_file_icon_mode = settingsInitial.ui_file_icon_mode;
+      state.dirStatsTimeoutMs = settingsInitial.perf_dir_stats_timeout_ms;
+      settingsReportMessage = t("settings.restore_ok");
+      actions.setStatusMessage(t("settings.restore_ready"), 1800);
+    } catch (err) {
+      settingsReportIsError = true;
+      settingsReportMessage = t("settings.restore_failed", {
+        error: formatError(err, "unknown error", t),
+      });
+    } finally {
+      settingsReporting = false;
+    }
+  }
+
+  async function exportDiagnosticReport(options) {
+    settingsReporting = true;
+    settingsReportMessage = "";
+    settingsReportIsError = false;
+    try {
+      const result = await invoke("config_generate_diagnostic_report", {
+        openAfterWrite: Boolean(options?.open_after_write ?? true),
+        maskSensitivePaths: Boolean(options?.mask_sensitive_paths ?? true),
+        asZip: Boolean(options?.as_zip ?? false),
+        copyPathToClipboard: Boolean(options?.copy_path_to_clipboard ?? false),
+      });
+      const reportPath = String(result?.report_path || result?.reportPath || "");
+      const copied = Boolean(result?.copied_to_clipboard ?? result?.copiedToClipboard ?? false);
+      settingsReportMessage = copied
+        ? t("settings.report_ok_copied", { path: reportPath })
+        : t("settings.report_ok", { path: reportPath });
       actions.setStatusMessage(t("settings.report_ready"), 1800);
     } catch (err) {
       settingsReportIsError = true;
@@ -697,10 +786,13 @@
     onCancel={closeSettingsModal}
     onSave={saveSettings}
     onOpenConfig={openConfigFromSettings}
+    onBackupConfig={createSettingsBackup}
+    onRestoreConfig={restoreSettingsBackup}
     onExportReport={exportDiagnosticReport}
     onRunDiagnostic={runSettingsDiagnostic}
     {trapModalTab}
     {autofocus}
   />
 {/if}
+
 

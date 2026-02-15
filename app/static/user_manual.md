@@ -132,6 +132,11 @@ Fallback behavior:
 
 Use those names exactly when setting profile keys.
 
+### Shortcut Conflict Warnings (Settings)
+In **Settings > Advanced**, ReflexFiles shows shortcut conflict warnings for:
+- Known global shortcuts (example: `Ctrl+Alt+G` with Google Drive)
+- Internal duplicates (same key assigned to multiple actions)
+
 ---
 
 ## Known Limitations
@@ -143,3 +148,5 @@ Use those names exactly when setting profile keys.
 
 ## License
 This application is distributed under the MIT License.
+
+

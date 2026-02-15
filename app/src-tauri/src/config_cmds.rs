@@ -2,9 +2,24 @@ use crate::config::{config_path, load_config, save_config, save_history, save_ju
 use crate::error::{format_error, AppErrorKind};
 use crate::types::{AppConfig, FileIconMode, JumpItem, Language, SortKey, SortOrder, Theme};
 use chrono::Local;
+use serde::Serialize;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
+use zip::write::SimpleFileOptions;
+use zip::{CompressionMethod, ZipWriter};
+
+#[derive(Serialize)]
+pub struct DiagnosticReportResult {
+    pub report_path: String,
+    pub text_report_path: String,
+    pub zip_path: Option<String>,
+    pub copied_to_clipboard: bool,
+    pub masked: bool,
+    pub zipped: bool,
+}
 
 fn persist_config(config: &AppConfig) -> Result<(), String> {
     save_history(&config.history_paths)
@@ -85,6 +100,113 @@ fn read_tail_lines(path: &Path, max_lines: usize) -> String {
     lines.join("\n")
 }
 
+fn config_base_dir(cfg_path: &Path) -> PathBuf {
+    cfg_path
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn config_backups_dir(cfg_path: &Path) -> PathBuf {
+    config_base_dir(cfg_path).join("backups")
+}
+
+fn copy_text_to_clipboard(value: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut child = Command::new("cmd")
+            .args(["/C", "clip"])
+            .stdin(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("failed to launch clip: {e}"))?;
+
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(value.as_bytes())
+                .map_err(|e| format!("failed to write clip input: {e}"))?;
+        }
+
+        let status = child
+            .wait()
+            .map_err(|e| format!("failed to wait clip process: {e}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("clip exited with status {status}"))
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = value;
+        Err("clipboard copy is only supported on windows".to_string())
+    }
+}
+
+fn mask_pairs(cfg_path: &Path, log_path: &str) -> Vec<(String, String)> {
+    let mut pairs = Vec::new();
+    if let Ok(v) = std::env::var("USERPROFILE") {
+        if !v.trim().is_empty() {
+            pairs.push((v, "%USERPROFILE%".to_string()));
+        }
+    }
+    if let Ok(v) = std::env::var("APPDATA") {
+        if !v.trim().is_empty() {
+            pairs.push((v, "%APPDATA%".to_string()));
+        }
+    }
+    if let Ok(v) = std::env::var("LOCALAPPDATA") {
+        if !v.trim().is_empty() {
+            pairs.push((v, "%LOCALAPPDATA%".to_string()));
+        }
+    }
+    if let Ok(v) = std::env::var("TEMP") {
+        if !v.trim().is_empty() {
+            pairs.push((v, "%TEMP%".to_string()));
+        }
+    }
+
+    let cfg_parent = config_base_dir(cfg_path);
+    pairs.push((cfg_parent.to_string_lossy().to_string(), "%RF_CONFIG_DIR%".to_string()));
+
+    let normalized_log = normalize_executable_path(log_path);
+    if !normalized_log.is_empty() {
+        pairs.push((normalized_log, "%RF_LOG_PATH%".to_string()));
+    }
+
+    pairs
+}
+
+fn apply_masks(mut text: String, pairs: &[(String, String)]) -> String {
+    for (src, token) in pairs {
+        if src.trim().is_empty() {
+            continue;
+        }
+        text = text.replace(src, token);
+        let alt = src.replace('\\', "/");
+        if alt != *src {
+            text = text.replace(&alt, token);
+        }
+    }
+    text
+}
+
+fn write_diagnostic_zip(zip_path: &Path, inner_name: &str, text: &str) -> Result<(), String> {
+    let file = std::fs::File::create(zip_path)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("create zip failed: {e}")))?;
+    let mut writer = ZipWriter::new(file);
+    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    writer
+        .start_file(inner_name.replace('\\', "/"), options)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("zip start_file failed: {e}")))?;
+    writer
+        .write_all(text.as_bytes())
+        .map_err(|e| format_error(AppErrorKind::Io, format!("zip write failed: {e}")))?;
+    writer
+        .finish()
+        .map_err(|e| format_error(AppErrorKind::Io, format!("zip finish failed: {e}")))?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn config_get() -> Result<AppConfig, String> {
     Ok(load_config())
@@ -111,6 +233,69 @@ pub fn config_set_dir_stats_timeout(timeout_ms: u64) -> Result<AppConfig, String
     config.perf_dir_stats_timeout_ms = timeout_ms.max(500);
     save_config(&config)?;
     Ok(config)
+}
+
+#[tauri::command]
+pub fn config_create_backup() -> Result<String, String> {
+    let (_, cfg_path) = ensure_config()?;
+    let backups_dir = config_backups_dir(&cfg_path);
+    std::fs::create_dir_all(&backups_dir).map_err(|e| {
+        format_error(
+            AppErrorKind::Io,
+            format!("create backup directory failed: {e}"),
+        )
+    })?;
+
+    let timestamp = Local::now().format("%Y%m%d-%H%M%S");
+    let backup_path = backups_dir.join(format!("config-{timestamp}.toml"));
+    std::fs::copy(&cfg_path, &backup_path)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("backup failed: {e}")))?;
+
+    Ok(backup_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn config_restore_latest_backup() -> Result<AppConfig, String> {
+    let (_, cfg_path) = ensure_config()?;
+    let backups_dir = config_backups_dir(&cfg_path);
+    if !backups_dir.exists() {
+        return Err(format_error(AppErrorKind::NotFound, "backup directory not found"));
+    }
+
+    let mut entries: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
+    let rd = std::fs::read_dir(&backups_dir)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("read backups failed: {e}")))?;
+    for entry in rd.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|v| v.to_str()) else {
+            continue;
+        };
+        if !name.starts_with("config-") || !name.ends_with(".toml") {
+            continue;
+        }
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        entries.push((path, modified));
+    }
+
+    if entries.is_empty() {
+        return Err(format_error(AppErrorKind::NotFound, "no backup files found"));
+    }
+
+    entries.sort_by(|a, b| b.1.cmp(&a.1));
+    let latest = &entries[0].0;
+    std::fs::copy(latest, &cfg_path)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("restore failed: {e}")))?;
+
+    let restored = load_config();
+    save_config(&restored)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("save restored config failed: {e}")))?;
+    Ok(restored)
 }
 
 #[tauri::command]
@@ -167,9 +352,17 @@ pub fn config_save_preferences(
 pub fn config_generate_diagnostic_report(
     app: tauri::AppHandle,
     open_after_write: Option<bool>,
-) -> Result<String, String> {
+    mask_sensitive_paths: Option<bool>,
+    as_zip: Option<bool>,
+    copy_path_to_clipboard: Option<bool>,
+) -> Result<DiagnosticReportResult, String> {
     let (config, cfg_path) = ensure_config()?;
     let now = Local::now();
+    let write_zip = as_zip.unwrap_or(false);
+    let mask_paths = mask_sensitive_paths.unwrap_or(true);
+    let copy_path = copy_path_to_clipboard.unwrap_or(false);
+    let open_after = open_after_write.unwrap_or(true);
+
     let mut report = String::new();
 
     report.push_str("# ReflexFiles Diagnostic Report\n");
@@ -264,10 +457,11 @@ pub fn config_generate_diagnostic_report(
     }
     report.push('\n');
 
-    let base_dir = cfg_path
-        .parent()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
+    if mask_paths {
+        report = apply_masks(report, &mask_pairs(&cfg_path, &config.log_path));
+    }
+
+    let base_dir = config_base_dir(&cfg_path);
     let diagnostics_dir = base_dir.join("diagnostics");
     std::fs::create_dir_all(&diagnostics_dir).map_err(|e| {
         format_error(
@@ -275,21 +469,48 @@ pub fn config_generate_diagnostic_report(
             format!("create diagnostics directory failed: {e}"),
         )
     })?;
-    let report_path = diagnostics_dir.join(format!("diagnostic-{}.txt", now.format("%Y%m%d-%H%M%S")));
-    std::fs::write(&report_path, report).map_err(|e| {
+
+    let stamp = now.format("%Y%m%d-%H%M%S").to_string();
+    let text_name = format!("diagnostic-{stamp}.txt");
+    let text_path = diagnostics_dir.join(&text_name);
+    std::fs::write(&text_path, &report).map_err(|e| {
         format_error(
             AppErrorKind::Io,
             format!("write diagnostics report failed: {e}"),
         )
     })?;
 
-    if open_after_write.unwrap_or(false) {
+    let mut zip_path: Option<PathBuf> = None;
+    let report_path = if write_zip {
+        let zip_name = format!("diagnostic-{stamp}.zip");
+        let zip_target = diagnostics_dir.join(zip_name);
+        write_diagnostic_zip(&zip_target, &text_name, &report)?;
+        zip_path = Some(zip_target.clone());
+        zip_target
+    } else {
+        text_path.clone()
+    };
+
+    if open_after {
         let _ = app
             .opener()
             .open_path(report_path.to_string_lossy().to_string(), None::<&str>);
     }
 
-    Ok(report_path.to_string_lossy().to_string())
+    let copied_to_clipboard = if copy_path {
+        copy_text_to_clipboard(&report_path.to_string_lossy()).is_ok()
+    } else {
+        false
+    };
+
+    Ok(DiagnosticReportResult {
+        report_path: report_path.to_string_lossy().to_string(),
+        text_report_path: text_path.to_string_lossy().to_string(),
+        zip_path: zip_path.map(|p| p.to_string_lossy().to_string()),
+        copied_to_clipboard,
+        masked: mask_paths,
+        zipped: write_zip,
+    })
 }
 
 #[tauri::command]

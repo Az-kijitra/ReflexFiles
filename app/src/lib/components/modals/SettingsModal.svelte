@@ -21,11 +21,19 @@
   export let onCancel = () => {};
   export let onSave = () => {};
   export let onOpenConfig = () => {};
+  export let onBackupConfig = () => {};
+  export let onRestoreConfig = () => {};
   export let onExportReport = () => {};
   export let onRunDiagnostic = () => {};
 
   let activeSection = "general";
   let draft = {};
+  let reportOptions = {
+    mask_sensitive_paths: true,
+    as_zip: false,
+    copy_path_to_clipboard: true,
+    open_after_write: true,
+  };
 
   $: draft = {
     ui_theme: initial.ui_theme ?? "light",
@@ -99,6 +107,10 @@
 
   function submit() {
     onSave?.(normalizedDraft);
+  }
+
+  function runExportReport() {
+    onExportReport?.({ ...reportOptions });
   }
 
   function handleKeydown(event) {
@@ -283,12 +295,37 @@
         <h3>{t("settings.section.advanced")}</h3>
         <p class="settings-help">{t("settings.help.advanced")}</p>
         <div class="settings-advanced-actions">
-          <button type="button" onclick={() => onOpenConfig?.()}>
+          <button type="button" disabled={reporting} onclick={() => onOpenConfig?.()}>
             {t("settings.open_config_file")}
           </button>
-          <button type="button" disabled={reporting} onclick={() => onExportReport?.()}>
+          <button type="button" disabled={reporting} onclick={() => onBackupConfig?.()}>
+            {t("settings.create_backup")}
+          </button>
+          <button type="button" disabled={reporting} onclick={() => onRestoreConfig?.()}>
+            {t("settings.restore_latest_backup")}
+          </button>
+          <button type="button" disabled={reporting} onclick={runExportReport}>
             {t("settings.export_diagnostic_report")}
           </button>
+        </div>
+
+        <div class="settings-report-options">
+          <label>
+            <input type="checkbox" bind:checked={reportOptions.mask_sensitive_paths} />
+            <span>{t("settings.report_option_mask_paths")}</span>
+          </label>
+          <label>
+            <input type="checkbox" bind:checked={reportOptions.as_zip} />
+            <span>{t("settings.report_option_zip")}</span>
+          </label>
+          <label>
+            <input type="checkbox" bind:checked={reportOptions.copy_path_to_clipboard} />
+            <span>{t("settings.report_option_copy_path")}</span>
+          </label>
+          <label>
+            <input type="checkbox" bind:checked={reportOptions.open_after_write} />
+            <span>{t("settings.report_option_open_after")}</span>
+          </label>
         </div>
         <p class="settings-help settings-help-compact">{t("settings.desc.export_diagnostic_report")}</p>
         {#if reporting}
@@ -479,7 +516,29 @@
   }
 
   .settings-advanced-actions {
-    margin-bottom: 16px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .settings-report-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 12px;
+    margin-bottom: 6px;
+  }
+
+  .settings-report-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ui-fg);
+  }
+
+  .settings-report-options input[type="checkbox"] {
+    margin: 0;
   }
 
   .settings-profile-list {
@@ -555,6 +614,7 @@
     font-size: 12px;
   }
 </style>
+
 
 
 
