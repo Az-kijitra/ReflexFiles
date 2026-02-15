@@ -53,6 +53,7 @@ npm run audit:cargo
 
 ## ドキュメント
 - ユーザーマニュアル: `user_manual.md`
+- ターミナル固定プロファイル（`Ctrl+Alt+1/2/3`）の設定手順は `docs/ja/user_manual.ja.md` を参照してください。
 
 ## コントリビュート
 `CONTRIBUTING.md` を参照してください。
