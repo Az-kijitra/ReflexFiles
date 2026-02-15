@@ -1,6 +1,6 @@
 use crate::config::{config_path, load_config, save_config, save_history, save_jump_list};
 use crate::error::{format_error, AppErrorKind};
-use crate::types::{AppConfig, JumpItem, SortKey, SortOrder, Theme};
+use crate::types::{AppConfig, JumpItem, Language, SortKey, SortOrder, Theme};
 use tauri::Manager;
 use tauri_plugin_opener::OpenerExt;
 
@@ -46,6 +46,35 @@ pub fn config_set_dir_stats_timeout(timeout_ms: u64) -> Result<AppConfig, String
     let (mut config, _) = ensure_config()?;
     config.perf_dir_stats_timeout_ms = timeout_ms.max(500);
     save_config(&config)?;
+    Ok(config)
+}
+
+#[tauri::command]
+pub fn config_save_preferences(
+    ui_theme: String,
+    ui_language: String,
+    perf_dir_stats_timeout_ms: u64,
+    external_vscode_path: String,
+    external_git_client_path: String,
+    external_terminal_profile: String,
+    external_terminal_profile_cmd: String,
+    external_terminal_profile_powershell: String,
+    external_terminal_profile_wsl: String,
+) -> Result<AppConfig, String> {
+    let (mut config, _) = ensure_config()?;
+
+    config.ui_theme = Theme::parse(ui_theme.trim());
+    config.ui_language = Language::parse(ui_language.trim());
+    config.perf_dir_stats_timeout_ms = perf_dir_stats_timeout_ms.max(500);
+    config.external_vscode_path = external_vscode_path.trim().to_string();
+    config.external_git_client_path = external_git_client_path.trim().to_string();
+    config.external_terminal_profile = external_terminal_profile.trim().to_string();
+    config.external_terminal_profile_cmd = external_terminal_profile_cmd.trim().to_string();
+    config.external_terminal_profile_powershell =
+        external_terminal_profile_powershell.trim().to_string();
+    config.external_terminal_profile_wsl = external_terminal_profile_wsl.trim().to_string();
+
+    persist_config(&config)?;
     Ok(config)
 }
 
@@ -103,3 +132,4 @@ pub fn set_window_theme(app: tauri::AppHandle, theme: String) -> Result<(), Stri
         .set_theme(Some(theme))
         .map_err(|e: tauri::Error| format_error(AppErrorKind::Io, e.to_string()))
 }
+

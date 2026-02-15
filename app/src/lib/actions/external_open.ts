@@ -240,6 +240,10 @@ export function createExternalActions(ctx, helpers) {
   }
 
   async function openConfigFile() {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("rf:open-settings"));
+      return;
+    }
     try {
       await ctx.invoke("config_open_in_editor");
       setStatusMessage(ctx.t("status.opened_config"), STATUS_SHORT_MS);
@@ -332,3 +336,4 @@ export function createExternalActions(ctx, helpers) {
     closeViewer,
   };
 }
+

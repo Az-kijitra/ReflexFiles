@@ -14,6 +14,7 @@
   import { KEYMAP_ACTIONS, MENU_GROUPS } from "$lib/ui_constants";
 
   import { formatModified, formatName, formatSize } from "$lib/utils/format";
+  import { formatError } from "$lib/utils/error_format";
   import { eventToKeyString, normalizeKeyString } from "$lib/utils/keymap";
   import { handleGlobalKey } from "$lib/utils/keyboard_global";
   import { getVisibleTreeNodes, treeNodeName } from "$lib/utils/tree";
@@ -61,6 +62,7 @@
   import { createKeymapBindingsState } from "$lib/page_keymap_bindings_state";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
+  import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
 
   const defaults = createPageStateDefaults();
 
@@ -144,6 +146,24 @@
   /** @type {HTMLElement | null} */
   let listHeaderEl = $state(null);
 
+  /** @type {HTMLElement | null} */
+  let settingsModalEl = $state(null);
+  let settingsOpen = $state(false);
+  let settingsSaving = $state(false);
+  let settingsError = $state("");
+  /** @type {Array<{ name: string, guid: string, source: string, is_default: boolean }>} */
+  let settingsProfiles = $state([]);
+  let settingsInitial = $state({
+    ui_theme: "light",
+    ui_language: "en",
+    perf_dir_stats_timeout_ms: 3000,
+    external_vscode_path: "",
+    external_git_client_path: "",
+    external_terminal_profile: "",
+    external_terminal_profile_cmd: "",
+    external_terminal_profile_powershell: "",
+    external_terminal_profile_wsl: "",
+  });
   // Watch timers
   /** @type {ReturnType<typeof setTimeout> | null} */
   let watchTimer = null;
@@ -389,6 +409,110 @@
     viewProps,
     overlayBindings,
   });
+
+  function normalizeSettingsConfig(config) {
+    return {
+      ui_theme: config?.ui_theme === "dark" ? "dark" : "light",
+      ui_language: config?.ui_language === "ja" ? "ja" : "en",
+      perf_dir_stats_timeout_ms: Math.max(500, Number(config?.perf_dir_stats_timeout_ms || 3000)),
+      external_vscode_path: String(config?.external_vscode_path || ""),
+      external_git_client_path: String(config?.external_git_client_path || ""),
+      external_terminal_profile: String(config?.external_terminal_profile || ""),
+      external_terminal_profile_cmd: String(config?.external_terminal_profile_cmd || ""),
+      external_terminal_profile_powershell: String(
+        config?.external_terminal_profile_powershell || ""
+      ),
+      external_terminal_profile_wsl: String(config?.external_terminal_profile_wsl || ""),
+    };
+  }
+
+  async function openSettingsModal() {
+    settingsSaving = false;
+    settingsError = "";
+    try {
+      const config = await invoke("config_get");
+      settingsInitial = normalizeSettingsConfig(config || {});
+    } catch (err) {
+      settingsError = formatError(err, "failed to load config", t);
+      settingsInitial = normalizeSettingsConfig({
+        ui_theme: state.ui_theme,
+        ui_language: state.ui_language,
+        perf_dir_stats_timeout_ms: state.dirStatsTimeoutMs,
+      });
+    }
+
+    try {
+      const profiles = await invoke("external_list_terminal_profiles");
+      settingsProfiles = Array.isArray(profiles) ? profiles : [];
+    } catch {
+      settingsProfiles = [];
+    }
+
+    settingsOpen = true;
+  }
+
+  function closeSettingsModal() {
+    if (settingsSaving) return;
+    settingsOpen = false;
+    settingsError = "";
+    queueMicrotask(() => {
+      shellRefs.listEl?.focus?.();
+    });
+  }
+
+  async function saveSettings(values) {
+    settingsSaving = true;
+    settingsError = "";
+    try {
+      const saved = await invoke("config_save_preferences", {
+        ui_theme: values.ui_theme,
+        ui_language: values.ui_language,
+        perf_dir_stats_timeout_ms: Number(values.perf_dir_stats_timeout_ms || 3000),
+        external_vscode_path: values.external_vscode_path || "",
+        external_git_client_path: values.external_git_client_path || "",
+        external_terminal_profile: values.external_terminal_profile || "",
+        external_terminal_profile_cmd: values.external_terminal_profile_cmd || "",
+        external_terminal_profile_powershell: values.external_terminal_profile_powershell || "",
+        external_terminal_profile_wsl: values.external_terminal_profile_wsl || "",
+      });
+
+      settingsInitial = normalizeSettingsConfig(saved || values);
+      state.ui_theme = settingsInitial.ui_theme;
+      state.ui_language = settingsInitial.ui_language;
+      state.dirStatsTimeoutMs = settingsInitial.perf_dir_stats_timeout_ms;
+      actions.setStatusMessage(t("settings.saved"), 1500);
+      closeSettingsModal();
+    } catch (err) {
+      settingsError = formatError(err, "save failed", t);
+    } finally {
+      settingsSaving = false;
+    }
+  }
+
+  async function openConfigFromSettings() {
+    try {
+      await invoke("config_open_in_editor");
+      actions.setStatusMessage(t("status.opened_config"), 1500);
+    } catch (err) {
+      settingsError = `${t("status.open_failed")}: ${formatError(err, "unknown error", t)}`;
+    }
+  }
+
+  onMount(() => {
+    const handler = () => {
+      void openSettingsModal();
+    };
+    window.addEventListener("rf:open-settings", handler);
+    return () => {
+      window.removeEventListener("rf:open-settings", handler);
+    };
+  });
+
+  $effect(() => {
+    if (typeof window !== "undefined") {
+      window.__rf_settings_open = settingsOpen;
+    }
+  });
 </script>
 
 <PageShellBindings
@@ -397,4 +521,19 @@
   {...pageShellProps}
 />
 
+{#if settingsOpen}
+  <SettingsModal
+    bind:modalEl={settingsModalEl}
+    t={t}
+    initial={settingsInitial}
+    profiles={settingsProfiles}
+    saving={settingsSaving}
+    error={settingsError}
+    onCancel={closeSettingsModal}
+    onSave={saveSettings}
+    onOpenConfig={openConfigFromSettings}
+    {trapModalTab}
+    {autofocus}
+  />
+{/if}
 

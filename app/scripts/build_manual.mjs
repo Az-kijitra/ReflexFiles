@@ -44,6 +44,36 @@ const md = new MarkdownIt({
   typographer: false,
 });
 
+async function readFileIfExists(filePath) {
+  try {
+    return await fs.readFile(filePath);
+  } catch {
+    return null;
+  }
+}
+
+async function writeTextIfChanged(filePath, text) {
+  const next = Buffer.from(text, "utf-8");
+  const current = await readFileIfExists(filePath);
+  if (current && Buffer.compare(current, next) === 0) {
+    return false;
+  }
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, next);
+  return true;
+}
+
+async function copyFileIfChanged(fromPath, toPath) {
+  const next = await fs.readFile(fromPath);
+  const current = await readFileIfExists(toPath);
+  if (current && Buffer.compare(current, next) === 0) {
+    return false;
+  }
+  await fs.mkdir(path.dirname(toPath), { recursive: true });
+  await fs.writeFile(toPath, next);
+  return true;
+}
+
 function getManualImageSources(markdown) {
   const tokens = md.parse(markdown, {});
   const sources = new Set();
@@ -70,10 +100,8 @@ function normalizeAssetPath(src) {
 async function copyAssetToRoots(absSrc, relSrc) {
   const staticAssetPath = path.join(staticDir, relSrc);
   const resourceAssetPath = path.join(resourcesDir, relSrc);
-  await fs.mkdir(path.dirname(staticAssetPath), { recursive: true });
-  await fs.copyFile(absSrc, staticAssetPath);
-  await fs.mkdir(path.dirname(resourceAssetPath), { recursive: true });
-  await fs.copyFile(absSrc, resourceAssetPath);
+  await copyFileIfChanged(absSrc, staticAssetPath);
+  await copyFileIfChanged(absSrc, resourceAssetPath);
 }
 
 async function copyManualAssets(markdown) {
@@ -170,13 +198,11 @@ async function writeManualOutputs(manual, markdown, html) {
   const htmlName = `user_manual.${manual.id}.html`;
   const mdName = `user_manual.${manual.id}.md`;
 
-  await fs.mkdir(staticDir, { recursive: true });
-  await fs.writeFile(path.join(staticDir, htmlName), html, "utf-8");
-  await fs.writeFile(path.join(staticDir, mdName), markdown, "utf-8");
+  await writeTextIfChanged(path.join(staticDir, htmlName), html);
+  await writeTextIfChanged(path.join(staticDir, mdName), markdown);
 
-  await fs.mkdir(resourcesDir, { recursive: true });
-  await fs.writeFile(path.join(resourcesDir, htmlName), html, "utf-8");
-  await fs.writeFile(path.join(resourcesDir, mdName), markdown, "utf-8");
+  await writeTextIfChanged(path.join(resourcesDir, htmlName), html);
+  await writeTextIfChanged(path.join(resourcesDir, mdName), markdown);
 }
 
 async function writeCompatibilityAliases() {
@@ -200,7 +226,7 @@ async function writeCompatibilityAliases() {
   ];
 
   for (const pair of aliases) {
-    await fs.copyFile(pair.from, pair.to);
+    await copyFileIfChanged(pair.from, pair.to);
   }
 }
 
@@ -220,8 +246,8 @@ async function copyLogoIfPresent() {
     return;
   }
 
-  await fs.copyFile(logoSource, path.join(staticDir, "ReflexFiles.png"));
-  await fs.copyFile(logoSource, path.join(resourcesDir, "ReflexFiles.png"));
+  await copyFileIfChanged(logoSource, path.join(staticDir, "ReflexFiles.png"));
+  await copyFileIfChanged(logoSource, path.join(resourcesDir, "ReflexFiles.png"));
 }
 
 async function buildManual(manual) {

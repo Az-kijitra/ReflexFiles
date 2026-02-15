@@ -2,6 +2,9 @@ import type { PageKeydownParams } from "$lib/page_dom_handlers_keydown_types";
 
 export function createPageKeydownHandler(params: PageKeydownParams) {
   return function onKeyDown(event) {
+    if (typeof window !== "undefined" && (window as any).__rf_settings_open === true) {
+      return;
+    }
     const handled = params.handleGlobalKey(event, {
       activeElement: document.activeElement,
       listEl: params.getListEl(),
