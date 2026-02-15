@@ -118,7 +118,7 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 - **ソート**
   - ソートメニューから選択
 - **外部アプリ起動**
-  - エクスプローラー / コマンドプロンプト / VS Code / Git クライアント
+  - エクスプローラー / ターミナル / VS Code / Git クライアント
   - ユーザー定義の外部アプリ
 - **アンドゥ / リドゥ**
   - 直前の操作を元に戻す / やり直す（対応操作のみ）
@@ -175,7 +175,10 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 | ZIP | ZIP 作成 | Ctrl+Alt+Z |
 | ZIP | ZIP 解凍 | Ctrl+Alt+X |
 | 外部アプリ | エクスプローラーで開く | Ctrl+Alt+E |
-| 外部アプリ | コマンドプロンプトで開く | Ctrl+Alt+C |
+| 外部アプリ | ターミナルで開く（既定プロファイル） | Ctrl+Alt+C |
+| 外部アプリ | CMD プロファイルで開く | Ctrl+Alt+1 |
+| 外部アプリ | PowerShell プロファイルで開く | Ctrl+Alt+2 |
+| 外部アプリ | WSL プロファイルで開く | Ctrl+Alt+3 |
 | 外部アプリ | VS Code で開く | Ctrl+Alt+V |
 | 外部アプリ | Git クライアントで開く | Ctrl+Alt+G |
 
@@ -194,6 +197,22 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 ### 履歴 / ジャンプリストの保存先
 - 履歴: `%APPDATA%\\ReflexFIles\\history.toml`
 - ジャンプリスト: `%APPDATA%\\ReflexFIles\\jump_list.toml`
+
+### `Ctrl+Alt+1/2/3` の固定プロファイル設定
+Windows Terminal のプロファイル名を固定で指定できます。
+- `external_terminal_profile_cmd` : `Ctrl+Alt+1`（CMD）
+- `external_terminal_profile_powershell` : `Ctrl+Alt+2`（PowerShell）
+- `external_terminal_profile_wsl` : `Ctrl+Alt+3`（WSL）
+
+フォールバック動作:
+- 個別キーが空なら `external_terminal_profile` を使用
+- それも空なら Windows Terminal の既定プロファイルを使用
+- Windows Terminal が利用できない場合は `cmd.exe` にフォールバック
+
+`config.toml` には保存時点で次のコメントも出力されます。
+- `# 現在検出できた Windows Terminal プロファイル一覧（保存時点）`
+
+このコメントに表示された名前を、そのまま各設定値に貼り付けてください。
 
 > 各ファイルには **項目ごとのコメント**があり、設定値の範囲/選択肢が記載されています。
 
@@ -292,6 +311,10 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 | `external_apps` | array(table) | 外部アプリ一覧 | `name`/`command`/`args`/`shortcut` |
 | `external_git_client_path` | string | Git クライアントの実行パス | 空なら既定を使用 |
 | `external_vscode_path` | string | VS Code 実行パス | 空なら `code` を試行 |
+| `external_terminal_profile` | string | ターミナル共通プロファイル名 | 空なら Windows Terminal 既定 |
+| `external_terminal_profile_cmd` | string | `Ctrl+Alt+1` 用プロファイル名 | 空なら `external_terminal_profile` |
+| `external_terminal_profile_powershell` | string | `Ctrl+Alt+2` 用プロファイル名 | 空なら `external_terminal_profile` |
+| `external_terminal_profile_wsl` | string | `Ctrl+Alt+3` 用プロファイル名 | 空なら `external_terminal_profile` |
 
 `external_apps` の `args` では `{path}` / `{cwd}` が使用できます。  
 例:

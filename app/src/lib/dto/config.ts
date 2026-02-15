@@ -44,6 +44,11 @@ export interface AppConfig {
   external_apps: ExternalAppConfig[];
   external_git_client_path: string;
   external_vscode_path: string;
+  external_terminal_profile: string;
+  external_terminal_profile_cmd: string;
+  external_terminal_profile_powershell: string;
+  external_terminal_profile_wsl: string;
   log_path: string;
   log_enabled: boolean;
 }
+

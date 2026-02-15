@@ -36,6 +36,10 @@ pub fn default_app_config() -> AppConfig {
         external_apps: Vec::new(),
         external_git_client_path: String::new(),
         external_vscode_path: String::new(),
+        external_terminal_profile: String::new(),
+        external_terminal_profile_cmd: String::new(),
+        external_terminal_profile_powershell: String::new(),
+        external_terminal_profile_wsl: String::new(),
         log_path: default_log_path().to_string_lossy().to_string(),
         log_enabled: true,
     }
@@ -125,3 +129,4 @@ fn local_app_data_base() -> PathBuf {
 fn normalized_path_text(value: &str) -> String {
     value.replace('/', "\\").to_ascii_lowercase()
 }
+

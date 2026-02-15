@@ -65,6 +65,71 @@ where
 fn toml_string(value: &str) -> Value {
     Value::String(value.to_string())
 }
+
+fn append_if_env_path(candidates: &mut Vec<PathBuf>, env_key: &str, suffix: &str) {
+    if let Ok(value) = std::env::var(env_key) {
+        candidates.push(PathBuf::from(value).join(suffix));
+    }
+}
+
+fn terminal_settings_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    append_if_env_path(
+        &mut candidates,
+        "LOCALAPPDATA",
+        "Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json",
+    );
+    append_if_env_path(
+        &mut candidates,
+        "LOCALAPPDATA",
+        "Packages\\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\\LocalState\\settings.json",
+    );
+    append_if_env_path(
+        &mut candidates,
+        "LOCALAPPDATA",
+        "Microsoft\\Windows Terminal\\settings.json",
+    );
+    candidates
+}
+
+fn detect_terminal_profile_names() -> Vec<String> {
+    for path in terminal_settings_candidates() {
+        let text = match fs::read_to_string(&path) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+
+        let root: serde_json::Value = match json5::from_str(&text) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+
+        let list = match root
+            .get("profiles")
+            .and_then(|profiles| profiles.get("list"))
+            .and_then(|list| list.as_array())
+        {
+            Some(value) => value,
+            None => continue,
+        };
+
+        let mut names = Vec::new();
+        for item in list {
+            if let Some(name) = item.get("name").and_then(|value| value.as_str()) {
+                let trimmed = name.trim();
+                if !trimmed.is_empty() {
+                    names.push(trimmed.to_string());
+                }
+            }
+        }
+
+        if !names.is_empty() {
+            return names;
+        }
+    }
+
+    Vec::new()
+}
 fn localize_config_comments_to_en(mut text: String) -> String {
     let replacements = [
         (
@@ -129,6 +194,10 @@ fn localize_config_comments_to_en(mut text: String) -> String {
         ("# --- 外部ツール ---\n", "# --- External Tools ---\n"),
         ("# Git クライアントのパス。\n", "# Git client path.\n"),
         ("# VSCode のパス。\n", "# VS Code path.\n"),
+        (
+            "# ターミナルプロファイル名。空で既定。\n",
+            "# Terminal profile name (empty uses default profile).\n",
+        ),
         (
             "# 既定の関連付け (拡張子 -> アプリ ID)。\n",
             "# Default associations (extension -> app id).\n",
@@ -304,6 +373,69 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "external_vscode_path = {}\n\n",
         toml_string(&config.external_vscode_path)
     ));
+    let terminal_profile_names = detect_terminal_profile_names();
+
+    if matches!(config.ui_language, Language::Ja) {
+        out.push_str("# ターミナルプロファイル名（共通）。空なら Windows Terminal の既定。\n");
+        out.push_str(&format!(
+            "external_terminal_profile = {}\n\n",
+            toml_string(&config.external_terminal_profile)
+        ));
+        out.push_str("# Ctrl+Alt+1 (CMD) 用の固定プロファイル名。空なら external_terminal_profile を使用。\n");
+        out.push_str(&format!(
+            "external_terminal_profile_cmd = {}\n\n",
+            toml_string(&config.external_terminal_profile_cmd)
+        ));
+        out.push_str("# Ctrl+Alt+2 (PowerShell) 用の固定プロファイル名。空なら external_terminal_profile を使用。\n");
+        out.push_str(&format!(
+            "external_terminal_profile_powershell = {}\n\n",
+            toml_string(&config.external_terminal_profile_powershell)
+        ));
+        out.push_str("# Ctrl+Alt+3 (WSL) 用の固定プロファイル名。空なら external_terminal_profile を使用。\n");
+        out.push_str(&format!(
+            "external_terminal_profile_wsl = {}\n\n",
+            toml_string(&config.external_terminal_profile_wsl)
+        ));
+        out.push_str("# 現在検出できた Windows Terminal プロファイル一覧（保存時点）:\n");
+        if terminal_profile_names.is_empty() {
+            out.push_str("#   (取得できませんでした)\n\n");
+        } else {
+            for name in &terminal_profile_names {
+                out.push_str(&format!("#   - {name}\n"));
+            }
+            out.push('\n');
+        }
+    } else {
+        out.push_str("# Terminal profile name (global fallback). Empty uses Windows Terminal default.\n");
+        out.push_str(&format!(
+            "external_terminal_profile = {}\n\n",
+            toml_string(&config.external_terminal_profile)
+        ));
+        out.push_str("# Fixed profile name for Ctrl+Alt+1 (CMD). Empty falls back to external_terminal_profile.\n");
+        out.push_str(&format!(
+            "external_terminal_profile_cmd = {}\n\n",
+            toml_string(&config.external_terminal_profile_cmd)
+        ));
+        out.push_str("# Fixed profile name for Ctrl+Alt+2 (PowerShell). Empty falls back to external_terminal_profile.\n");
+        out.push_str(&format!(
+            "external_terminal_profile_powershell = {}\n\n",
+            toml_string(&config.external_terminal_profile_powershell)
+        ));
+        out.push_str("# Fixed profile name for Ctrl+Alt+3 (WSL). Empty falls back to external_terminal_profile.\n");
+        out.push_str(&format!(
+            "external_terminal_profile_wsl = {}\n\n",
+            toml_string(&config.external_terminal_profile_wsl)
+        ));
+        out.push_str("# Detected Windows Terminal profiles at save time:\n");
+        if terminal_profile_names.is_empty() {
+            out.push_str("#   (not available)\n\n");
+        } else {
+            for name in &terminal_profile_names {
+                out.push_str(&format!("#   - {name}\n"));
+            }
+            out.push('\n');
+        }
+    }
     out.push_str("# 既定の関連付け (拡張子 -> アプリ ID)。\n");
     out.push_str(&format!(
         "external_associations = {}\n\n",
@@ -344,3 +476,5 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     file.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+

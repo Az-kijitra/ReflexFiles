@@ -204,6 +204,41 @@ It provides a multi-column file list, tree navigation, fast search, and integrat
 <td><code>Ctrl+Shift+B</code></td>
 </tr>
 <tr>
+<td>External</td>
+<td>Open in Explorer</td>
+<td><code>Ctrl+Alt+E</code></td>
+</tr>
+<tr>
+<td>External</td>
+<td>Open terminal (default profile)</td>
+<td><code>Ctrl+Alt+C</code></td>
+</tr>
+<tr>
+<td>External</td>
+<td>Open CMD terminal profile</td>
+<td><code>Ctrl+Alt+1</code></td>
+</tr>
+<tr>
+<td>External</td>
+<td>Open PowerShell terminal profile</td>
+<td><code>Ctrl+Alt+2</code></td>
+</tr>
+<tr>
+<td>External</td>
+<td>Open WSL terminal profile</td>
+<td><code>Ctrl+Alt+3</code></td>
+</tr>
+<tr>
+<td>External</td>
+<td>Open in VS Code</td>
+<td><code>Ctrl+Alt+V</code></td>
+</tr>
+<tr>
+<td>External</td>
+<td>Open in Git client</td>
+<td><code>Ctrl+Alt+G</code></td>
+</tr>
+<tr>
 <td>Help</td>
 <td>Keymap help</td>
 <td><code>F1</code></td>
@@ -228,6 +263,24 @@ It provides a multi-column file list, tree navigation, fast search, and integrat
 <li>History: <code>%APPDATA%\\ReflexFIles\\history.toml</code></li>
 <li>Jump list: <code>%APPDATA%\\ReflexFIles\\jump_list.toml</code></li>
 </ul>
+<h3>Fixed terminal profiles for <code>Ctrl+Alt+1/2/3</code></h3>
+<p>You can assign fixed Windows Terminal profile names:</p>
+<ul>
+<li><code>external_terminal_profile_cmd</code> for <code>Ctrl+Alt+1</code></li>
+<li><code>external_terminal_profile_powershell</code> for <code>Ctrl+Alt+2</code></li>
+<li><code>external_terminal_profile_wsl</code> for <code>Ctrl+Alt+3</code></li>
+</ul>
+<p>Fallback behavior:</p>
+<ul>
+<li>If a per-key setting is empty, <code>external_terminal_profile</code> is used.</li>
+<li>If that is also empty, Windows Terminal default profile is used.</li>
+<li>If Windows Terminal is unavailable, it falls back to <code>cmd.exe</code>.</li>
+</ul>
+<p><code>config.toml</code> also includes a comment section:</p>
+<ul>
+<li><code>Detected Windows Terminal profiles at save time</code></li>
+</ul>
+<p>Use those names exactly when setting profile keys.</p>
 <hr>
 <h2>Known Limitations</h2>
 <ul>

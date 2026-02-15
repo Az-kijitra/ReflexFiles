@@ -104,6 +104,21 @@ export function handleListKey(event, ctx) {
     ctx.openInCmd();
     return true;
   }
+  if (ctx.matchesAction(event, "open_terminal_cmd")) {
+    event.preventDefault();
+    ctx.openInTerminalCmd();
+    return true;
+  }
+  if (ctx.matchesAction(event, "open_terminal_powershell")) {
+    event.preventDefault();
+    ctx.openInTerminalPowerShell();
+    return true;
+  }
+  if (ctx.matchesAction(event, "open_terminal_wsl")) {
+    event.preventDefault();
+    ctx.openInTerminalWsl();
+    return true;
+  }
   if (ctx.matchesAction(event, "open_vscode")) {
     event.preventDefault();
     ctx.openInVSCode();

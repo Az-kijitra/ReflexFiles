@@ -197,6 +197,28 @@ export function createExternalActions(ctx, helpers) {
     }
   }
 
+  async function openInTerminalKind(kind) {
+    const currentPath = ctx.getCurrentPath();
+    if (!currentPath) return;
+    try {
+      await ctx.invoke("external_open_terminal_kind", { path: currentPath, kind });
+    } catch (err) {
+      showError(ctx.t("error.open_cmd_failed", { error: formatError(err, "unknown error", ctx.t) }));
+    }
+  }
+
+  async function openInTerminalCmd() {
+    await openInTerminalKind("cmd");
+  }
+
+  async function openInTerminalPowerShell() {
+    await openInTerminalKind("powershell");
+  }
+
+  async function openInTerminalWsl() {
+    await openInTerminalKind("wsl");
+  }
+
   async function openInVSCode() {
     const currentPath = ctx.getCurrentPath();
     if (!currentPath) return;
@@ -297,6 +319,9 @@ export function createExternalActions(ctx, helpers) {
     openParentForSelection,
     openInExplorer,
     openInCmd,
+    openInTerminalCmd,
+    openInTerminalPowerShell,
+    openInTerminalWsl,
     openInVSCode,
     openInGitClient,
     openConfigFile,

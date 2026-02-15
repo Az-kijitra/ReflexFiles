@@ -55,9 +55,12 @@ pub fn run() {
             crate::external_apps_cmds::external_open_with_app,
             crate::external_apps_cmds::external_open_explorer,
             crate::external_apps_cmds::external_open_cmd,
+            crate::external_apps_cmds::external_open_terminal_profile,
+            crate::external_apps_cmds::external_open_terminal_kind,
             crate::external_apps_cmds::external_open_vscode,
             crate::external_apps_cmds::external_open_git_client,
             crate::external_apps_cmds::external_open_custom,
+            crate::external_apps_cmds::external_list_terminal_profiles,
             crate::system_cmds::app_exit,
             crate::viewer_cmds::open_viewer,
             crate::viewer_cmds::close_viewer,
@@ -96,3 +99,4 @@ fn configure_windows_webview_logging() {
 
 #[cfg(not(target_os = "windows"))]
 fn configure_windows_webview_logging() {}
+

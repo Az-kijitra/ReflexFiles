@@ -216,7 +216,7 @@
 </li>
 <li><strong>外部アプリ起動</strong>
 <ul>
-<li>エクスプローラー / コマンドプロンプト / VS Code / Git クライアント</li>
+<li>エクスプローラー / ターミナル / VS Code / Git クライアント</li>
 <li>ユーザー定義の外部アプリ</li>
 </ul>
 </li>
@@ -444,8 +444,23 @@
 </tr>
 <tr>
 <td>外部アプリ</td>
-<td>コマンドプロンプトで開く</td>
+<td>ターミナルで開く（既定プロファイル）</td>
 <td>Ctrl+Alt+C</td>
+</tr>
+<tr>
+<td>外部アプリ</td>
+<td>CMD プロファイルで開く</td>
+<td>Ctrl+Alt+1</td>
+</tr>
+<tr>
+<td>外部アプリ</td>
+<td>PowerShell プロファイルで開く</td>
+<td>Ctrl+Alt+2</td>
+</tr>
+<tr>
+<td>外部アプリ</td>
+<td>WSL プロファイルで開く</td>
+<td>Ctrl+Alt+3</td>
 </tr>
 <tr>
 <td>外部アプリ</td>
@@ -474,6 +489,24 @@
 <li>履歴: <code>%APPDATA%\\ReflexFIles\\history.toml</code></li>
 <li>ジャンプリスト: <code>%APPDATA%\\ReflexFIles\\jump_list.toml</code></li>
 </ul>
+<h3><code>Ctrl+Alt+1/2/3</code> の固定プロファイル設定</h3>
+<p>Windows Terminal のプロファイル名を固定で指定できます。</p>
+<ul>
+<li><code>external_terminal_profile_cmd</code> : <code>Ctrl+Alt+1</code>（CMD）</li>
+<li><code>external_terminal_profile_powershell</code> : <code>Ctrl+Alt+2</code>（PowerShell）</li>
+<li><code>external_terminal_profile_wsl</code> : <code>Ctrl+Alt+3</code>（WSL）</li>
+</ul>
+<p>フォールバック動作:</p>
+<ul>
+<li>個別キーが空なら <code>external_terminal_profile</code> を使用</li>
+<li>それも空なら Windows Terminal の既定プロファイルを使用</li>
+<li>Windows Terminal が利用できない場合は <code>cmd.exe</code> にフォールバック</li>
+</ul>
+<p><code>config.toml</code> には保存時点で次のコメントも出力されます。</p>
+<ul>
+<li><code># 現在検出できた Windows Terminal プロファイル一覧（保存時点）</code></li>
+</ul>
+<p>このコメントに表示された名前を、そのまま各設定値に貼り付けてください。</p>
 <blockquote>
 <p>各ファイルには <strong>項目ごとのコメント</strong>があり、設定値の範囲/選択肢が記載されています。</p>
 </blockquote>
@@ -726,6 +759,30 @@
 <td>string</td>
 <td>VS Code 実行パス</td>
 <td>空なら <code>code</code> を試行</td>
+</tr>
+<tr>
+<td><code>external_terminal_profile</code></td>
+<td>string</td>
+<td>ターミナル共通プロファイル名</td>
+<td>空なら Windows Terminal 既定</td>
+</tr>
+<tr>
+<td><code>external_terminal_profile_cmd</code></td>
+<td>string</td>
+<td><code>Ctrl+Alt+1</code> 用プロファイル名</td>
+<td>空なら <code>external_terminal_profile</code></td>
+</tr>
+<tr>
+<td><code>external_terminal_profile_powershell</code></td>
+<td>string</td>
+<td><code>Ctrl+Alt+2</code> 用プロファイル名</td>
+<td>空なら <code>external_terminal_profile</code></td>
+</tr>
+<tr>
+<td><code>external_terminal_profile_wsl</code></td>
+<td>string</td>
+<td><code>Ctrl+Alt+3</code> 用プロファイル名</td>
+<td>空なら <code>external_terminal_profile</code></td>
 </tr>
 </tbody>
 </table>

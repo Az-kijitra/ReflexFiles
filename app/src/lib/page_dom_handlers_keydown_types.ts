@@ -59,6 +59,9 @@
  * @param {(err: unknown) => void} params.showError
  * @param {() => void} params.openInExplorer
  * @param {() => void} params.openInCmd
+ * @param {() => void} params.openInTerminalCmd
+ * @param {() => void} params.openInTerminalPowerShell
+ * @param {() => void} params.openInTerminalWsl
  * @param {() => void} params.openInVSCode
  * @param {() => void} params.openInGitClient
  * @param {() => void} params.openZipCreate
