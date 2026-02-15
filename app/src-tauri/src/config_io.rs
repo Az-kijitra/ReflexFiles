@@ -182,6 +182,10 @@ fn localize_config_comments_to_en(mut text: String) -> String {
         ("# 主题: light | dark。\n", "# Theme: light | dark.\n"),
         ("# 言語: ja | en。\n", "# Language: ja | en.\n"),
         (
+            "# ファイルアイコン表示: by_type | simple | none。\n",
+            "# File icon display mode: by_type | simple | none.\n",
+        ),
+        (
             "# メインウィンドウ位置とサイズ。\n",
             "# Main window position and size.\n",
         ),
@@ -322,6 +326,11 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     out.push_str(&format!(
         "ui_language = {}\n\n",
         Value::String(config.ui_language.as_str().to_string())
+    ));
+    out.push_str("# ファイルアイコン表示: by_type | simple | none。\n");
+    out.push_str(&format!(
+        "ui_file_icon_mode = {}\n\n",
+        Value::String(config.ui_file_icon_mode.as_str().to_string())
     ));
     out.push_str("# メインウィンドウ位置とサイズ。\n");
     out.push_str(&format!("ui_window_x = {}\n", config.ui_window_x));

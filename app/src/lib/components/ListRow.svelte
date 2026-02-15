@@ -5,6 +5,7 @@
   export let focused = false;
   export let showSize = false;
   export let showTime = false;
+  export let uiFileIconMode = "by_type";
   export let formatName;
   export let formatSize;
   export let formatModified;
@@ -19,7 +20,7 @@
   export let onContextMenu;
   export let onDoubleClick;
 
-  $: entryIcon = getEntryIcon(entry);
+  $: entryIcon = getEntryIcon(entry, uiFileIconMode);
 </script>
 
 <div
@@ -39,7 +40,9 @@
   }}
 >
   <div class="name">
-    <span class="icon">{entryIcon}</span>
+    {#if entryIcon}
+      <span class="icon">{entryIcon}</span>
+    {/if}
     <span class="text">{formatName(entry.name, entry.ext)}</span>
     {#if overflowLeft && visualIndex === visibleColStart * listRows}
       <span class="edge-marker left">◀</span>

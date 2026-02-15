@@ -51,6 +51,9 @@ export function buildPageMountStateFromState(params) {
       uiLanguage: (value) => {
         state.ui_language = value;
       },
+      uiFileIconMode: (value) => {
+        state.ui_file_icon_mode = value;
+      },
       keymapProfile: (value) => {
         state.keymapProfile = value;
       },

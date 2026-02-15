@@ -14,6 +14,7 @@ export function buildViewInputStateFromVars(vars) {
     treeFocusedIndex: vars.treeFocusedIndex,
     showSize: vars.showSize,
     showTime: vars.showTime,
+    uiFileIconMode: vars.uiFileIconMode,
     loading: vars.loading,
     filteredEntries: vars.filteredEntries,
     entries: vars.entries,

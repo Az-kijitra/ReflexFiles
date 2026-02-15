@@ -7,6 +7,7 @@
   export let listBodyEl = null;
   export let showSize = false;
   export let showTime = false;
+  export let uiFileIconMode = "by_type";
   export let loading = false;
   export let filteredEntries = [];
   export let entries = [];
@@ -67,6 +68,7 @@
           {visualIndex}
           {showSize}
           {showTime}
+          {uiFileIconMode}
           {formatName}
           {formatSize}
           {formatModified}

@@ -16,6 +16,7 @@ export function buildViewPropsInputsState(params) {
     treeFocusedIndex: state.tree.treeFocusedIndex,
     showSize: state.list.showSize,
     showTime: state.list.showTime,
+    uiFileIconMode: state.list.uiFileIconMode,
     loading: state.list.loading,
     filteredEntries: state.list.filteredEntries,
     entries: state.list.entries,

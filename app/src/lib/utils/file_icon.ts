@@ -15,6 +15,17 @@ function normalizeName(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+/**
+ * @param {string} value
+ */
+function normalizeMode(value) {
+  const mode = String(value || "").trim().toLowerCase();
+  if (mode === "simple" || mode === "none") {
+    return mode;
+  }
+  return "by_type";
+}
+
 const IMAGE_EXTS = new Set([
   "png", "jpg", "jpeg", "bmp", "gif", "webp", "svg", "ico", "tif", "tiff", "avif", "heic", "heif"
 ]);
@@ -43,8 +54,17 @@ const GIT_BASENAMES = new Set([".gitignore", ".gitattributes", ".gitmodules"]);
 
 /**
  * @param {{ type: "file" | "dir", name?: string, ext?: string }} entry
+ * @param {"by_type" | "simple" | "none"} [mode]
  */
-export function getEntryIcon(entry) {
+export function getEntryIcon(entry, mode = "by_type") {
+  const normalizedMode = normalizeMode(mode);
+  if (normalizedMode === "none") {
+    return "";
+  }
+  if (normalizedMode === "simple") {
+    return entry?.type === "dir" ? "📁" : "📄";
+  }
+
   if (!entry || entry.type === "dir") {
     return "📁";
   }

@@ -22,6 +22,7 @@ export function buildViewInputStateFromState(params) {
     treeFocusedIndex: state.treeFocusedIndex,
     showSize: state.showSize,
     showTime: state.showTime,
+    uiFileIconMode: state.ui_file_icon_mode,
     loading: state.loading,
     filteredEntries: state.filteredEntries,
     entries: state.entries,

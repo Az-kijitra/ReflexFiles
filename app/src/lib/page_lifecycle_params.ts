@@ -23,6 +23,7 @@ export function buildLifecycleParams(params) {
     setSortOrder: params.setSortOrder,
     setUiTheme: params.setUiTheme,
     setUiLanguage: params.setUiLanguage,
+    setUiFileIconMode: params.setUiFileIconMode,
     setKeymapProfile: params.setKeymapProfile,
     setExternalAppAssociations: params.setExternalAppAssociations,
     setExternalApps: params.setExternalApps,

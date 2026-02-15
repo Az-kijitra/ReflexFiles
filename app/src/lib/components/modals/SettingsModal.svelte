@@ -9,11 +9,20 @@
   export let initial = {};
   export let profiles = [];
   export let saving = false;
+  export let testing = false;
+  export let testMessage = "";
+  export let testIsError = false;
+  export let reporting = false;
+  export let reportMessage = "";
+  export let reportIsError = false;
+  export let shortcutConflicts = [];
   export let error = "";
 
   export let onCancel = () => {};
   export let onSave = () => {};
   export let onOpenConfig = () => {};
+  export let onExportReport = () => {};
+  export let onRunDiagnostic = () => {};
 
   let activeSection = "general";
   let draft = {};
@@ -21,6 +30,10 @@
   $: draft = {
     ui_theme: initial.ui_theme ?? "light",
     ui_language: initial.ui_language ?? "en",
+    ui_file_icon_mode:
+      initial.ui_file_icon_mode === "simple" || initial.ui_file_icon_mode === "none"
+        ? initial.ui_file_icon_mode
+        : "by_type",
     perf_dir_stats_timeout_ms: Number(initial.perf_dir_stats_timeout_ms ?? 3000),
     external_vscode_path: initial.external_vscode_path ?? "",
     external_git_client_path: initial.external_git_client_path ?? "",
@@ -40,6 +53,10 @@
     return {
       ui_theme: values?.ui_theme ?? "light",
       ui_language: values?.ui_language ?? "en",
+      ui_file_icon_mode:
+        values?.ui_file_icon_mode === "simple" || values?.ui_file_icon_mode === "none"
+          ? values.ui_file_icon_mode
+          : "by_type",
       perf_dir_stats_timeout_ms: clampTimeoutMs(values?.perf_dir_stats_timeout_ms),
       external_vscode_path: String(values?.external_vscode_path || "").trim(),
       external_git_client_path: String(values?.external_git_client_path || "").trim(),
@@ -152,6 +169,16 @@
         </label>
 
         <label class="settings-row">
+          <span>{t("settings.file_icon_mode")}</span>
+          <select bind:value={draft.ui_file_icon_mode}>
+            <option value="by_type">{t("settings.file_icon_mode_by_type")}</option>
+            <option value="simple">{t("settings.file_icon_mode_simple")}</option>
+            <option value="none">{t("settings.file_icon_mode_none")}</option>
+          </select>
+          <small>{t("settings.desc.file_icon_mode")}</small>
+        </label>
+
+        <label class="settings-row">
           <span>{t("settings.dir_stats_timeout")}</span>
           <input
             type="number"
@@ -218,6 +245,38 @@
           <input type="text" bind:value={draft.external_git_client_path} />
           <small>{t("settings.desc.external_git_client_path")}</small>
         </label>
+
+        <div class="settings-diagnostics">
+          <div class="settings-profile-title">{t("settings.external_diagnostics")}</div>
+          <div class="settings-diagnostics-actions">
+            <button
+              type="button"
+              disabled={testing}
+              onclick={() => onRunDiagnostic?.("terminal", normalizedDraft)}
+            >
+              {t("settings.test_terminal")}
+            </button>
+            <button
+              type="button"
+              disabled={testing}
+              onclick={() => onRunDiagnostic?.("vscode", normalizedDraft)}
+            >
+              {t("settings.test_vscode")}
+            </button>
+            <button
+              type="button"
+              disabled={testing}
+              onclick={() => onRunDiagnostic?.("git", normalizedDraft)}
+            >
+              {t("settings.test_git_client")}
+            </button>
+          </div>
+          {#if testing}
+            <p class="settings-help">{t("settings.test_running")}</p>
+          {:else if testMessage}
+            <p class:test-error={testIsError} class="settings-test-message">{testMessage}</p>
+          {/if}
+        </div>
       {/if}
 
       {#if activeSection === "advanced"}
@@ -227,7 +286,16 @@
           <button type="button" onclick={() => onOpenConfig?.()}>
             {t("settings.open_config_file")}
           </button>
+          <button type="button" disabled={reporting} onclick={() => onExportReport?.()}>
+            {t("settings.export_diagnostic_report")}
+          </button>
         </div>
+        <p class="settings-help settings-help-compact">{t("settings.desc.export_diagnostic_report")}</p>
+        {#if reporting}
+          <p class="settings-help settings-help-compact">{t("settings.report_running")}</p>
+        {:else if reportMessage}
+          <p class:test-error={reportIsError} class="settings-test-message">{reportMessage}</p>
+        {/if}
 
         <div class="settings-profile-list">
           <div class="settings-profile-title">{t("settings.detected_profiles")}</div>
@@ -244,6 +312,19 @@
             </ul>
           {:else}
             <p>{t("settings.no_profiles")}</p>
+          {/if}
+        </div>
+
+        <div class="settings-shortcut-conflicts">
+          <div class="settings-profile-title">{t("settings.shortcut_conflicts")}</div>
+          {#if Array.isArray(shortcutConflicts) && shortcutConflicts.length > 0}
+            <ul>
+              {#each shortcutConflicts as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          {:else}
+            <p>{t("settings.no_shortcut_conflicts")}</p>
           {/if}
         </div>
       {/if}
@@ -422,6 +503,29 @@
     font-size: 12px;
   }
 
+  .settings-diagnostics {
+    border-top: 1px solid var(--ui-border);
+    margin-top: 8px;
+    padding-top: 12px;
+  }
+
+  .settings-diagnostics-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .settings-test-message {
+    margin: 8px 0 0;
+    color: var(--ui-muted);
+    font-size: 12px;
+  }
+
+  .settings-test-message.test-error {
+    color: var(--ui-error);
+  }
+
   .default-badge {
     display: inline-block;
     margin-left: 8px;
@@ -430,6 +534,25 @@
     border: 1px solid var(--ui-border-strong);
     color: var(--ui-muted);
     border-radius: 10px;
+  }
+  .settings-help-compact {
+    margin: 4px 0 10px;
+  }
+
+  .settings-shortcut-conflicts {
+    border-top: 1px solid var(--ui-border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .settings-shortcut-conflicts ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .settings-shortcut-conflicts li {
+    margin-bottom: 4px;
+    font-size: 12px;
   }
 </style>
 

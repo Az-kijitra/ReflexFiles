@@ -151,11 +151,20 @@
   let settingsOpen = $state(false);
   let settingsSaving = $state(false);
   let settingsError = $state("");
+  let settingsTesting = $state(false);
+  let settingsTestMessage = $state("");
+  let settingsTestIsError = $state(false);
+  let settingsReporting = $state(false);
+  let settingsReportMessage = $state("");
+  let settingsReportIsError = $state(false);
+  /** @type {string[]} */
+  let settingsShortcutConflicts = $state([]);
   /** @type {Array<{ name: string, guid: string, source: string, is_default: boolean }>} */
   let settingsProfiles = $state([]);
   let settingsInitial = $state({
     ui_theme: "light",
     ui_language: "en",
+    ui_file_icon_mode: "by_type",
     perf_dir_stats_timeout_ms: 3000,
     external_vscode_path: "",
     external_git_client_path: "",
@@ -414,6 +423,10 @@
     return {
       ui_theme: config?.ui_theme === "dark" ? "dark" : "light",
       ui_language: config?.ui_language === "ja" ? "ja" : "en",
+      ui_file_icon_mode:
+        config?.ui_file_icon_mode === "simple" || config?.ui_file_icon_mode === "none"
+          ? config.ui_file_icon_mode
+          : "by_type",
       perf_dir_stats_timeout_ms: Math.max(500, Number(config?.perf_dir_stats_timeout_ms || 3000)),
       external_vscode_path: String(config?.external_vscode_path || ""),
       external_git_client_path: String(config?.external_git_client_path || ""),
@@ -426,9 +439,43 @@
     };
   }
 
+  const KNOWN_SHORTCUT_CONFLICTS = {
+    [normalizeKeyString("Ctrl+Alt+G")]: "settings.shortcut_conflict_google_drive",
+  };
+
+  function collectSettingsShortcutConflicts() {
+    const next = [];
+    const seen = new Set();
+    for (const action of KEYMAP_ACTIONS) {
+      const bindings = keymapBindings.getActionBindings(action.id);
+      for (const binding of bindings) {
+        const normalized = normalizeKeyString(binding);
+        const reasonKey = KNOWN_SHORTCUT_CONFLICTS[normalized];
+        if (!reasonKey) continue;
+        const dedupeKey = `${action.id}:${normalized}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        next.push(
+          t("settings.shortcut_conflict_item", {
+            binding: normalized,
+            action: t(action.labelKey),
+            reason: t(reasonKey),
+          })
+        );
+      }
+    }
+    settingsShortcutConflicts = next;
+  }
+
   async function openSettingsModal() {
     settingsSaving = false;
     settingsError = "";
+    settingsTesting = false;
+    settingsTestMessage = "";
+    settingsTestIsError = false;
+    settingsReporting = false;
+    settingsReportMessage = "";
+    settingsReportIsError = false;
     try {
       const config = await invoke("config_get");
       settingsInitial = normalizeSettingsConfig(config || {});
@@ -437,6 +484,7 @@
       settingsInitial = normalizeSettingsConfig({
         ui_theme: state.ui_theme,
         ui_language: state.ui_language,
+        ui_file_icon_mode: state.ui_file_icon_mode,
         perf_dir_stats_timeout_ms: state.dirStatsTimeoutMs,
       });
     }
@@ -448,6 +496,7 @@
       settingsProfiles = [];
     }
 
+    collectSettingsShortcutConflicts();
     settingsOpen = true;
   }
 
@@ -467,6 +516,7 @@
       const saved = await invoke("config_save_preferences", {
         uiTheme: values.ui_theme,
         uiLanguage: values.ui_language,
+        uiFileIconMode: values.ui_file_icon_mode,
         perfDirStatsTimeoutMs: Number(values.perf_dir_stats_timeout_ms || 3000),
         externalVscodePath: values.external_vscode_path || "",
         externalGitClientPath: values.external_git_client_path || "",
@@ -479,6 +529,7 @@
       settingsInitial = normalizeSettingsConfig(saved || values);
       state.ui_theme = settingsInitial.ui_theme;
       state.ui_language = settingsInitial.ui_language;
+      state.ui_file_icon_mode = settingsInitial.ui_file_icon_mode;
       state.dirStatsTimeoutMs = settingsInitial.perf_dir_stats_timeout_ms;
       actions.setStatusMessage(t("settings.saved"), 1500);
       closeSettingsModal();
@@ -495,6 +546,113 @@
       actions.setStatusMessage(t("status.opened_config"), 1500);
     } catch (err) {
       settingsError = `${t("status.open_failed")}: ${formatError(err, "unknown error", t)}`;
+    }
+  }
+
+  async function exportDiagnosticReport() {
+    settingsReporting = true;
+    settingsReportMessage = "";
+    settingsReportIsError = false;
+    try {
+      const reportPath = await invoke("config_generate_diagnostic_report", {
+        openAfterWrite: true,
+      });
+      settingsReportMessage = t("settings.report_ok", { path: String(reportPath || "") });
+      actions.setStatusMessage(t("settings.report_ready"), 1800);
+    } catch (err) {
+      settingsReportIsError = true;
+      settingsReportMessage = t("settings.report_failed", {
+        error: formatError(err, "unknown error", t),
+      });
+    } finally {
+      settingsReporting = false;
+    }
+  }
+
+  function normalizeExecutablePath(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (
+      (raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'"))
+    ) {
+      return raw.slice(1, -1).trim();
+    }
+    return raw;
+  }
+
+  async function runSettingsDiagnostic(kind, values) {
+    settingsTesting = true;
+    settingsTestMessage = "";
+    settingsTestIsError = false;
+    settingsReporting = false;
+    settingsReportMessage = "";
+    settingsReportIsError = false;
+
+    const targetPath = String(state.currentPath || "").trim();
+    if (!targetPath) {
+      settingsTestIsError = true;
+      settingsTestMessage = t("settings.test_path_missing");
+      settingsTesting = false;
+      return;
+    }
+
+    try {
+      if (kind === "terminal") {
+        const profile = String(values?.external_terminal_profile || "").trim();
+        if (profile) {
+          await invoke("external_open_terminal_profile", {
+            path: targetPath,
+            profile,
+          });
+        } else {
+          await invoke("external_open_terminal_kind", {
+            path: targetPath,
+            kind: "cmd",
+          });
+        }
+        settingsTestMessage = t("settings.test_ok", { target: t("settings.test_terminal") });
+      } else if (kind === "vscode") {
+        const command = normalizeExecutablePath(values?.external_vscode_path);
+        if (command) {
+          try {
+            await invoke("external_open_custom", { command, args: [targetPath] });
+          } catch {
+            await invoke("external_open_vscode", { path: targetPath });
+          }
+        } else {
+          await invoke("external_open_vscode", { path: targetPath });
+        }
+        settingsTestMessage = t("settings.test_ok", { target: t("settings.test_vscode") });
+      } else if (kind === "git") {
+        const command = normalizeExecutablePath(values?.external_git_client_path);
+        if (command) {
+          try {
+            await invoke("external_open_custom", { command, args: [targetPath] });
+          } catch {
+            await invoke("external_open_git_client", { path: targetPath });
+          }
+        } else {
+          await invoke("external_open_git_client", { path: targetPath });
+        }
+        settingsTestMessage = t("settings.test_ok", { target: t("settings.test_git_client") });
+      } else {
+        throw new Error("unknown diagnostics target");
+      }
+      actions.setStatusMessage(settingsTestMessage, 1800);
+    } catch (err) {
+      settingsTestIsError = true;
+      settingsTestMessage = t("settings.test_failed", {
+        target:
+          kind === "terminal"
+            ? t("settings.test_terminal")
+            : kind === "vscode"
+              ? t("settings.test_vscode")
+              : t("settings.test_git_client"),
+        error: formatError(err, "unknown error", t),
+      });
+    } finally {
+      settingsTesting = false;
     }
   }
 
@@ -528,10 +686,19 @@
     initial={settingsInitial}
     profiles={settingsProfiles}
     saving={settingsSaving}
+    testing={settingsTesting}
+    testMessage={settingsTestMessage}
+    testIsError={settingsTestIsError}
+    reporting={settingsReporting}
+    reportMessage={settingsReportMessage}
+    reportIsError={settingsReportIsError}
+    shortcutConflicts={settingsShortcutConflicts}
     error={settingsError}
     onCancel={closeSettingsModal}
     onSave={saveSettings}
     onOpenConfig={openConfigFromSettings}
+    onExportReport={exportDiagnosticReport}
+    onRunDiagnostic={runSettingsDiagnostic}
     {trapModalTab}
     {autofocus}
   />

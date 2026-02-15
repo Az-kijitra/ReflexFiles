@@ -30,6 +30,7 @@ export function setupPageLifecycleFromParts({ deps, state, handlers }) {
       setSortOrder: state.setSortOrder,
       setUiTheme: state.setUiTheme,
       setUiLanguage: state.setUiLanguage,
+      setUiFileIconMode: state.setUiFileIconMode,
       setKeymapProfile: state.setKeymapProfile,
       setExternalAppAssociations: state.setExternalAppAssociations,
       setExternalApps: state.setExternalApps,

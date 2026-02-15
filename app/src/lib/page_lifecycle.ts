@@ -20,6 +20,7 @@
  * @param {(value: string) => void} ctx.setSortOrder
  * @param {(value: "light" | "dark") => void} ctx.setUiTheme
  * @param {(value: "en" | "ja") => void} ctx.setUiLanguage
+ * @param {(value: "by_type" | "simple" | "none") => void} ctx.setUiFileIconMode
  * @param {(value: "windows" | "vim") => void} ctx.setKeymapProfile
  * @param {(value: Record<string, string>) => void} ctx.setExternalAppAssociations
  * @param {(value: import("$lib/types").ExternalAppConfig[]) => void} ctx.setExternalApps
@@ -77,6 +78,9 @@ export async function setupPageLifecycle(ctx) {
     }
     if (config?.ui_language) {
       ctx.setUiLanguage(config.ui_language);
+    }
+    if (config?.ui_file_icon_mode) {
+      ctx.setUiFileIconMode(config.ui_file_icon_mode);
     }
     if (config?.input_keymap_profile) {
       ctx.setKeymapProfile(config.input_keymap_profile);

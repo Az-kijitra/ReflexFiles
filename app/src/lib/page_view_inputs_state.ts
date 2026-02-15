@@ -19,6 +19,7 @@ export function buildViewInputsState(params) {
     list: {
       showSize: params.state.showSize,
       showTime: params.state.showTime,
+      uiFileIconMode: params.state.uiFileIconMode,
       loading: params.state.loading,
       filteredEntries: params.state.filteredEntries,
       entries: params.state.entries,

@@ -22,6 +22,8 @@ pub struct AppConfig {
     pub ui_show_time: bool,
     #[serde(rename = "ui_show_tree", alias = "show_tree", default = "default_true")]
     pub ui_show_tree: bool,
+    #[serde(rename = "ui_file_icon_mode", alias = "file_icon_mode")]
+    pub ui_file_icon_mode: FileIconMode,
     #[serde(rename = "view_sort_key", alias = "sort_key")]
     pub view_sort_key: SortKey,
     #[serde(rename = "view_sort_order", alias = "sort_order")]
@@ -115,6 +117,41 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme::Light
+    }
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum FileIconMode {
+    ByType,
+    Simple,
+    None,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FileIconMode {
+    pub fn parse(value: &str) -> Self {
+        match value {
+            "simple" => FileIconMode::Simple,
+            "none" => FileIconMode::None,
+            _ => FileIconMode::ByType,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FileIconMode::ByType => "by_type",
+            FileIconMode::Simple => "simple",
+            FileIconMode::None => "none",
+            FileIconMode::Unknown => "by_type",
+        }
+    }
+}
+
+impl Default for FileIconMode {
+    fn default() -> Self {
+        FileIconMode::ByType
     }
 }
 

@@ -16,6 +16,7 @@
  *     sortOrder: (value: string) => void;
  *     uiTheme: (value: "light" | "dark") => void;
  *     uiLanguage: (value: "en" | "ja") => void;
+ *     uiFileIconMode: (value: "by_type" | "simple" | "none") => void;
  *     keymapProfile: (value: "windows" | "vim") => void;
  *     externalAppAssociations: (value: Record<string, string>) => void;
  *     externalApps: (value: import("$lib/types").ExternalAppConfig[]) => void;
@@ -71,6 +72,9 @@ export function buildPageMountStateFromVars(params) {
     },
     setUiLanguage: (value) => {
       params.set.uiLanguage(value);
+    },
+    setUiFileIconMode: (value) => {
+      params.set.uiFileIconMode(value);
     },
     setKeymapProfile: (value) => {
       params.set.keymapProfile(value);

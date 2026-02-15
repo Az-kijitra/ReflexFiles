@@ -11,6 +11,7 @@
  *   treeFocusedIndex: number;
  *   showSize: boolean;
  *   showTime: boolean;
+ *   uiFileIconMode: "by_type" | "simple" | "none";
  *   loading: boolean;
  *   filteredEntries: any[];
  *   entries: any[];
@@ -66,6 +67,7 @@ export function buildViewState(params) {
     treeFocusedIndex: params.treeFocusedIndex,
     showSize: params.showSize,
     showTime: params.showTime,
+    uiFileIconMode: params.uiFileIconMode,
     loading: params.loading,
     filteredEntries: params.filteredEntries,
     entries: params.entries,

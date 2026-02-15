@@ -16,6 +16,8 @@
   const IMAGE_PREFETCH_OPPOSITE_NEIGHBORS = 1;
   const IMAGE_SRC_CACHE_LIMIT = 32;
   const IMAGE_PRELOADED_OBJECT_LIMIT = 16;
+  const IMAGE_PREVIEW_CACHE_LIMIT = 48;
+  const IMAGE_QUICK_PREVIEW_DELAY_MS = 120;
   const VIRTUAL_LINE_HEIGHT_PX = 20;
   const VIRTUAL_SCROLL_MAX_PX = 20_000_000;
   const VIRTUAL_PROFILE_STORAGE_KEY = "__rf_viewer_virtual_profile";
@@ -84,6 +86,8 @@
   let imagePrefetchWorkerRunning = false;
   let imagePrefetchDirection = 1;
   const imagePreloadedObjects = new Map();
+  const imagePreviewCache = new Map();
+  let imageOpenToken = 0;
   let imageZoom = $state(1);
   let imageZoomMode = $state("fit");
   let imageNaturalWidth = $state(0);
@@ -1015,6 +1019,119 @@
     return cached;
   }
 
+  function cacheImagePreview(path, src) {
+    const key = normalizePathForCompare(path);
+    const value = String(src || "");
+    if (!key || !value) {
+      return;
+    }
+    if (imagePreviewCache.has(key)) {
+      imagePreviewCache.delete(key);
+    }
+    imagePreviewCache.set(key, value);
+    while (imagePreviewCache.size > IMAGE_PREVIEW_CACHE_LIMIT) {
+      const oldest = imagePreviewCache.keys().next().value;
+      if (oldest === undefined) break;
+      imagePreviewCache.delete(oldest);
+    }
+  }
+
+  function getCachedImagePreview(path) {
+    const key = normalizePathForCompare(path);
+    if (!key) {
+      return "";
+    }
+    const cached = imagePreviewCache.get(key);
+    if (!cached) {
+      return "";
+    }
+    imagePreviewCache.delete(key);
+    imagePreviewCache.set(key, cached);
+    return String(cached || "");
+  }
+
+  async function resolveNormalizedPreviewSrc(path) {
+    const targetPath = String(path || "");
+    if (!targetPath) {
+      return "";
+    }
+    const cached = getCachedImagePreview(targetPath);
+    if (cached) {
+      return cached;
+    }
+    const normalizedPath = await invoke("fs_read_image_normalized_temp_path", { path: targetPath });
+    const previewSrc = toViewerImageSrc(String(normalizedPath || ""));
+    if (previewSrc) {
+      cacheImagePreview(targetPath, previewSrc);
+    }
+    return previewSrc;
+  }
+
+  function waitMs(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, Math.max(0, Number(ms) || 0));
+    });
+  }
+
+  function isSamePath(a, b) {
+    return normalizePathForCompare(a) === normalizePathForCompare(b);
+  }
+
+  async function tryUpgradeImageToDirect(path, token) {
+    if (token !== imageOpenToken || currentKind !== "image" || !isSamePath(currentPath, path)) {
+      return;
+    }
+    const directSrc = toViewerImageSrc(path);
+    if (!directSrc) {
+      return;
+    }
+    const ok = await canLoadImageSource(directSrc);
+    if (!ok) {
+      return;
+    }
+    if (token !== imageOpenToken || currentKind !== "image" || !isSamePath(currentPath, path)) {
+      return;
+    }
+    setImageSource(directSrc, "direct");
+  }
+
+  async function maybeApplyImageQuickPreview(path, token) {
+    await waitMs(IMAGE_QUICK_PREVIEW_DELAY_MS);
+    if (
+      token !== imageOpenToken ||
+      currentKind !== "image" ||
+      !isSamePath(currentPath, path) ||
+      imageLoaded ||
+      imageLoadError
+    ) {
+      return;
+    }
+
+    let previewSrc = getCachedImagePreview(path);
+    if (!previewSrc) {
+      try {
+        previewSrc = await resolveNormalizedPreviewSrc(path);
+      } catch {
+        previewSrc = "";
+      }
+    }
+
+    if (!previewSrc) {
+      return;
+    }
+    if (
+      token !== imageOpenToken ||
+      currentKind !== "image" ||
+      !isSamePath(currentPath, path) ||
+      imageLoaded ||
+      imageLoadError
+    ) {
+      return;
+    }
+
+    setImageSource(previewSrc, "normalized");
+    void tryUpgradeImageToDirect(path, token);
+  }
   function rememberPreloadedImage(src, img) {
     if (!src || !img) {
       return;
@@ -1516,6 +1633,7 @@
     resetView();
     loading = true;
     currentKind = detectKind(currentPath);
+    const imageToken = ++imageOpenToken;
     pendingMarkdownJumpHeading = "";
 
     try {
@@ -1524,16 +1642,19 @@
         if (cached) {
           imageLoadFallbackStage = Number(cached.stage ?? 0) || 0;
           setImageSource(String(cached.src || ""), cached.kind || "direct");
+          if ((cached.kind || "") === "normalized") {
+            void tryUpgradeImageToDirect(currentPath, imageToken);
+          }
           void prefetchNeighborImages();
           return;
         }
 
         imageLoadFallbackStage = 0;
         setImageSource(toViewerImageSrc(currentPath), "direct");
+        void maybeApplyImageQuickPreview(currentPath, imageToken);
         void prefetchNeighborImages();
         return;
       }
-
       const viewportInfoRaw = await invoke("fs_text_viewport_info", {
         path: currentPath,
       });

@@ -47,6 +47,7 @@ pub fn run() {
             crate::config_cmds::config_get,
             crate::config_cmds::config_get_path,
             crate::config_cmds::config_open_in_editor,
+            crate::config_cmds::config_generate_diagnostic_report,
             crate::config_cmds::config_set_dir_stats_timeout,
             crate::config_cmds::config_save_preferences,
             crate::config_cmds::config_save_ui_state,
@@ -100,4 +101,3 @@ fn configure_windows_webview_logging() {
 
 #[cfg(not(target_os = "windows"))]
 fn configure_windows_webview_logging() {}
-

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::config_io::{config_path, load_history, load_jump_list};
-use crate::config_types::{AppConfig, KeymapProfile, Language, SortKey, SortOrder, Theme};
+use crate::config_types::{AppConfig, FileIconMode, KeymapProfile, Language, SortKey, SortOrder, Theme};
 
 pub fn default_app_config() -> AppConfig {
     AppConfig {
@@ -12,6 +12,7 @@ pub fn default_app_config() -> AppConfig {
         ui_show_size: true,
         ui_show_time: false,
         ui_show_tree: true,
+        ui_file_icon_mode: FileIconMode::ByType,
         view_sort_key: SortKey::Name,
         view_sort_order: SortOrder::Asc,
         history_paths: vec![],
@@ -62,6 +63,39 @@ fn default_language() -> Language {
     }
     Language::En
 }
+
+fn normalize_single_line(value: &str, max_len: usize) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.trim().chars() {
+        if !ch.is_control() {
+            out.push(ch);
+        }
+    }
+    if out.len() > max_len {
+        out.truncate(max_len);
+    }
+    out
+}
+
+fn strip_wrapping_quotes(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.len() >= 2 {
+        let bytes = trimmed.as_bytes();
+        let first = bytes[0];
+        let last = bytes[bytes.len() - 1];
+        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
+            return trimmed[1..trimmed.len() - 1].trim().to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+fn normalize_executable_path(value: &str) -> String {
+    let compact = normalize_single_line(value, 1024);
+    let unquoted = strip_wrapping_quotes(&compact);
+    normalize_single_line(&unquoted, 1024)
+}
+
 pub fn normalize_config(mut config: AppConfig) -> AppConfig {
     if config.config_version == 0 {
         config.config_version = 1;
@@ -69,12 +103,15 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
     if config.perf_dir_stats_timeout_ms < 500 {
         config.perf_dir_stats_timeout_ms = 500;
     }
+
+    config.log_path = normalize_single_line(&config.log_path, 1024);
     let legacy = legacy_default_log_path().to_string_lossy().to_string();
     if config.log_path.trim().is_empty()
         || normalized_path_text(&config.log_path) == normalized_path_text(&legacy)
     {
         config.log_path = default_log_path().to_string_lossy().to_string();
     }
+
     if matches!(config.view_sort_key, SortKey::Unknown) {
         config.view_sort_key = SortKey::default();
     }
@@ -84,15 +121,30 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
     if matches!(config.ui_theme, Theme::Unknown) {
         config.ui_theme = Theme::default();
     }
+    if matches!(config.ui_file_icon_mode, FileIconMode::Unknown) {
+        config.ui_file_icon_mode = FileIconMode::default();
+    }
     if matches!(config.ui_language, Language::Unknown) {
         config.ui_language = default_language();
     }
     if matches!(config.input_keymap_profile, KeymapProfile::Unknown) {
         config.input_keymap_profile = KeymapProfile::default();
     }
+
+    config.external_vscode_path = normalize_executable_path(&config.external_vscode_path);
+    config.external_git_client_path = normalize_executable_path(&config.external_git_client_path);
+    config.external_terminal_profile = normalize_single_line(&config.external_terminal_profile, 256);
+    config.external_terminal_profile_cmd =
+        normalize_single_line(&config.external_terminal_profile_cmd, 256);
+    config.external_terminal_profile_powershell =
+        normalize_single_line(&config.external_terminal_profile_powershell, 256);
+    config.external_terminal_profile_wsl =
+        normalize_single_line(&config.external_terminal_profile_wsl, 256);
+
     if config.external_apps.is_empty() {
         config.external_apps = Vec::new();
     }
+
     let history = load_history();
     if !history.is_empty() {
         config.history_paths = history;
@@ -129,4 +181,3 @@ fn local_app_data_base() -> PathBuf {
 fn normalized_path_text(value: &str) -> String {
     value.replace('/', "\\").to_ascii_lowercase()
 }
-

@@ -1,4 +1,4 @@
 pub use crate::types::{
-    AppConfig, HistoryFile, JumpItem, JumpListFile, KeymapProfile, Language, SortKey, SortOrder,
+    AppConfig, FileIconMode, HistoryFile, JumpItem, JumpListFile, KeymapProfile, Language, SortKey, SortOrder,
     Theme,
 };

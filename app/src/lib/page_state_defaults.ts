@@ -25,6 +25,7 @@ export function createPageStateDefaults() {
     sortOrder: "asc",
     ui_theme: "light",
     ui_language: "en",
+    ui_file_icon_mode: "by_type",
     keymapProfile: "windows",
     keymapCustom: {},
     externalAppAssociations: {},

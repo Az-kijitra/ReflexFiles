@@ -1,6 +1,7 @@
 export type Theme = "light" | "dark";
 export type Language = "en" | "ja";
 export type KeymapProfile = "windows" | "vim";
+export type FileIconMode = "by_type" | "simple" | "none";
 export type SortKey = "name" | "size" | "type" | "modified";
 export type SortOrder = "asc" | "desc";
 
@@ -33,6 +34,7 @@ export interface AppConfig {
   history_search: string[];
   ui_theme: Theme;
   ui_language: Language;
+  ui_file_icon_mode: FileIconMode;
   ui_window_x: number;
   ui_window_y: number;
   ui_window_width: number;

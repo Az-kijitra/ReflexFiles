@@ -42,6 +42,7 @@ export function buildFileListProps(params) {
   return {
     showSize: params.showSize,
     showTime: params.showTime,
+    uiFileIconMode: params.uiFileIconMode,
     loading: params.loading,
     filteredEntries: params.filteredEntries,
     entries: params.entries,

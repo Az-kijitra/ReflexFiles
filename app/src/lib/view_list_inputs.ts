@@ -9,6 +9,7 @@ export function buildListViewInputs({ state, actions, formatters, helpers }) {
   return {
     showSize: state.showSize,
     showTime: state.showTime,
+    uiFileIconMode: state.uiFileIconMode,
     loading: state.loading,
     filteredEntries: state.filteredEntries,
     entries: state.entries,
