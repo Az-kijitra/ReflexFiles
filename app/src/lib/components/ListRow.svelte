@@ -1,4 +1,5 @@
 <script>
+  import { getEntryIcon } from "$lib/utils/file_icon";
   export let entry;
   export let selected = false;
   export let focused = false;
@@ -17,6 +18,8 @@
   export let onClick;
   export let onContextMenu;
   export let onDoubleClick;
+
+  $: entryIcon = getEntryIcon(entry);
 </script>
 
 <div
@@ -36,7 +39,7 @@
   }}
 >
   <div class="name">
-    <span class="icon">{entry.type === "dir" ? "📁" : "📄"}</span>
+    <span class="icon">{entryIcon}</span>
     <span class="text">{formatName(entry.name, entry.ext)}</span>
     {#if overflowLeft && visualIndex === visibleColStart * listRows}
       <span class="edge-marker left">◀</span>
@@ -122,6 +125,12 @@
     gap: 6px;
     min-width: 0;
     overflow: hidden;
+  }
+
+  .name .icon {
+    width: 1.2em;
+    text-align: center;
+    flex: 0 0 auto;
   }
 
   .name .text {
