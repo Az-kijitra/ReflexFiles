@@ -88,6 +88,8 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 - **Ctrl+O**: ファイルを選択して開く
 - **Ctrl+F**: 検索パネルを開く（テキスト/Markdown）
 - **Ctrl + ホイール / Ctrl+Plus / Ctrl+Minus / Ctrl+0**: 拡大縮小（画像表示、または Markdown HTML 表示）
+- **Ctrl+Shift+1 / Ctrl+Shift+2 / Ctrl+Shift+3**: 大容量テキストのプリフェッチ設定（Fast / Balanced / Memory）
+
 
 ---
 
@@ -308,4 +310,3 @@ external_apps = [
 ### 参考: キー割り当て
 既定キーの一覧は、**ヘルプ → キー一覧** から確認できます。  
 `config.toml` に既定キー一覧は出力されません。変更したい場合は `input_keymap_custom` を使用してください。
-

@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from "svelte";
   import MarkdownIt from "markdown-it";
-  import { invoke, listen } from "$lib/tauri_client";
+  import { invoke, listen, convertFileSrc } from "$lib/tauri_client";
 
   const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
   const MAX_TEXT_BYTES = 2 * 1024 * 1024;
@@ -12,6 +12,10 @@
   const IMAGE_ZOOM_MAX = 8;
   const IMAGE_ZOOM_STEP = 1.2;
   const IMAGE_VIEW_PADDING = 32;
+  const IMAGE_PREFETCH_NEIGHBORS = 4;
+  const IMAGE_PREFETCH_OPPOSITE_NEIGHBORS = 1;
+  const IMAGE_SRC_CACHE_LIMIT = 32;
+  const IMAGE_PRELOADED_OBJECT_LIMIT = 16;
   const VIRTUAL_LINE_HEIGHT_PX = 20;
   const VIRTUAL_SCROLL_MAX_PX = 20_000_000;
   const VIRTUAL_PROFILE_STORAGE_KEY = "__rf_viewer_virtual_profile";
@@ -69,7 +73,17 @@
   let markdownArticleEl = $state();
   let pendingMarkdownJumpHeading = $state("");
   let imageSrc = $state("");
+  let imageLoadFallbackStage = $state(0);
   let imageLoadError = $state("");
+  let imageLoaded = $state(false);
+  let imageCurrentSourceKind = $state("direct");
+  const imageSourceCache = new Map();
+  const imagePrefetchInFlight = new Map();
+  const imagePrefetchQueued = new Set();
+  const imagePrefetchQueue = [];
+  let imagePrefetchWorkerRunning = false;
+  let imagePrefetchDirection = 1;
+  const imagePreloadedObjects = new Map();
   let imageZoom = $state(1);
   let imageZoomMode = $state("fit");
   let imageNaturalWidth = $state(0);
@@ -527,6 +541,9 @@
   function resetImageView() {
     imageSrc = "";
     imageLoadError = "";
+    imageLoaded = false;
+    imageCurrentSourceKind = "direct";
+    imageLoadFallbackStage = 0;
     imageZoom = 1;
     imageZoomMode = "fit";
     imageNaturalWidth = 0;
@@ -678,12 +695,24 @@
         siblingFilePaths = [...files, targetPath];
         siblingFileIndex = siblingFilePaths.length - 1;
       }
+      if (
+        currentKind === "image" &&
+        normalizePathForCompare(currentPath) === normalizePathForCompare(targetPath)
+      ) {
+        void prefetchNeighborImages();
+      }
     } catch {
       if (token !== siblingRefreshToken) {
         return;
       }
       siblingFilePaths = [targetPath];
       siblingFileIndex = 0;
+      if (
+        currentKind === "image" &&
+        normalizePathForCompare(currentPath) === normalizePathForCompare(targetPath)
+      ) {
+        void prefetchNeighborImages();
+      }
     }
   }
 
@@ -706,6 +735,7 @@
    * @param {-1 | 1} delta
    */
   function moveSiblingFile(delta) {
+    imagePrefetchDirection = delta >= 0 ? 1 : -1;
     if (!siblingFilePaths.length || siblingFileIndex < 0) {
       return;
     }
@@ -905,9 +935,247 @@
   /**
    * @param {string} path
    */
-  function isJpegPath(path) {
-    const value = String(path || "").toLowerCase();
-    return value.endsWith(".jpg") || value.endsWith(".jpeg");
+  function stripExtendedWindowsPathPrefix(path) {
+    const value = String(path || "");
+    if (value.startsWith("\\\\?\\")) {
+      return value.slice(4);
+    }
+    return value;
+  }
+
+  /**
+   * @param {string} path
+   */
+  function toViewerImageSrc(path) {
+    const normalizedPath = stripExtendedWindowsPathPrefix(path);
+    if (!normalizedPath) {
+      return "";
+    }
+    try {
+      return convertFileSrc(normalizedPath);
+    } catch {
+      const slashPath = normalizedPath.replaceAll("\\", "/");
+      if (/^[A-Za-z]:\//.test(slashPath)) {
+        return `file:///${encodeURI(slashPath)}`;
+      }
+      return `file://${encodeURI(slashPath)}`;
+    }
+  }
+
+  /**
+   * @param {string} src
+   * @param {"direct" | "raw" | "normalized"} kind
+   */
+  function setImageSource(src, kind = "direct") {
+    imageLoaded = false;
+    imageCurrentSourceKind = kind;
+    imageSrc = String(src || "");
+  }
+
+  function toImageFallbackStage(kind) {
+    if (kind === "raw") return 1;
+    if (kind === "normalized") return 2;
+    return 0;
+  }
+
+  function cacheImageSource(path, src, kind) {
+    const key = normalizePathForCompare(path);
+    const value = String(src || "");
+    if (!key || !value) {
+      return;
+    }
+    const normalizedKind = kind === "raw" || kind === "normalized" ? kind : "direct";
+    const entry = {
+      src: value,
+      kind: normalizedKind,
+      stage: toImageFallbackStage(normalizedKind),
+    };
+    if (imageSourceCache.has(key)) {
+      imageSourceCache.delete(key);
+    }
+    imageSourceCache.set(key, entry);
+    while (imageSourceCache.size > IMAGE_SRC_CACHE_LIMIT) {
+      const oldest = imageSourceCache.keys().next().value;
+      if (oldest === undefined) break;
+      imageSourceCache.delete(oldest);
+    }
+  }
+
+  function getCachedImageSource(path) {
+    const key = normalizePathForCompare(path);
+    if (!key) {
+      return null;
+    }
+    const cached = imageSourceCache.get(key);
+    if (!cached) {
+      return null;
+    }
+    imageSourceCache.delete(key);
+    imageSourceCache.set(key, cached);
+    return cached;
+  }
+
+  function rememberPreloadedImage(src, img) {
+    if (!src || !img) {
+      return;
+    }
+    if (imagePreloadedObjects.has(src)) {
+      imagePreloadedObjects.delete(src);
+    }
+    imagePreloadedObjects.set(src, img);
+    while (imagePreloadedObjects.size > IMAGE_PRELOADED_OBJECT_LIMIT) {
+      const oldest = imagePreloadedObjects.keys().next().value;
+      if (oldest === undefined) break;
+      imagePreloadedObjects.delete(oldest);
+    }
+  }
+
+  async function canLoadImageSource(src) {
+    const target = String(src || "");
+    if (!target) {
+      return false;
+    }
+    if (typeof Image === "undefined") {
+      return false;
+    }
+    return await new Promise((resolve) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        rememberPreloadedImage(target, img);
+        resolve(true);
+      };
+      img.onerror = () => resolve(false);
+      img.src = target;
+    });
+  }
+
+  async function prefetchImagePath(path) {
+    const targetPath = String(path || "");
+    if (!targetPath || detectKind(targetPath) !== "image") {
+      return;
+    }
+
+    const key = normalizePathForCompare(targetPath);
+    if (!key || imageSourceCache.has(key) || imagePrefetchInFlight.has(key)) {
+      return;
+    }
+
+    const task = (async () => {
+      const directSrc = toViewerImageSrc(targetPath);
+      if (directSrc && (await canLoadImageSource(directSrc))) {
+        cacheImageSource(targetPath, directSrc, "direct");
+        return;
+      }
+
+      try {
+        const rawDataUrl = await invoke("fs_read_image_data_url", {
+          path: targetPath,
+          normalize: false,
+        });
+        const rawSrc = String(rawDataUrl || "");
+        if (rawSrc && (await canLoadImageSource(rawSrc))) {
+          cacheImageSource(targetPath, rawSrc, "raw");
+          return;
+        }
+      } catch {
+        // ignore and continue
+      }
+
+      try {
+        const normalizedDataUrl = await invoke("fs_read_image_data_url", {
+          path: targetPath,
+          normalize: true,
+        });
+        const normalizedSrc = String(normalizedDataUrl || "");
+        if (normalizedSrc && (await canLoadImageSource(normalizedSrc))) {
+          cacheImageSource(targetPath, normalizedSrc, "normalized");
+        }
+      } catch {
+        // ignore final prefetch failure
+      }
+    })();
+
+    imagePrefetchInFlight.set(key, task);
+    try {
+      await task;
+    } finally {
+      imagePrefetchInFlight.delete(key);
+    }
+  }
+
+  function enqueueImagePrefetch(path) {
+    const targetPath = String(path || "");
+    if (!targetPath || detectKind(targetPath) !== "image") {
+      return;
+    }
+    const key = normalizePathForCompare(targetPath);
+    if (!key) {
+      return;
+    }
+    if (imageSourceCache.has(key) || imagePrefetchInFlight.has(key) || imagePrefetchQueued.has(key)) {
+      return;
+    }
+    imagePrefetchQueued.add(key);
+    imagePrefetchQueue.push({ key, path: targetPath });
+    void runImagePrefetchWorker();
+  }
+
+  async function runImagePrefetchWorker() {
+    if (imagePrefetchWorkerRunning) {
+      return;
+    }
+    imagePrefetchWorkerRunning = true;
+    try {
+      while (imagePrefetchQueue.length > 0) {
+        const next = imagePrefetchQueue.shift();
+        if (!next) {
+          continue;
+        }
+        imagePrefetchQueued.delete(next.key);
+        await prefetchImagePath(next.path);
+      }
+    } finally {
+      imagePrefetchWorkerRunning = false;
+      if (imagePrefetchQueue.length > 0) {
+        void runImagePrefetchWorker();
+      }
+    }
+  }
+
+  function prefetchNeighborImages() {
+    if (siblingFileIndex < 0 || siblingFilePaths.length === 0) {
+      return;
+    }
+    const forwardFirst = imagePrefetchDirection >= 0;
+    if (forwardFirst) {
+      for (let offset = 1; offset <= IMAGE_PREFETCH_NEIGHBORS; offset += 1) {
+        const nextPath = siblingFilePaths[siblingFileIndex + offset];
+        if (nextPath) {
+          enqueueImagePrefetch(nextPath);
+        }
+      }
+      for (let offset = 1; offset <= IMAGE_PREFETCH_OPPOSITE_NEIGHBORS; offset += 1) {
+        const prevPath = siblingFilePaths[siblingFileIndex - offset];
+        if (prevPath) {
+          enqueueImagePrefetch(prevPath);
+        }
+      }
+      return;
+    }
+
+    for (let offset = 1; offset <= IMAGE_PREFETCH_NEIGHBORS; offset += 1) {
+      const prevPath = siblingFilePaths[siblingFileIndex - offset];
+      if (prevPath) {
+        enqueueImagePrefetch(prevPath);
+      }
+    }
+    for (let offset = 1; offset <= IMAGE_PREFETCH_OPPOSITE_NEIGHBORS; offset += 1) {
+      const nextPath = siblingFilePaths[siblingFileIndex + offset];
+      if (nextPath) {
+        enqueueImagePrefetch(nextPath);
+      }
+    }
   }
 
   function getActiveScrollContainer() {
@@ -1084,14 +1352,54 @@
   function handleImageLoad(event) {
     const img = /** @type {HTMLImageElement} */ (event.currentTarget);
     imageLoadError = "";
+    imageLoaded = true;
     imageNaturalWidth = img.naturalWidth || 0;
     imageNaturalHeight = img.naturalHeight || 0;
+
+    if (currentPath && imageSrc) {
+      cacheImageSource(currentPath, imageSrc, imageCurrentSourceKind);
+    }
+    prefetchNeighborImages();
+
     if (imageZoomMode === "fit") {
       void fitImageToWindow();
     }
   }
 
-  function handleImageError() {
+  async function handleImageError() {
+    if (currentKind !== "image" || !currentPath) {
+      imageLoadError = "\u753b\u50cf\u3092\u8868\u793a\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002";
+      return;
+    }
+
+    if (imageLoadFallbackStage === 0) {
+      imageLoadFallbackStage = 1;
+      try {
+        const dataUrl = await invoke("fs_read_image_data_url", { path: currentPath, normalize: false });
+        setImageSource(String(dataUrl || ""), "raw");
+        imageLoadError = "";
+        return;
+      } catch {
+        // fall through to normalized fallback
+      }
+    }
+
+    if (imageLoadFallbackStage <= 1) {
+      imageLoadFallbackStage = 2;
+      try {
+        const normalizedDataUrl = await invoke("fs_read_image_data_url", {
+          path: currentPath,
+          normalize: true,
+        });
+        setImageSource(String(normalizedDataUrl || ""), "normalized");
+        imageLoadError = "";
+        return;
+      } catch {
+        // final error below
+      }
+    }
+
+    imageLoadFallbackStage = 3;
     imageLoadError = "\u753b\u50cf\u3092\u8868\u793a\u3067\u304d\u307e\u305b\u3093\u3067\u3057\u305f\u3002";
   }
 
@@ -1212,28 +1520,17 @@
 
     try {
       if (currentKind === "image") {
-        // JPEG is rendered more reliably after normalization.
-        if (isJpegPath(currentPath)) {
-          try {
-            const dataUrl = await invoke("fs_read_image_data_url", {
-              path: currentPath,
-              normalize: true,
-            });
-            imageSrc = String(dataUrl || "");
-            return;
-          } catch {
-            // fall through
-          }
+        const cached = getCachedImageSource(currentPath);
+        if (cached) {
+          imageLoadFallbackStage = Number(cached.stage ?? 0) || 0;
+          setImageSource(String(cached.src || ""), cached.kind || "direct");
+          void prefetchNeighborImages();
+          return;
         }
 
-        try {
-          const dataUrl = await invoke("fs_read_image_data_url", { path: currentPath, normalize: false });
-          imageSrc = String(dataUrl || "");
-          return;
-        } catch {
-          const dataUrl = await invoke("fs_read_image_data_url", { path: currentPath, normalize: true });
-          imageSrc = String(dataUrl || "");
-        }
+        imageLoadFallbackStage = 0;
+        setImageSource(toViewerImageSrc(currentPath), "direct");
+        void prefetchNeighborImages();
         return;
       }
 
@@ -1555,6 +1852,7 @@
               onerror={handleImageError}
               onload={handleImageLoad}
               style={getImageInlineStyle()}
+              class:image-not-ready={!imageLoaded}
             />
           </div>
           <div class="image-controls">
@@ -1772,6 +2070,9 @@
     box-sizing: border-box;
   }
 
+  .image-scroll img.image-not-ready {
+    visibility: hidden;
+  }
   .image-scroll img {
     display: block;
     width: auto;
@@ -2114,3 +2415,7 @@
     padding: 0;
   }
 </style>
+
+
+
+
