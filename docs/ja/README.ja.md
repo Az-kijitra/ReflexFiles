@@ -34,10 +34,13 @@ npm run tauri build
 ```
 
 ## E2E（Tauri）
-```bash
+~~~bash
 cd app
-npm run e2e:tauri
-```
+npm run e2e:tauri    # smoke
+npm run e2e:viewer   # viewer flow
+npm run e2e:settings # settings + backup/report + undo/redo session
+npm run e2e:full     # 総合スイート（上記を順番に実行）
+~~~
 
 ## 依存関係監査
 ```bash
@@ -53,6 +56,8 @@ npm run audit:cargo
 
 ## ドキュメント
 - ユーザーマニュアル: `user_manual.md`
+- メンテナンスガイド（日本語）: `docs/ja/maintenance_guide.ja.md`
+- メンテナンスガイド（英語）: `docs/maintenance_guide.md`
 - ターミナル固定プロファイル（`Ctrl+Alt+1/2/3`）の設定手順は `docs/ja/user_manual.ja.md` を参照してください。
 
 ## コントリビュート

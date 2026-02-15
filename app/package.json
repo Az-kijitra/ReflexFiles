@@ -16,6 +16,8 @@
     "audit:deps": "npm run audit:npm && npm run audit:cargo",
     "e2e:tauri": "node scripts/e2e/run-tauri-selenium.mjs",
     "e2e:viewer": "node scripts/e2e/run-tauri-viewer-selenium.mjs",
+    "e2e:settings": "node scripts/e2e/run-tauri-settings-selenium.mjs",
+    "e2e:full": "node scripts/e2e/run-tauri-suite-selenium.mjs",
     "tauri": "tauri"
   },
   "license": "MIT",

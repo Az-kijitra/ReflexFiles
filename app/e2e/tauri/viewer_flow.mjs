@@ -3,13 +3,17 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const withTimeout = (promise, ms, label) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    ),
-  ]);
+const withTimeout = async (promise, ms, label) => {
+  let timer;
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    });
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
 
 const defaultAppCandidates = [
   resolve(process.cwd(), "src-tauri", "target", "debug", "ReflexFiles.exe"),
@@ -78,7 +82,7 @@ try {
   const getPathInput = async () => driver.findElement(By.css("header.path-bar input"));
   const getListElement = async () => {
     const listEl = await withTimeout(
-      driver.wait(until.elementLocated(By.css("section.list")), timeoutMs),
+      driver.wait(until.elementLocated(By.css(".list")), timeoutMs),
       timeoutMs,
       "wait list"
     );
@@ -107,7 +111,7 @@ try {
   };
 
   const collectVisibleNames = async () => {
-    const rows = await driver.findElements(By.css("section.list .row .text"));
+    const rows = await driver.findElements(By.css(".list .row .text"));
     const values = [];
     for (const row of rows) {
       const text = (await row.getText()).trim();
@@ -131,7 +135,7 @@ try {
 
   const rowByName = async (name) => {
     const candidates = [name, name.replace(/\.[^.]+$/, "")];
-    const rowTexts = await driver.findElements(By.css("section.list .row .text"));
+    const rowTexts = await driver.findElements(By.css(".list .row .text"));
     for (const rowText of rowTexts) {
       const text = (await rowText.getText()).trim();
       if (candidates.includes(text)) {

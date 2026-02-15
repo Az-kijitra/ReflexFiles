@@ -2,13 +2,17 @@ import { Builder, By, Key, until } from 'selenium-webdriver';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const withTimeout = (promise, ms, label) =>
-  Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    ),
-  ]);
+const withTimeout = async (promise, ms, label) => {
+  let timer;
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    });
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
 
 const defaultAppCandidates = [
   resolve(process.cwd(), 'src-tauri', 'target', 'debug', 'ReflexFiles.exe'),
@@ -85,7 +89,7 @@ const captureArtifacts = async (label) => {
     }
     let visibleNames = [];
     try {
-      const rows = await driver.findElements(By.css('section.list .row .text'));
+      const rows = await driver.findElements(By.css('.list .row .text'));
       for (const row of rows) {
         const text = (await row.getText()).trim();
         if (text) {
@@ -115,7 +119,7 @@ try {
 
   const getListElement = async () => {
     const listEl = await withTimeout(
-      driver.wait(until.elementLocated(By.css('section.list')), timeoutMs),
+      driver.wait(until.elementLocated(By.css('.list')), timeoutMs),
       timeoutMs,
       'wait for list'
     );
@@ -316,7 +320,7 @@ try {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const rowTexts = await driver.findElements(
-          By.css('section.list .row .text')
+          By.css('.list .row .text')
         );
         const visibleNames = [];
         for (const row of rowTexts) {
@@ -514,7 +518,7 @@ try {
   const rowByName = async (name) => {
     const candidates = displayCandidates(name);
     const rowTexts = await driver.findElements(
-      By.css('section.list .row .text')
+      By.css('.list .row .text')
     );
     for (const rowText of rowTexts) {
       const text = (await rowText.getText()).trim();
