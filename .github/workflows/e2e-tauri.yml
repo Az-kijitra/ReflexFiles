@@ -1,14 +1,77 @@
 name: e2e-tauri
 
 on:
+  pull_request:
   push:
     branches: ["main", "master"]
-  pull_request:
+  schedule:
+    - cron: "0 18 * * *"
 
 jobs:
-  e2e:
+  e2e_pr_quick:
+    if: github.event_name == 'pull_request'
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        working-directory: app
+        run: npm ci
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver
+
+      - name: Install Edge WebDriver
+        shell: pwsh
+        run: |
+          $edgeVersion = (Get-Item "$Env:ProgramFiles (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.ProductVersion
+          $major = $edgeVersion.Split('.')[0]
+          $latestUrl = "https://msedgedriver.azureedge.net/LATEST_RELEASE_$major"
+          $driverVersion = (Invoke-WebRequest -Uri $latestUrl -UseBasicParsing).Content.Trim()
+          $zipUrl = "https://msedgedriver.azureedge.net/$driverVersion/edgedriver_win64.zip"
+          Invoke-WebRequest -Uri $zipUrl -OutFile "$PWD\edgedriver.zip"
+          Expand-Archive -Path "$PWD\edgedriver.zip" -DestinationPath "$PWD\edgedriver" -Force
+          Copy-Item "$PWD\edgedriver\msedgedriver.exe" "$PWD\msedgedriver.exe" -Force
+
+      - name: Build app (debug)
+        working-directory: app/src-tauri
+        run: cargo build --locked
+
+      - name: Run E2E quick set (smoke + viewer)
+        shell: pwsh
+        working-directory: app
+        run: |
+          $env:E2E_TAURI_APP_PATH = "$PWD\src-tauri\target\debug\ReflexFiles.exe"
+          $env:E2E_TAURI_KILL_APP = "1"
+          $env:E2E_TAURI_TEST_RETRIES = "1"
+          $env:E2E_TAURI_SHUTDOWN_TIMEOUT_MS = "15000"
+          npm run e2e:tauri
+          npm run e2e:viewer
+
+      - name: Upload E2E artifacts (quick)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e_artifacts_quick
+          path: e2e_artifacts/**
+
+  e2e_full:
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: windows-latest
+    timeout-minutes: 50
 
     steps:
       - name: Checkout
@@ -54,11 +117,12 @@ jobs:
           $env:E2E_TAURI_APP_PATH = "$PWD\src-tauri\target\debug\ReflexFiles.exe"
           $env:E2E_TAURI_KILL_APP = "1"
           $env:E2E_TAURI_TEST_RETRIES = "1"
+          $env:E2E_TAURI_SHUTDOWN_TIMEOUT_MS = "15000"
           npm run e2e:full
 
-      - name: Upload E2E artifacts
+      - name: Upload E2E artifacts (full)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e_artifacts
+          name: e2e_artifacts_full
           path: e2e_artifacts/**

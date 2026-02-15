@@ -18,7 +18,8 @@
     "e2e:viewer": "node scripts/e2e/run-tauri-viewer-selenium.mjs",
     "e2e:settings": "node scripts/e2e/run-tauri-settings-selenium.mjs",
     "e2e:full": "node scripts/e2e/run-tauri-suite-selenium.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release:precheck": "node scripts/release/precheck.mjs"
   },
   "license": "MIT",
   "dependencies": {

@@ -46,9 +46,12 @@ const driver = await withTimeout(
 );
 
 const artifactsRoot = resolve(process.cwd(), '..', 'e2e_artifacts');
+const artifactDirOverride = process.env.E2E_TAURI_ARTIFACT_DIR
+  ? resolve(process.env.E2E_TAURI_ARTIFACT_DIR)
+  : null;
 let testId = 'boot';
-let artifactDir = resolve(artifactsRoot, `smoke_${testId}`);
-let targetPath = process.env.E2E_TAURI_WORKDIR ?? artifactDir;
+let artifactDir = artifactDirOverride ?? resolve(artifactsRoot, `smoke_${testId}`);
+let targetPath = process.env.E2E_TAURI_WORKDIR ?? resolve(artifactDir, 'work');
 
 const isStaleError = (error) =>
   error &&
@@ -140,9 +143,11 @@ try {
   const fileB = `e2e_${testId}_b.txt`;
   const zipName = `e2e_${testId}.zip`;
 
-  artifactDir = resolve(artifactsRoot, `smoke_${testId}`);
+  if (!artifactDirOverride) {
+    artifactDir = resolve(artifactsRoot, `smoke_${testId}`);
+  }
   if (!process.env.E2E_TAURI_WORKDIR) {
-    targetPath = artifactDir;
+    targetPath = resolve(artifactDir, 'work');
   }
   mkdirSync(artifactDir, { recursive: true });
   mkdirSync(targetPath, { recursive: true });

@@ -33,15 +33,6 @@ cd app
 npm run tauri build
 ```
 
-## E2E（Tauri）
-~~~bash
-cd app
-npm run e2e:tauri    # smoke
-npm run e2e:viewer   # viewer flow
-npm run e2e:settings # settings + backup/report + undo/redo session
-npm run e2e:full     # 総合スイート（上記を順番に実行）
-~~~
-
 ## 依存関係監査
 ```bash
 cd app

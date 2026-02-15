@@ -39,8 +39,10 @@ const caps = process.env.E2E_TAURI_CAPS
 
 const artifactsRoot = resolve(process.cwd(), "..", "e2e_artifacts");
 const testId = Date.now().toString().slice(-6);
-const artifactDir = resolve(artifactsRoot, `viewer_flow_${testId}`);
-const workDir = process.env.E2E_TAURI_WORKDIR ?? artifactDir;
+const artifactDir = process.env.E2E_TAURI_ARTIFACT_DIR
+  ? resolve(process.env.E2E_TAURI_ARTIFACT_DIR)
+  : resolve(artifactsRoot, `viewer_flow_${testId}`);
+const workDir = process.env.E2E_TAURI_WORKDIR ?? resolve(artifactDir, "work");
 
 const captureFailureArtifacts = async (driver, label) => {
   try {

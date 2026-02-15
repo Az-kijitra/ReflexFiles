@@ -127,7 +127,7 @@ npm run e2e:settings
 npm run e2e:full
 ```
 
-### Runtime behavior of runner
+### Runner behavior and stability controls
 `app/scripts/e2e/run-tauri-selenium.mjs`:
 - Starts `tauri-driver`
 - Chooses bootstrap mode:
@@ -137,23 +137,53 @@ npm run e2e:full
 - Executes Selenium scenario
 - Performs aggressive child-process shutdown on Windows to avoid stale process hangs
 
-### Artifacts
+### Suite summary and failure classification
+`app/scripts/e2e/run-tauri-suite-selenium.mjs` now writes:
+- suite-level `summary.json`
+- `failureOverview` section when failed
+- per-case `failureCategory` values such as:
+  - `smoke_flow_failed`
+  - `viewer_flow_failed`
+  - `settings_session_failed`
+  - `runner_spawn_error`
+
+### Artifacts (fixed per case in suite mode)
 When running from `app/`, artifacts are written under repository root:
-- `e2e_artifacts/<case>_<id>/...`
-- `e2e_artifacts/suite_<timestamp>/summary.json`
+- Single-case runs: `e2e_artifacts/<case>_<id>/...`
+- Suite run summary: `e2e_artifacts/suite_<timestamp>/summary.json`
+- Suite case artifacts: `e2e_artifacts/suite_<timestamp>/cases/<case>/...`
 
 ## CI Integration
 Workflow file:
 - `.github/workflows/e2e-tauri.yml`
 
-Current CI behavior:
-- Runs on `windows-latest`
-- Installs Node + Rust
-- Installs `tauri-driver`
-- Downloads matching `msedgedriver`
-- Builds debug app
-- Executes `npm run e2e:full`
-- Uploads E2E artifacts
+Current CI split:
+- **Pull Request** job (quick):
+  - runs `e2e:tauri` + `e2e:viewer`
+- **Push to main/master + nightly schedule** job (full):
+  - runs `e2e:full`
+
+Both jobs:
+- run on `windows-latest`
+- install Node + Rust + `tauri-driver`
+- install matching `msedgedriver`
+- build debug app
+- upload `e2e_artifacts/**`
+
+## Release Precheck (One Command)
+From `app/`:
+```bash
+npm run release:precheck
+```
+
+This command executes:
+1. `npm run check`
+2. `npm run e2e:full`
+3. `npm run tauri build`
+4. SHA256 generation for latest NSIS installer
+
+Output report:
+- `docs/RELEASE_PRECHECK_LAST.md`
 
 ## Daily Maintenance Checklist
 1. Run local type/consistency checks after edits
@@ -167,7 +197,10 @@ npm run check
 - file operation changes -> `npm run e2e:tauri`
 3. Before merge/release candidate
 - run `npm run e2e:full`
-- verify suite summary JSON exists and all cases pass
+- verify suite `summary.json` exists and all cases pass
+4. Before release publication
+- run `npm run release:precheck`
+- verify `docs/RELEASE_PRECHECK_LAST.md`
 
 ## Troubleshooting
 ### `os error 5` when building/running Tauri in tests
@@ -182,7 +215,8 @@ Actions:
 - inspect runner logs for:
   - `shutdown start...`
   - `shutdown complete.`
-- verify suite summary file generation
+- inspect suite `summary.json` and `failureOverview`
+- inspect case artifact directory: `e2e_artifacts/suite_<timestamp>/cases/<case>/`
 
 ### Viewer/UI element not found in E2E
 Actions:

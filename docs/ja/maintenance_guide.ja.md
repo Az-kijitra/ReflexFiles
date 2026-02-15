@@ -129,7 +129,7 @@ npm run e2e:settings
 npm run e2e:full
 ```
 
-### ランナーの挙動
+### ランナーの挙動と安定化
 `app/scripts/e2e/run-tauri-selenium.mjs`:
 - `tauri-driver` を起動
 - 起動モードを選択
@@ -139,23 +139,53 @@ npm run e2e:full
 - Selenium シナリオを実行
 - Windows で子プロセスを強制終了してハングを回避
 
-### 成果物
+### スイートサマリーと失敗分類
+`app/scripts/e2e/run-tauri-suite-selenium.mjs` は以下を出力:
+- スイート `summary.json`
+- 失敗時の `failureOverview`
+- ケースごとの `failureCategory`（例）:
+  - `smoke_flow_failed`
+  - `viewer_flow_failed`
+  - `settings_session_failed`
+  - `runner_spawn_error`
+
+### 成果物（スイート時はケース固定）
 `app/` から実行した場合、成果物はリポジトリ直下に出力:
-- `e2e_artifacts/<case>_<id>/...`
-- `e2e_artifacts/suite_<timestamp>/summary.json`
+- 単体実行: `e2e_artifacts/<case>_<id>/...`
+- スイート要約: `e2e_artifacts/suite_<timestamp>/summary.json`
+- スイートケース別: `e2e_artifacts/suite_<timestamp>/cases/<case>/...`
 
 ## CI連携
 ワークフロー:
 - `.github/workflows/e2e-tauri.yml`
 
-現行動作:
+現行の分割運用:
+- **Pull Request**（高速セット）:
+  - `e2e:tauri` + `e2e:viewer`
+- **main/master への push と nightly**（フル）:
+  - `e2e:full`
+
+両ジョブ共通:
 - `windows-latest` で実行
-- Node + Rust をセットアップ
-- `tauri-driver` をインストール
+- Node + Rust + `tauri-driver` セットアップ
 - 対応する `msedgedriver` を取得
 - debug ビルド
-- `npm run e2e:full` 実行
 - `e2e_artifacts/**` をアップロード
+
+## リリース事前検証（1コマンド）
+`app/` で実行:
+```bash
+npm run release:precheck
+```
+
+このコマンドで実行される内容:
+1. `npm run check`
+2. `npm run e2e:full`
+3. `npm run tauri build`
+4. 最新 NSIS インストーラーの SHA256 生成
+
+出力レポート:
+- `docs/RELEASE_PRECHECK_LAST.md`
 
 ## 日常メンテナンスチェックリスト
 1. 変更後の整合チェック
@@ -169,7 +199,10 @@ npm run check
 - ファイル操作変更: `npm run e2e:tauri`
 3. マージ前/リリース候補前
 - `npm run e2e:full`
-- `summary.json` 生成と全ケース PASS を確認
+- スイート `summary.json` 生成と全ケース PASS を確認
+4. リリース公開前
+- `npm run release:precheck`
+- `docs/RELEASE_PRECHECK_LAST.md` を確認
 
 ## トラブルシュート
 ### `os error 5`（ReflexFiles.exe アクセス拒否）
@@ -185,7 +218,8 @@ npm run check
 - ランナーログで以下を確認
   - `shutdown start...`
   - `shutdown complete.`
-- スイートの `summary.json` 生成有無を確認
+- スイート `summary.json` の `failureOverview` を確認
+- ケース別成果物: `e2e_artifacts/suite_<timestamp>/cases/<case>/`
 
 ### UI セレクタ不一致で E2E が落ちる
 対応:
