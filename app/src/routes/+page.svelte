@@ -465,15 +465,15 @@
     settingsError = "";
     try {
       const saved = await invoke("config_save_preferences", {
-        ui_theme: values.ui_theme,
-        ui_language: values.ui_language,
-        perf_dir_stats_timeout_ms: Number(values.perf_dir_stats_timeout_ms || 3000),
-        external_vscode_path: values.external_vscode_path || "",
-        external_git_client_path: values.external_git_client_path || "",
-        external_terminal_profile: values.external_terminal_profile || "",
-        external_terminal_profile_cmd: values.external_terminal_profile_cmd || "",
-        external_terminal_profile_powershell: values.external_terminal_profile_powershell || "",
-        external_terminal_profile_wsl: values.external_terminal_profile_wsl || "",
+        uiTheme: values.ui_theme,
+        uiLanguage: values.ui_language,
+        perfDirStatsTimeoutMs: Number(values.perf_dir_stats_timeout_ms || 3000),
+        externalVscodePath: values.external_vscode_path || "",
+        externalGitClientPath: values.external_git_client_path || "",
+        externalTerminalProfile: values.external_terminal_profile || "",
+        externalTerminalProfileCmd: values.external_terminal_profile_cmd || "",
+        externalTerminalProfilePowershell: values.external_terminal_profile_powershell || "",
+        externalTerminalProfileWsl: values.external_terminal_profile_wsl || "",
       });
 
       settingsInitial = normalizeSettingsConfig(saved || values);

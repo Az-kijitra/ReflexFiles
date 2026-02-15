@@ -99,7 +99,7 @@ The default profile is `windows`.
 | External | Open PowerShell terminal profile | `Ctrl+Alt+2` |
 | External | Open WSL terminal profile | `Ctrl+Alt+3` |
 | External | Open in VS Code | `Ctrl+Alt+V` |
-| External | Open in Git client | `Ctrl+Alt+G` |
+| External | Open in Git client | `Ctrl+Alt+Shift+G` |
 | Help | Keymap help | `F1` |
 | App | Exit | `Ctrl+Q` |
 

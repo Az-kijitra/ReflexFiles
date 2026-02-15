@@ -180,7 +180,7 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 | 外部アプリ | PowerShell プロファイルで開く | Ctrl+Alt+2 |
 | 外部アプリ | WSL プロファイルで開く | Ctrl+Alt+3 |
 | 外部アプリ | VS Code で開く | Ctrl+Alt+V |
-| 外部アプリ | Git クライアントで開く | Ctrl+Alt+G |
+| 外部アプリ | Git クライアントで開く | Ctrl+Alt+Shift+G |
 
 > キーは設定ファイルで変更可能です。
 

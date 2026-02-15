@@ -67,6 +67,39 @@ fn vscode_candidates(config_path: &str) -> Vec<PathBuf> {
     candidates
 }
 
+fn git_client_candidates(config_path: &str) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let trimmed = config_path.trim();
+    if !trimmed.is_empty() {
+        let configured = PathBuf::from(trimmed);
+        candidates.push(configured.clone());
+        if configured.extension().is_none() {
+            candidates.push(configured.with_extension("exe"));
+        }
+        if configured.is_dir() {
+            candidates.push(configured.join("GitHubDesktop.exe"));
+            candidates.push(configured.join("github.exe"));
+        }
+    }
+
+    append_if_env_path(
+        &mut candidates,
+        "LOCALAPPDATA",
+        "GitHubDesktop\\GitHubDesktop.exe",
+    );
+    append_if_env_path(
+        &mut candidates,
+        "ProgramFiles",
+        "GitHub Desktop\\GitHubDesktop.exe",
+    );
+    append_if_env_path(
+        &mut candidates,
+        "ProgramFiles(x86)",
+        "GitHub Desktop\\GitHubDesktop.exe",
+    );
+    candidates
+}
+
 fn terminal_settings_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     append_if_env_path(
@@ -266,8 +299,40 @@ pub(crate) fn external_open_vscode_impl(path: String) -> AppResult<()> {
 
 pub(crate) fn external_open_git_client_impl(path: String) -> AppResult<()> {
     let config = load_config();
-    let app = require_non_empty("external_git_client_path", &config.external_git_client_path)?;
-    spawn_with_args(app, &[path])
+    let configured = config.external_git_client_path.trim().to_string();
+    let mut last_err: Option<AppError> = None;
+
+    for exe in git_client_candidates(&configured) {
+        if exe.exists() {
+            match spawn_with_args(&exe, &[path.clone()]) {
+                Ok(()) => return Ok(()),
+                Err(err) => last_err = Some(err),
+            }
+        }
+    }
+
+    for command in ["github", "github-desktop"] {
+        match spawn_with_args(command, &[path.clone()]) {
+            Ok(()) => return Ok(()),
+            Err(err) => last_err = Some(err),
+        }
+    }
+
+    if let Some(err) = last_err {
+        return Err(err);
+    }
+
+    if configured.is_empty() {
+        return Err(AppError::with_kind(
+            AppErrorKind::NotFound,
+            "git client not found (set external_git_client_path)".to_string(),
+        ));
+    }
+
+    Err(AppError::with_kind(
+        AppErrorKind::NotFound,
+        format!("git client not found: {configured}"),
+    ))
 }
 
 pub(crate) fn external_open_custom_impl(command: String, args: Vec<String>) -> AppResult<()> {

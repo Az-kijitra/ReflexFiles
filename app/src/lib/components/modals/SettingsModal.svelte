@@ -36,25 +36,58 @@
     return Math.max(500, Math.trunc(num));
   }
 
-  function submit() {
-    onSave?.({
-      ...draft,
-      perf_dir_stats_timeout_ms: clampTimeoutMs(draft.perf_dir_stats_timeout_ms),
-      external_vscode_path: String(draft.external_vscode_path || "").trim(),
-      external_git_client_path: String(draft.external_git_client_path || "").trim(),
-      external_terminal_profile: String(draft.external_terminal_profile || "").trim(),
-      external_terminal_profile_cmd: String(draft.external_terminal_profile_cmd || "").trim(),
+  function normalizeForSubmit(values) {
+    return {
+      ui_theme: values?.ui_theme ?? "light",
+      ui_language: values?.ui_language ?? "en",
+      perf_dir_stats_timeout_ms: clampTimeoutMs(values?.perf_dir_stats_timeout_ms),
+      external_vscode_path: String(values?.external_vscode_path || "").trim(),
+      external_git_client_path: String(values?.external_git_client_path || "").trim(),
+      external_terminal_profile: String(values?.external_terminal_profile || "").trim(),
+      external_terminal_profile_cmd: String(values?.external_terminal_profile_cmd || "").trim(),
       external_terminal_profile_powershell: String(
-        draft.external_terminal_profile_powershell || ""
+        values?.external_terminal_profile_powershell || ""
       ).trim(),
-      external_terminal_profile_wsl: String(draft.external_terminal_profile_wsl || "").trim(),
-    });
+      external_terminal_profile_wsl: String(values?.external_terminal_profile_wsl || "").trim(),
+    };
+  }
+
+  $: normalizedInitial = normalizeForSubmit(initial || {});
+  $: normalizedDraft = normalizeForSubmit(draft || {});
+  $: hasUnsavedChanges = JSON.stringify(normalizedInitial) !== JSON.stringify(normalizedDraft);
+
+  function getUnsavedChangesLabel() {
+    return normalizedDraft.ui_language === "ja"
+      ? "未保存の変更があります"
+      : "Unsaved changes";
+  }
+
+  function getDiscardConfirmMessage() {
+    return normalizedDraft.ui_language === "ja"
+      ? "未保存の変更を破棄して閉じますか？"
+      : "Discard unsaved changes?";
+  }
+
+  function requestCancel() {
+    if (saving) return;
+    if (
+      hasUnsavedChanges &&
+      typeof window !== "undefined" &&
+      !window.confirm(getDiscardConfirmMessage())
+    ) {
+      return;
+    }
+    onCancel?.();
+  }
+
+  function submit() {
+    onSave?.(normalizedDraft);
   }
 
   function handleKeydown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
-      onCancel?.();
+      requestCancel();
       return;
     }
     if (event.ctrlKey && !event.altKey && !event.shiftKey && event.key === "Enter") {
@@ -222,7 +255,10 @@
   </div>
 
   <div slot="actions" class="settings-actions">
-    <button type="button" onclick={() => onCancel?.()}>{t("cancel")}</button>
+    {#if hasUnsavedChanges}
+      <span class="settings-unsaved">{getUnsavedChangesLabel()}</span>
+    {/if}
+    <button type="button" onclick={() => requestCancel()}>{t("cancel")}</button>
     <button type="button" class="primary" disabled={saving} onclick={submit}>
       {saving ? t("loading") : t("settings.save")}
     </button>
@@ -343,6 +379,12 @@
     gap: 8px;
     padding: 0 16px 14px;
     box-sizing: border-box;
+  }
+
+  .settings-unsaved {
+    margin-right: auto;
+    color: var(--ui-muted);
+    font-size: 12px;
   }
 
   .settings-actions button.primary {
