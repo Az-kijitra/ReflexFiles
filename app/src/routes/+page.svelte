@@ -77,6 +77,59 @@
   /** @typedef {{ kind: "delete", pairs: { from: string, to: string }[] }} UndoDelete */
   /** @typedef {UndoCopy | UndoMove | UndoRename | UndoCreate | UndoDelete} UndoEntry */
 
+  function normalizeUndoPairs(rawPairs) {
+    if (!Array.isArray(rawPairs)) return [];
+    const pairs = [];
+    for (const pair of rawPairs) {
+      const from = typeof pair?.from === "string" ? pair.from.trim() : "";
+      const to = typeof pair?.to === "string" ? pair.to.trim() : "";
+      if (!from || !to) continue;
+      pairs.push({ from, to });
+    }
+    return pairs;
+  }
+
+  /** @returns {UndoEntry | null} */
+  function normalizeUndoEntry(entry) {
+    if (!entry || typeof entry !== "object") return null;
+    const kind = String(entry.kind || "").trim();
+
+    if (kind === "copy" || kind === "move" || kind === "delete") {
+      const pairs = normalizeUndoPairs(entry.pairs);
+      if (!pairs.length) return null;
+      return { kind, pairs };
+    }
+
+    if (kind === "rename") {
+      const from = typeof entry.from === "string" ? entry.from.trim() : "";
+      const to = typeof entry.to === "string" ? entry.to.trim() : "";
+      if (!from || !to) return null;
+      return { kind: "rename", from, to };
+    }
+
+    if (kind === "create") {
+      const path = typeof entry.path === "string" ? entry.path.trim() : "";
+      const createKind = entry.createKind === "folder" ? "folder" : "file";
+      if (!path) return null;
+      return { kind: "create", path, createKind };
+    }
+
+    return null;
+  }
+
+  function normalizeUndoEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    const next = [];
+    for (const entry of entries) {
+      const normalized = normalizeUndoEntry(entry);
+      if (normalized) {
+        next.push(normalized);
+      }
+      if (next.length >= UNDO_LIMIT) break;
+    }
+    return next;
+  }
+
   /** @type {() => Promise<void>} */
   let updateWindowBounds = async () => {};
 
@@ -85,6 +138,11 @@
 
   /** @type {ReturnType<typeof setTimeout> | null} */
   let uiSaveTimer = null;
+
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let undoSessionSaveTimer = null;
+  let undoSessionLoaded = false;
+
   const { cacheGetDirStats, cacheSetDirStats, clearDirStatsCache } =
     createDirStatsCache(DIR_STATS_CACHE_LIMIT);
 
@@ -745,6 +803,61 @@
     }
   }
 
+  onMount(() => {
+    let disposed = false;
+
+    (async () => {
+      try {
+        const session = await invoke("undo_redo_load_session", { limit: UNDO_LIMIT });
+        if (disposed) return;
+
+        const undoStack = normalizeUndoEntries(session?.undo_stack ?? session?.undoStack ?? []);
+        const redoStack = normalizeUndoEntries(session?.redo_stack ?? session?.redoStack ?? []);
+        state.undoStack = undoStack;
+        state.redoStack = redoStack;
+      } catch {
+        // ignore undo/redo session load errors
+      } finally {
+        if (!disposed) {
+          undoSessionLoaded = true;
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      if (undoSessionSaveTimer) {
+        clearTimeout(undoSessionSaveTimer);
+        undoSessionSaveTimer = null;
+      }
+    };
+  });
+
+  $effect(() => {
+    const undoStack = state.undoStack;
+    const redoStack = state.redoStack;
+    if (!undoSessionLoaded) return;
+
+    if (undoSessionSaveTimer) {
+      clearTimeout(undoSessionSaveTimer);
+      undoSessionSaveTimer = null;
+    }
+
+    undoSessionSaveTimer = setTimeout(() => {
+      void invoke("undo_redo_save_session", {
+        undoStack,
+        redoStack,
+        limit: UNDO_LIMIT,
+      }).catch(() => {});
+    }, 250);
+
+    return () => {
+      if (undoSessionSaveTimer) {
+        clearTimeout(undoSessionSaveTimer);
+        undoSessionSaveTimer = null;
+      }
+    };
+  });
   onMount(() => {
     const handler = () => {
       void openSettingsModal();

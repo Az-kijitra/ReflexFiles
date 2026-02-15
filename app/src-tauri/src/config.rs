@@ -86,3 +86,35 @@ pub fn load_config() -> AppConfig {
     let _ = save_config(&config);
     config
 }
+
+pub fn load_config_fast() -> AppConfig {
+    let installer_hint = read_installer_language_hint();
+    let path = config_path();
+
+    if let Ok(mut file) = std::fs::File::open(&path) {
+        let mut contents = String::new();
+        if std::io::Read::read_to_string(&mut file, &mut contents).is_ok() {
+            if let Ok(config) = toml::from_str::<AppConfig>(&contents) {
+                let mut config = normalize_config(config);
+                apply_installer_language_once(&mut config, installer_hint.as_ref());
+                return config;
+            }
+        }
+    }
+
+    let legacy = legacy_config_path();
+    if let Ok(mut file) = std::fs::File::open(&legacy) {
+        let mut contents = String::new();
+        if std::io::Read::read_to_string(&mut file, &mut contents).is_ok() {
+            if let Ok(config) = serde_json::from_str::<AppConfig>(&contents) {
+                let mut config = normalize_config(config);
+                apply_installer_language_once(&mut config, installer_hint.as_ref());
+                return config;
+            }
+        }
+    }
+
+    let mut config = normalize_config(default_app_config());
+    apply_installer_language_once(&mut config, installer_hint.as_ref());
+    config
+}

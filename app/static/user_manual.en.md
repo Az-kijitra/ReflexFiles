@@ -132,6 +132,24 @@ Fallback behavior:
 
 Use those names exactly when setting profile keys.
 
+### Settings Backup / Restore (Settings)
+In **Settings > Advanced**:
+- **Create Config Backup** writes a timestamped backup of config.toml
+- **Restore Latest Backup** replaces current settings with the newest backup
+
+Backup files are stored in:
+- %APPDATA%\\ReflexFIles\\backups\\config-YYYYMMDD-HHMMSS.toml
+
+### Diagnostic Report Options (Settings)
+In **Settings > Advanced > Export Diagnostic Report**, you can choose:
+- **Mask sensitive paths** (recommended)
+- **Save as ZIP**
+- **Copy output path to clipboard**
+- **Open after export**
+
+Diagnostic reports are stored in:
+- %APPDATA%\\ReflexFIles\\diagnostics\\
+
 ### Shortcut Conflict Warnings (Settings)
 In **Settings > Advanced**, ReflexFiles shows shortcut conflict warnings for:
 - Known global shortcuts (example: `Ctrl+Alt+G` with Google Drive)

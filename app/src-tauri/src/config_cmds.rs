@@ -2,7 +2,7 @@ use crate::config::{config_path, load_config, save_config, save_history, save_ju
 use crate::error::{format_error, AppErrorKind};
 use crate::types::{AppConfig, FileIconMode, JumpItem, Language, SortKey, SortOrder, Theme};
 use chrono::Local;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -19,6 +19,24 @@ pub struct DiagnosticReportResult {
     pub copied_to_clipboard: bool,
     pub masked: bool,
     pub zipped: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct UndoRedoSession {
+    #[serde(default)]
+    pub undo_stack: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub redo_stack: Vec<serde_json::Value>,
+}
+
+fn undo_redo_session_path(cfg_path: &Path) -> PathBuf {
+    config_base_dir(cfg_path).join("undo_redo_session.json")
+}
+
+fn clamp_undo_redo_entries(entries: &mut Vec<serde_json::Value>, limit: usize) {
+    if entries.len() > limit {
+        entries.truncate(limit);
+    }
 }
 
 fn persist_config(config: &AppConfig) -> Result<(), String> {
@@ -212,6 +230,65 @@ pub fn config_get() -> Result<AppConfig, String> {
     Ok(load_config())
 }
 
+#[tauri::command]
+pub fn config_get_startup() -> Result<AppConfig, String> {
+    Ok(crate::config::load_config_fast())
+}
+
+#[tauri::command]
+pub fn undo_redo_load_session(limit: Option<usize>) -> Result<UndoRedoSession, String> {
+    let max_entries = limit.unwrap_or(50).clamp(1, 500);
+    let cfg_path = config_path();
+    let session_path = undo_redo_session_path(&cfg_path);
+
+    if !session_path.exists() {
+        return Ok(UndoRedoSession::default());
+    }
+
+    let raw = std::fs::read_to_string(&session_path)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("read undo/redo session failed: {e}")))?;
+
+    let mut session =
+        serde_json::from_str::<UndoRedoSession>(&raw).unwrap_or_else(|_| UndoRedoSession::default());
+    clamp_undo_redo_entries(&mut session.undo_stack, max_entries);
+    clamp_undo_redo_entries(&mut session.redo_stack, max_entries);
+    Ok(session)
+}
+
+#[tauri::command]
+pub fn undo_redo_save_session(
+    mut undo_stack: Vec<serde_json::Value>,
+    mut redo_stack: Vec<serde_json::Value>,
+    limit: Option<usize>,
+) -> Result<(), String> {
+    let max_entries = limit.unwrap_or(50).clamp(1, 500);
+    clamp_undo_redo_entries(&mut undo_stack, max_entries);
+    clamp_undo_redo_entries(&mut redo_stack, max_entries);
+
+    let cfg_path = config_path();
+    let session_path = undo_redo_session_path(&cfg_path);
+    if let Some(parent) = session_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            format_error(
+                AppErrorKind::Io,
+                format!("create undo/redo directory failed: {e}"),
+            )
+        })?;
+    }
+
+    let payload = UndoRedoSession {
+        undo_stack,
+        redo_stack,
+    };
+
+    let serialized = serde_json::to_string(&payload)
+        .map_err(|e| format_error(AppErrorKind::InvalidPath, format!("serialize failed: {e}")))?;
+
+    std::fs::write(&session_path, serialized)
+        .map_err(|e| format_error(AppErrorKind::Io, format!("write undo/redo session failed: {e}")))?;
+
+    Ok(())
+}
 #[tauri::command]
 pub fn config_get_path() -> Result<String, String> {
     let (_, path) = ensure_config()?;

@@ -47,7 +47,7 @@ export async function setupPageLifecycle(ctx) {
   const home = await ctx.homeDir();
   let config = null;
   try {
-    config = await ctx.invoke("config_get");
+    config = await ctx.invoke("config_get_startup");
     if (config?.perf_dir_stats_timeout_ms) {
       ctx.setDirStatsTimeoutMs(config.perf_dir_stats_timeout_ms);
     }
