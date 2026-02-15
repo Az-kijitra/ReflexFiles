@@ -15,8 +15,11 @@
   const IMAGE_PREFETCH_NEIGHBORS = 4;
   const IMAGE_PREFETCH_OPPOSITE_NEIGHBORS = 1;
   const IMAGE_SRC_CACHE_LIMIT = 32;
+  const IMAGE_SRC_CACHE_MAX_BYTES = 96 * 1024 * 1024;
   const IMAGE_PRELOADED_OBJECT_LIMIT = 16;
   const IMAGE_PREVIEW_CACHE_LIMIT = 48;
+  const IMAGE_PREVIEW_CACHE_MAX_BYTES = 12 * 1024 * 1024;
+  const IMAGE_PREFETCH_QUEUE_LIMIT = 128;
   const IMAGE_QUICK_PREVIEW_DELAY_MS = 120;
   const VIRTUAL_LINE_HEIGHT_PX = 20;
   const VIRTUAL_SCROLL_MAX_PX = 20_000_000;
@@ -80,6 +83,7 @@
   let imageLoaded = $state(false);
   let imageCurrentSourceKind = $state("direct");
   const imageSourceCache = new Map();
+  let imageSourceCacheBytes = 0;
   const imagePrefetchInFlight = new Map();
   const imagePrefetchQueued = new Set();
   const imagePrefetchQueue = [];
@@ -87,6 +91,7 @@
   let imagePrefetchDirection = 1;
   const imagePreloadedObjects = new Map();
   const imagePreviewCache = new Map();
+  let imagePreviewCacheBytes = 0;
   let imageOpenToken = 0;
   let imageZoom = $state(1);
   let imageZoomMode = $state("fit");
@@ -982,6 +987,38 @@
     return 0;
   }
 
+  function estimateStringBytes(value) {
+    return String(value || "").length * 2;
+  }
+
+  function compactCacheKey(key) {
+    const value = String(key || "");
+    if (!value) {
+      return "(empty)";
+    }
+    const slash = Math.max(value.lastIndexOf("\\"), value.lastIndexOf("/"));
+    return slash >= 0 ? value.slice(slash + 1) : value;
+  }
+
+  function logCacheEviction(cacheName, reason, key, bytes) {
+    console.info(
+      `[viewer][cache] evict ${cacheName} reason=${reason} key=${compactCacheKey(key)} bytes=${bytes}`
+    );
+  }
+
+  function evictOldestImageSource(reason) {
+    const oldest = imageSourceCache.keys().next().value;
+    if (oldest === undefined) {
+      return false;
+    }
+    const entry = imageSourceCache.get(oldest);
+    imageSourceCache.delete(oldest);
+    const removedBytes = Math.max(0, Number(entry?.bytes || 0));
+    imageSourceCacheBytes = Math.max(0, imageSourceCacheBytes - removedBytes);
+    logCacheEviction("image_source", reason, oldest, removedBytes);
+    return true;
+  }
+
   function cacheImageSource(path, src, kind) {
     const key = normalizePathForCompare(path);
     const value = String(src || "");
@@ -993,15 +1030,27 @@
       src: value,
       kind: normalizedKind,
       stage: toImageFallbackStage(normalizedKind),
+      bytes: estimateStringBytes(value),
     };
-    if (imageSourceCache.has(key)) {
+
+    const existing = imageSourceCache.get(key);
+    if (existing) {
       imageSourceCache.delete(key);
+      imageSourceCacheBytes = Math.max(0, imageSourceCacheBytes - Math.max(0, Number(existing.bytes || 0)));
     }
+
     imageSourceCache.set(key, entry);
+    imageSourceCacheBytes += entry.bytes;
+
     while (imageSourceCache.size > IMAGE_SRC_CACHE_LIMIT) {
-      const oldest = imageSourceCache.keys().next().value;
-      if (oldest === undefined) break;
-      imageSourceCache.delete(oldest);
+      if (!evictOldestImageSource("count_limit")) {
+        break;
+      }
+    }
+    while (imageSourceCacheBytes > IMAGE_SRC_CACHE_MAX_BYTES) {
+      if (!evictOldestImageSource("byte_limit")) {
+        break;
+      }
     }
   }
 
@@ -1019,20 +1068,48 @@
     return cached;
   }
 
+  function evictOldestImagePreview(reason) {
+    const oldest = imagePreviewCache.keys().next().value;
+    if (oldest === undefined) {
+      return false;
+    }
+    const entry = imagePreviewCache.get(oldest);
+    imagePreviewCache.delete(oldest);
+    const removedBytes = Math.max(0, Number(entry?.bytes || 0));
+    imagePreviewCacheBytes = Math.max(0, imagePreviewCacheBytes - removedBytes);
+    logCacheEviction("image_preview", reason, oldest, removedBytes);
+    return true;
+  }
+
   function cacheImagePreview(path, src) {
     const key = normalizePathForCompare(path);
     const value = String(src || "");
     if (!key || !value) {
       return;
     }
-    if (imagePreviewCache.has(key)) {
+
+    const entry = {
+      src: value,
+      bytes: estimateStringBytes(value),
+    };
+    const existing = imagePreviewCache.get(key);
+    if (existing) {
       imagePreviewCache.delete(key);
+      imagePreviewCacheBytes = Math.max(0, imagePreviewCacheBytes - Math.max(0, Number(existing.bytes || 0)));
     }
-    imagePreviewCache.set(key, value);
+
+    imagePreviewCache.set(key, entry);
+    imagePreviewCacheBytes += entry.bytes;
+
     while (imagePreviewCache.size > IMAGE_PREVIEW_CACHE_LIMIT) {
-      const oldest = imagePreviewCache.keys().next().value;
-      if (oldest === undefined) break;
-      imagePreviewCache.delete(oldest);
+      if (!evictOldestImagePreview("count_limit")) {
+        break;
+      }
+    }
+    while (imagePreviewCacheBytes > IMAGE_PREVIEW_CACHE_MAX_BYTES) {
+      if (!evictOldestImagePreview("byte_limit")) {
+        break;
+      }
     }
   }
 
@@ -1047,7 +1124,7 @@
     }
     imagePreviewCache.delete(key);
     imagePreviewCache.set(key, cached);
-    return String(cached || "");
+    return String(cached.src || "");
   }
 
   async function resolveNormalizedPreviewSrc(path) {
@@ -1144,6 +1221,7 @@
       const oldest = imagePreloadedObjects.keys().next().value;
       if (oldest === undefined) break;
       imagePreloadedObjects.delete(oldest);
+      logCacheEviction("preloaded_object", "count_limit", oldest, 0);
     }
   }
 
@@ -1233,11 +1311,17 @@
     if (imageSourceCache.has(key) || imagePrefetchInFlight.has(key) || imagePrefetchQueued.has(key)) {
       return;
     }
+    if (imagePrefetchQueue.length >= IMAGE_PREFETCH_QUEUE_LIMIT) {
+      const dropped = imagePrefetchQueue.shift();
+      if (dropped?.key) {
+        imagePrefetchQueued.delete(dropped.key);
+        logCacheEviction("prefetch_queue", "queue_limit", dropped.key, 0);
+      }
+    }
     imagePrefetchQueued.add(key);
     imagePrefetchQueue.push({ key, path: targetPath });
     void runImagePrefetchWorker();
   }
-
   async function runImagePrefetchWorker() {
     if (imagePrefetchWorkerRunning) {
       return;

@@ -44,13 +44,56 @@ const artifactDir = process.env.E2E_TAURI_ARTIFACT_DIR
   : resolve(artifactsRoot, `viewer_flow_${testId}`);
 const workDir = process.env.E2E_TAURI_WORKDIR ?? resolve(artifactDir, "work");
 
+const makeFailureArtifactDir = (label) => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const dir = resolve(artifactDir, "on-failure", `${label}_${stamp}`);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+};
+
 const captureFailureArtifacts = async (driver, label) => {
   try {
-    mkdirSync(artifactDir, { recursive: true });
+    const failureDir = makeFailureArtifactDir(label);
     const png = await driver.takeScreenshot();
-    writeFileSync(resolve(artifactDir, `failure_${label}.png`), png, "base64");
+    writeFileSync(resolve(failureDir, "screen.png"), png, "base64");
     const html = await driver.getPageSource();
-    writeFileSync(resolve(artifactDir, `failure_${label}.html`), html);
+    writeFileSync(resolve(failureDir, "page.html"), html);
+
+    let currentUrl = "";
+    let title = "";
+    let handles = [];
+    try {
+      currentUrl = await driver.getCurrentUrl();
+    } catch {
+      currentUrl = "";
+    }
+    try {
+      title = await driver.getTitle();
+    } catch {
+      title = "";
+    }
+    try {
+      handles = await driver.getAllWindowHandles();
+    } catch {
+      handles = [];
+    }
+
+    writeFileSync(
+      resolve(failureDir, "context.json"),
+      JSON.stringify(
+        {
+          captured_at: new Date().toISOString(),
+          label,
+          current_url: currentUrl,
+          title,
+          window_handles: handles,
+          work_dir: workDir,
+        },
+        null,
+        2
+      )
+    );
+    console.error(`[viewer-flow] failure artifacts saved: ${failureDir}`);
   } catch (error) {
     console.error(`[viewer-flow] failed to capture artifacts: ${error}`);
   }

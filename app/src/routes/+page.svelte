@@ -497,6 +497,99 @@
     };
   }
 
+  const SETTINGS_PATH_MAX_LEN = 1024;
+  const SETTINGS_PROFILE_MAX_LEN = 256;
+
+  function buildSettingsSavePatch(baseValues, nextValues) {
+    const base = normalizeSettingsConfig(baseValues || {});
+    const next = normalizeSettingsConfig(nextValues || {});
+    return {
+      uiTheme: base.ui_theme !== next.ui_theme ? next.ui_theme : null,
+      uiLanguage: base.ui_language !== next.ui_language ? next.ui_language : null,
+      uiFileIconMode: base.ui_file_icon_mode !== next.ui_file_icon_mode ? next.ui_file_icon_mode : null,
+      perfDirStatsTimeoutMs:
+        Number(base.perf_dir_stats_timeout_ms) !== Number(next.perf_dir_stats_timeout_ms)
+          ? Number(next.perf_dir_stats_timeout_ms)
+          : null,
+      externalVscodePath:
+        base.external_vscode_path !== next.external_vscode_path ? next.external_vscode_path : null,
+      externalGitClientPath:
+        base.external_git_client_path !== next.external_git_client_path
+          ? next.external_git_client_path
+          : null,
+      externalTerminalProfile:
+        base.external_terminal_profile !== next.external_terminal_profile
+          ? next.external_terminal_profile
+          : null,
+      externalTerminalProfileCmd:
+        base.external_terminal_profile_cmd !== next.external_terminal_profile_cmd
+          ? next.external_terminal_profile_cmd
+          : null,
+      externalTerminalProfilePowershell:
+        base.external_terminal_profile_powershell !== next.external_terminal_profile_powershell
+          ? next.external_terminal_profile_powershell
+          : null,
+      externalTerminalProfileWsl:
+        base.external_terminal_profile_wsl !== next.external_terminal_profile_wsl
+          ? next.external_terminal_profile_wsl
+          : null,
+    };
+  }
+
+  function hasSettingsPatchChanges(patch) {
+    return Object.values(patch || {}).some((value) => value !== null && value !== undefined);
+  }
+
+  function validateSettingsDraft(values) {
+    const theme = String(values?.ui_theme || "");
+    if (theme !== "light" && theme !== "dark") {
+      return t("settings.validation_invalid_theme");
+    }
+
+    const language = String(values?.ui_language || "");
+    if (language !== "en" && language !== "ja") {
+      return t("settings.validation_invalid_language");
+    }
+
+    const iconMode = String(values?.ui_file_icon_mode || "");
+    if (iconMode !== "by_type" && iconMode !== "simple" && iconMode !== "none") {
+      return t("settings.validation_invalid_icon_mode");
+    }
+
+    const timeoutMs = Number(values?.perf_dir_stats_timeout_ms ?? 0);
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 500 || timeoutMs > 3_600_000) {
+      return t("settings.validation_timeout_range");
+    }
+
+    const pathValues = [values?.external_vscode_path, values?.external_git_client_path];
+    for (const raw of pathValues) {
+      const value = String(raw || "");
+      if (value.length > SETTINGS_PATH_MAX_LEN) {
+        return t("settings.validation_path_too_long");
+      }
+      if (/\r|\n/.test(value)) {
+        return t("settings.validation_single_line");
+      }
+    }
+
+    const profileValues = [
+      values?.external_terminal_profile,
+      values?.external_terminal_profile_cmd,
+      values?.external_terminal_profile_powershell,
+      values?.external_terminal_profile_wsl,
+    ];
+    for (const raw of profileValues) {
+      const value = String(raw || "");
+      if (value.length > SETTINGS_PROFILE_MAX_LEN) {
+        return t("settings.validation_profile_too_long");
+      }
+      if (/\r|\n/.test(value)) {
+        return t("settings.validation_single_line");
+      }
+    }
+
+    return "";
+  }
   const KNOWN_SHORTCUT_CONFLICTS = {
     [normalizeKeyString("Ctrl+Alt+G")]: "settings.shortcut_conflict_google_drive",
     [normalizeKeyString("Ctrl+Shift+Esc")]: "settings.shortcut_conflict_task_manager",
@@ -606,34 +699,46 @@
   async function saveSettings(values) {
     settingsSaving = true;
     settingsError = "";
-    try {
-      const saved = await invoke("config_save_preferences", {
-        uiTheme: values.ui_theme,
-        uiLanguage: values.ui_language,
-        uiFileIconMode: values.ui_file_icon_mode,
-        perfDirStatsTimeoutMs: Number(values.perf_dir_stats_timeout_ms || 3000),
-        externalVscodePath: values.external_vscode_path || "",
-        externalGitClientPath: values.external_git_client_path || "",
-        externalTerminalProfile: values.external_terminal_profile || "",
-        externalTerminalProfileCmd: values.external_terminal_profile_cmd || "",
-        externalTerminalProfilePowershell: values.external_terminal_profile_powershell || "",
-        externalTerminalProfileWsl: values.external_terminal_profile_wsl || "",
-      });
 
-      settingsInitial = normalizeSettingsConfig(saved || values);
+    const normalizedValues = normalizeSettingsConfig(values || {});
+    const validationError = validateSettingsDraft(normalizedValues);
+    if (validationError) {
+      settingsSaving = false;
+      settingsError = validationError;
+      return;
+    }
+
+    const patch = buildSettingsSavePatch(settingsInitial, normalizedValues);
+    if (!hasSettingsPatchChanges(patch)) {
+      settingsSaving = false;
+      actions.setStatusMessage(t("settings.no_changes"), 1200);
+      settingsOpen = false;
+      queueMicrotask(() => {
+        shellRefs.listEl?.focus?.();
+      });
+      return;
+    }
+
+    try {
+      const saved = await invoke("config_save_preferences", patch);
+
+      settingsInitial = normalizeSettingsConfig(saved || normalizedValues);
       state.ui_theme = settingsInitial.ui_theme;
       state.ui_language = settingsInitial.ui_language;
       state.ui_file_icon_mode = settingsInitial.ui_file_icon_mode;
       state.dirStatsTimeoutMs = settingsInitial.perf_dir_stats_timeout_ms;
       actions.setStatusMessage(t("settings.saved"), 1500);
-      closeSettingsModal();
+      settingsOpen = false;
+      settingsError = "";
+      queueMicrotask(() => {
+        shellRefs.listEl?.focus?.();
+      });
     } catch (err) {
       settingsError = formatError(err, "save failed", t);
     } finally {
       settingsSaving = false;
     }
   }
-
   async function openConfigFromSettings() {
     try {
       await invoke("config_open_in_editor");

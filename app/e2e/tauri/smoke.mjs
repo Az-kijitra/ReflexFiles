@@ -75,13 +75,20 @@ const withStaleRetry = async (fn, label, attempts = 3) => {
   throw new Error(`${label} failed after ${attempts} attempts: ${lastError}`);
 };
 
+const makeFailureArtifactDir = (label) => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dir = resolve(artifactDir, 'on-failure', `${label}_${stamp}`);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+};
+
 const captureArtifacts = async (label) => {
   try {
-    mkdirSync(artifactDir, { recursive: true });
+    const failureDir = makeFailureArtifactDir(label);
     const png = await driver.takeScreenshot();
-    writeFileSync(resolve(artifactDir, `failure_${label}.png`), png, 'base64');
+    writeFileSync(resolve(failureDir, 'screen.png'), png, 'base64');
     const html = await driver.getPageSource();
-    writeFileSync(resolve(artifactDir, `failure_${label}.html`), html);
+    writeFileSync(resolve(failureDir, 'page.html'), html);
     let pathValue = '';
     try {
       pathValue = await driver
@@ -102,10 +109,41 @@ const captureArtifacts = async (label) => {
     } catch {
       visibleNames = [];
     }
+    let currentUrl = '';
+    let title = '';
+    let handles = [];
+    try {
+      currentUrl = await driver.getCurrentUrl();
+    } catch {
+      currentUrl = '';
+    }
+    try {
+      title = await driver.getTitle();
+    } catch {
+      title = '';
+    }
+    try {
+      handles = await driver.getAllWindowHandles();
+    } catch {
+      handles = [];
+    }
     writeFileSync(
-      resolve(artifactDir, `failure_${label}.json`),
-      JSON.stringify({ path: pathValue, visible: visibleNames }, null, 2)
+      resolve(failureDir, 'context.json'),
+      JSON.stringify(
+        {
+          captured_at: new Date().toISOString(),
+          label,
+          path: pathValue,
+          visible: visibleNames,
+          current_url: currentUrl,
+          title,
+          window_handles: handles,
+        },
+        null,
+        2
+      )
     );
+    console.error(`[smoke] failure artifacts saved: ${failureDir}`);
   } catch (error) {
     console.error(`[smoke] artifact capture failed: ${error}`);
   }
