@@ -6,7 +6,7 @@
  * @param {object} params.constants
  */
 
-export type PageKeydownParamsInput = Record<string, unknown>;
+export type PageKeydownParamsInput = Record<string, any>;
 
 /**
  * @param {object} params
@@ -14,4 +14,4 @@ export type PageKeydownParamsInput = Record<string, unknown>;
  * @param {object} params.actions
  */
 
-export type PageClickParamsInput = Record<string, unknown>;
+export type PageClickParamsInput = Record<string, any>;

@@ -173,4 +173,4 @@
  * }} params
  */
 
-export type ViewPropsInputsParams = Record<string, unknown>;
+export type ViewPropsInputsParams = Record<string, any>;

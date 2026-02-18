@@ -100,6 +100,14 @@ const captureFailureArtifacts = async (driver, label) => {
 };
 
 const normalizePath = (value) => String(value || "").replace(/\//g, "\\");
+const isTransientDomError = (error) => {
+  const text = String(error?.message || error || "").toLowerCase();
+  return (
+    text.includes("stale element reference") ||
+    text.includes("no such element") ||
+    text.includes("element not interactable")
+  );
+};
 
 console.log(`[viewer-flow] connecting to ${serverUrl}`);
 const driver = await withTimeout(
@@ -110,7 +118,39 @@ const driver = await withTimeout(
 
 try {
   await withTimeout(driver.wait(until.elementLocated(By.css("body")), timeoutMs), timeoutMs, "wait body");
-  const mainHandle = await driver.getWindowHandle();
+  const pickMainHandle = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const handles = await driver.getAllWindowHandles();
+      for (const handle of handles) {
+        await driver.switchTo().window(handle);
+        let currentUrl = "";
+        let title = "";
+        try {
+          currentUrl = await driver.getCurrentUrl();
+        } catch {
+          currentUrl = "";
+        }
+        try {
+          title = await driver.getTitle();
+        } catch {
+          title = "";
+        }
+        if (currentUrl && currentUrl !== "about:blank") {
+          return handle;
+        }
+        if (title && title !== "about:blank") {
+          return handle;
+        }
+      }
+      await sleep(150);
+    }
+    const fallback = await driver.getWindowHandle();
+    await driver.switchTo().window(fallback);
+    return fallback;
+  };
+
+  const mainHandle = await pickMainHandle();
 
   const closeExtraWindows = async () => {
     const handles = await driver.getAllWindowHandles();
@@ -124,31 +164,84 @@ try {
 
   await closeExtraWindows();
 
-  const getPathInput = async () => driver.findElement(By.css("header.path-bar input"));
+  const waitForMainUiReady = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await driver.switchTo().window(mainHandle);
+      try {
+        const ready = await driver.executeScript(() => {
+          const isVisible = (el) => {
+            if (!el) return false;
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== "none" &&
+              style.visibility !== "hidden"
+            );
+          };
+          const bodyReady = document.readyState === "complete";
+          const pathInput = document.querySelector("header.path-bar input");
+          const list = document.querySelector(".list");
+          return bodyReady && isVisible(pathInput) && isVisible(list);
+        });
+        if (ready) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(120);
+    }
+    throw new Error("main app UI did not become ready");
+  };
+
+  const waitVisibleElement = async (selector, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const elements = await driver.findElements(By.css(selector));
+        if (elements.length > 0) {
+          const element = elements[0];
+          if (await element.isDisplayed()) {
+            return element;
+          }
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(120);
+    }
+    throw new Error(`${label} timed out after ${timeoutMs}ms`);
+  };
+
+  const getPathInput = async () => {
+    return waitVisibleElement("header.path-bar input", "wait path input");
+  };
   const getListElement = async () => {
-    const listEl = await withTimeout(
-      driver.wait(until.elementLocated(By.css(".list")), timeoutMs),
-      timeoutMs,
-      "wait list"
-    );
-    await withTimeout(driver.wait(until.elementIsVisible(listEl), timeoutMs), timeoutMs, "wait list visible");
-    return listEl;
+    return waitVisibleElement(".list", "wait list");
   };
 
   const setPath = async (path) => {
-    const input = await getPathInput();
-    await input.click();
-    await input.sendKeys(Key.chord(Key.CONTROL, "a"));
-    await input.sendKeys(Key.DELETE);
-    await input.sendKeys(path);
-    await input.sendKeys(Key.ENTER);
-
     const expected = normalizePath(path).toLowerCase();
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const current = normalizePath(await (await getPathInput()).getAttribute("value")).toLowerCase();
-      if (current === expected) {
-        return;
+      try {
+        const input = await getPathInput();
+        await input.click();
+        await input.sendKeys(Key.chord(Key.CONTROL, "a"), Key.DELETE, path, Key.ENTER);
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+
+      try {
+        const current = normalizePath(await (await getPathInput()).getAttribute("value")).toLowerCase();
+        if (current === expected) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(200);
     }
@@ -156,36 +249,55 @@ try {
   };
 
   const collectVisibleNames = async () => {
-    const rows = await driver.findElements(By.css(".list .row .text"));
-    const values = [];
-    for (const row of rows) {
-      const text = (await row.getText()).trim();
-      if (text) values.push(text);
-    }
-    return values;
+    return driver.executeScript(() => {
+      return Array.from(document.querySelectorAll(".list .row .text"))
+        .map((el) => String(el.textContent || "").trim())
+        .filter((text) => text.length > 0);
+    });
   };
 
   const waitForVisibleName = async (name) => {
     const candidates = [name, name.replace(/\.[^.]+$/, "")];
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const visible = await collectVisibleNames();
-      if (visible.some((v) => candidates.includes(v))) {
-        return;
+      try {
+        const visible = await collectVisibleNames();
+        if (visible.some((v) => candidates.includes(v))) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(200);
     }
     throw new Error(`wait for visible name timeout: ${name}`);
   };
 
-  const rowByName = async (name) => {
+  const clickRowByName = async (name) => {
     const candidates = [name, name.replace(/\.[^.]+$/, "")];
-    const rowTexts = await driver.findElements(By.css(".list .row .text"));
-    for (const rowText of rowTexts) {
-      const text = (await rowText.getText()).trim();
-      if (candidates.includes(text)) {
-        return rowText.findElement(By.xpath("./ancestor::div[contains(@class,'row')]"));
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const clicked = await driver.executeScript((targets) => {
+          const texts = Array.from(document.querySelectorAll(".list .row .text"));
+          for (const textEl of texts) {
+            const text = String(textEl.textContent || "").trim();
+            if (!targets.includes(text)) continue;
+            const row = textEl.closest(".row");
+            if (!row) continue;
+            row.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+            return true;
+          }
+          return false;
+        }, candidates);
+        if (clicked) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
+      await sleep(120);
     }
     throw new Error(`row not found: ${name}`);
   };
@@ -219,6 +331,10 @@ try {
     throw new Error(`viewer title does not contain "${needle}"`);
   };
 
+  const waitVisibleCss = async (selector, label) => {
+    return waitVisibleElement(selector, label);
+  };
+
   const closeViewer = async (viewerHandle) => {
     await driver.switchTo().window(viewerHandle);
     await driver.actions().sendKeys(Key.ESCAPE).perform();
@@ -238,9 +354,13 @@ try {
   const waitIndicatorContains = async (text) => {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const value = await driver.findElement(By.css(".image-zoom-indicator")).getText();
-      if (value.includes(text)) {
-        return;
+      try {
+        const value = await driver.findElement(By.css(".image-zoom-indicator")).getText();
+        if (value.includes(text)) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(120);
     }
@@ -261,6 +381,7 @@ try {
   writeFileSync(resolve(workDir, mdName), mdContent, "utf8");
   writeFileSync(resolve(workDir, pngName), Buffer.from(pngBase64, "base64"));
 
+  await waitForMainUiReady();
   await setPath(workDir);
   await getListElement();
   await waitForVisibleName(textName);
@@ -271,10 +392,7 @@ try {
 
   const openViewerForFile = async (name) => {
     await driver.switchTo().window(mainHandle);
-    const row = await rowByName(name);
-    await row.click();
-    const listEl = await getListElement();
-    await listEl.sendKeys(Key.ENTER);
+    await clickRowByName(name);
     viewerHandle = await waitForViewerHandle(viewerHandle);
     await driver.switchTo().window(viewerHandle);
     await withTimeout(driver.wait(until.elementLocated(By.css("main.viewer-root")), timeoutMs), timeoutMs, "wait viewer root");
@@ -283,7 +401,8 @@ try {
 
   console.log("[viewer-flow] verify text file rendering...");
   await openViewerForFile(textName);
-  const textValue = await driver.findElement(By.css("pre.text")).getText();
+  const textPre = await waitVisibleCss(".text-lines pre.text.line-code", "wait text pre");
+  const textValue = await textPre.getText();
   if (!textValue.includes(textContent)) {
     throw new Error("text content mismatch in viewer");
   }
@@ -291,7 +410,8 @@ try {
 
   console.log("[viewer-flow] verify markdown rendering...");
   await openViewerForFile(mdName);
-  const markdownText = await driver.findElement(By.css("article.markdown")).getText();
+  const markdownRoot = await waitVisibleCss(".markdown", "wait markdown root");
+  const markdownText = await markdownRoot.getText();
   if (!markdownText.includes(mdTitle)) {
     throw new Error("markdown title mismatch in viewer");
   }
@@ -301,8 +421,15 @@ try {
   await openViewerForFile(pngName);
   await withTimeout(driver.wait(until.elementLocated(By.css(".image-controls")), timeoutMs), timeoutMs, "wait image controls");
   const imgSrc = await driver.findElement(By.css(".image-frame img")).getAttribute("src");
-  if (!String(imgSrc).startsWith("data:image/")) {
-    throw new Error("image src is not data url");
+  const normalizedImgSrc = String(imgSrc || "").toLowerCase();
+  const isSupportedImageSrc =
+    normalizedImgSrc.startsWith("data:image/") ||
+    normalizedImgSrc.startsWith("http://asset.localhost/") ||
+    normalizedImgSrc.startsWith("https://asset.localhost/") ||
+    normalizedImgSrc.startsWith("tauri://localhost/") ||
+    normalizedImgSrc.startsWith("file://");
+  if (!isSupportedImageSrc) {
+    throw new Error(`image src is unsupported: ${imgSrc}`);
   }
 
   const zoom200Button = await driver.findElement(

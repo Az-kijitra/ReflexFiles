@@ -29,7 +29,12 @@ export function updateStatusMessage(message, durationMs, ctx) {
  * @param {(message: string, durationMs?: number) => void} setStatusMessage
  * @param {{ t?: (key: string, vars?: Record<string, string | number>) => string }} [options]
  */
-export function applyError(err, setError, setStatusMessage, options = {}) {
+export function applyError(
+  err,
+  setError,
+  setStatusMessage,
+  options: { t?: (key: string, vars?: Record<string, string | number>) => string } = {}
+) {
   const message = formatError(err, "unknown error", options.t);
   setError(message);
   setStatusMessage(message);

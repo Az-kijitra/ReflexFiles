@@ -77,9 +77,9 @@ export function findTreeParentIndex(nodes, index) {
  * @param {HTMLElement | null} treeBodyEl
  * @param {number} focusedIndex
  */
-export function scrollTreeToFocus(treeBodyEl, focusedIndex) {
+export function scrollTreeToFocus(treeBodyEl: HTMLElement | null, focusedIndex: number) {
   if (!treeBodyEl) return;
-  const rows = Array.from(treeBodyEl.querySelectorAll(".tree-row"));
+  const rows = Array.from(treeBodyEl.querySelectorAll<HTMLElement>(".tree-row"));
   const row = rows[focusedIndex];
   if (row) {
     row.scrollIntoView({ block: "nearest" });

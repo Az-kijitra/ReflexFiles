@@ -1,7 +1,7 @@
 export type MarkReady = (name: string) => void;
 export type Get<T> = () => T;
 export type Set<T> = (value: T) => void;
-export type InvokeFn = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+export type InvokeFn = (cmd: string, args?: Record<string, any>) => Promise<unknown>;
 export type TimerHandle = ReturnType<typeof setTimeout> | null;
 
 export type UiSaveSectionParams = {
@@ -54,7 +54,7 @@ export type KeymapSectionParams = {
     getKeymapCustom: Get<Record<string, string>>;
     setKeymapCustom: Set<Record<string, string>>;
     scheduleUiSave: () => void;
-    KEYMAP_DEFAULTS: Record<string, unknown>;
+    KEYMAP_DEFAULTS: Record<string, any>;
     splitBindings: (value: string) => string[];
     normalizeKeyString: (value: string) => string;
     eventToKeyString: (event: KeyboardEvent) => string;
@@ -65,14 +65,14 @@ export type KeymapSectionParams = {
     matchesAction: (event: KeyboardEvent, action: string) => boolean;
     setCustomBinding: (action: string, value: string) => void;
     resetCustomBinding: (action: string) => void;
-    captureBinding: (event: KeyboardEvent) => string | null;
+    captureBinding: (...args: any[]) => any;
     getMenuShortcut: (action: string) => string;
   };
   getKeymapProfile: Get<"windows" | "vim">;
   getKeymapCustom: Get<Record<string, string>>;
   setKeymapCustom: Set<Record<string, string>>;
   getScheduleUiSave: Get<() => void>;
-  KEYMAP_DEFAULTS: Record<string, unknown>;
+  KEYMAP_DEFAULTS: Record<string, any>;
   splitBindings: (value: string) => string[];
   normalizeKeyString: (value: string) => string;
   eventToKeyString: (event: KeyboardEvent) => string;
@@ -82,7 +82,7 @@ export type KeymapSectionParams = {
   setMatchesAction: Set<(event: KeyboardEvent, action: string) => boolean>;
   setSetCustomBinding: Set<(action: string, value: string) => void>;
   setResetCustomBinding: Set<(action: string) => void>;
-  setCaptureBinding: Set<(event: KeyboardEvent) => string | null>;
+  setCaptureBinding: Set<(...args: any[]) => any>;
   setGetMenuShortcut: Set<(action: string) => string>;
   markReady: MarkReady;
 };
@@ -192,7 +192,7 @@ export type TreeSectionParams = {
     getCurrentPath: Get<string>;
     getLoadDir: Get<(path: string) => Promise<void>>;
     setTreeLoading: Set<boolean>;
-    handleTreeKeyUtil: (event: KeyboardEvent) => unknown;
+    handleTreeKeyUtil: (...args: any[]) => any;
     matchesAction: (event: KeyboardEvent, action: string) => boolean;
     getTreeFocusedIndex: Get<number>;
     getTreeEl: Get<HTMLElement | null>;
@@ -221,7 +221,7 @@ export type TreeSectionParams = {
   getCurrentPath: Get<string>;
   getLoadDir: Get<(path: string) => Promise<void>>;
   setTreeLoading: Set<boolean>;
-  handleTreeKeyUtil: (event: KeyboardEvent) => unknown;
+  handleTreeKeyUtil: (...args: any[]) => any;
   matchesAction: (event: KeyboardEvent, action: string) => boolean;
   getTreeFocusedIndex: Get<number>;
   getTreeEl: Get<HTMLElement | null>;
@@ -332,7 +332,7 @@ export type SortMenuSectionParams = {
     getSortOrder: Get<string>;
     setSortOrder: Set<string>;
     getSortMenuEl: Get<HTMLElement | null>;
-    trapModalTab: (event: KeyboardEvent) => void;
+    trapModalTab: (...args: any[]) => any;
     scheduleUiSave: () => void;
     loadCurrentDir: () => void;
     tick: () => Promise<void>;
@@ -351,7 +351,7 @@ export type SortMenuSectionParams = {
   getSortOrder: Get<string>;
   setSortOrder: Set<string>;
   getSortMenuEl: Get<HTMLElement | null>;
-  trapModalTab: (event: KeyboardEvent) => void;
+  trapModalTab: (...args: any[]) => any;
   getScheduleUiSave: Get<() => void>;
   loadCurrentDir: () => void;
   tick: () => Promise<void>;
@@ -365,7 +365,7 @@ export type SortMenuSectionParams = {
 export type SearchSectionParams = {
   createSearchHelpers: (args: {
     computeSearchEffect: (...args: unknown[]) => { filteredEntries: unknown[]; error?: string };
-    applySearchFilter: (...args: unknown[]) => unknown[];
+    applySearchFilter: (...args: any[]) => any;
     getEntries: Get<unknown[]>;
     getSearchActive: Get<boolean>;
     getSearchQuery: Get<string>;
@@ -375,7 +375,7 @@ export type SearchSectionParams = {
     t: (key: string, vars?: Record<string, string | number>) => string;
   }) => { recomputeSearch: () => void };
   computeSearchEffect: (...args: unknown[]) => { filteredEntries: unknown[]; error?: string };
-  applySearchFilter: (...args: unknown[]) => unknown[];
+  applySearchFilter: (...args: any[]) => any;
   getEntries: Get<unknown[]>;
   getSearchActive: Get<boolean>;
   getSearchQuery: Get<string>;

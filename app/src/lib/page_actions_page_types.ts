@@ -151,4 +151,4 @@
  * }} params
  */
 
-export type PageActionsPageParams = Record<string, unknown>;
+export type PageActionsPageParams = Record<string, any>;

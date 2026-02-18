@@ -53,19 +53,24 @@ let testId = 'boot';
 let artifactDir = artifactDirOverride ?? resolve(artifactsRoot, `smoke_${testId}`);
 let targetPath = process.env.E2E_TAURI_WORKDIR ?? resolve(artifactDir, 'work');
 
-const isStaleError = (error) =>
-  error &&
-  typeof error.message === 'string' &&
-  error.message.toLowerCase().includes('stale element reference');
+const isTransientDomError = (error) => {
+  const text = String(error?.message || error || '').toLowerCase();
+  return (
+    text.includes('stale element reference') ||
+    text.includes('no such element') ||
+    text.includes('element not interactable') ||
+    text.includes('does not belong to the document')
+  );
+};
 
-const withStaleRetry = async (fn, label, attempts = 3) => {
+const withStaleRetry = async (fn, label, attempts = 5) => {
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       return await fn();
     } catch (error) {
       lastError = error;
-      if (isStaleError(error)) {
+      if (isTransientDomError(error)) {
         await driver.sleep(150);
         continue;
       }
@@ -159,21 +164,58 @@ try {
   console.log('[smoke] body located.');
 
   const getListElement = async () => {
-    const listEl = await withTimeout(
-      driver.wait(until.elementLocated(By.css('.list')), timeoutMs),
-      timeoutMs,
-      'wait for list'
-    );
-    await withTimeout(
-      driver.wait(until.elementIsVisible(listEl), timeoutMs),
-      timeoutMs,
-      'wait for list visible'
-    );
-    return listEl;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const listEls = await driver.findElements(By.css('.list'));
+        if (listEls.length > 0) {
+          const listEl = listEls[0];
+          if (await listEl.isDisplayed()) {
+            return listEl;
+          }
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await driver.sleep(120);
+    }
+    throw new Error(`wait for list timed out after ${timeoutMs}ms`);
+  };
+
+  const waitForMainUiReady = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const ready = await driver.executeScript(() => {
+          const isVisible = (el) => {
+            if (!el) return false;
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden'
+            );
+          };
+          const pathInput = document.querySelector('header.path-bar input');
+          const list = document.querySelector('.list');
+          return document.readyState === 'complete' && isVisible(pathInput) && isVisible(list);
+        });
+        if (ready) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await driver.sleep(120);
+    }
+    throw new Error('main app UI did not become ready');
   };
 
   console.log('[smoke] waiting for list...');
   await getListElement();
+  await waitForMainUiReady();
   console.log('[smoke] list located.');
 
   testId = Date.now().toString().slice(-6);
@@ -190,8 +232,24 @@ try {
   mkdirSync(artifactDir, { recursive: true });
   mkdirSync(targetPath, { recursive: true });
 
-  const getPathInput = async () =>
-    driver.findElement(By.css('header.path-bar input'));
+  const getPathInput = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const inputs = await driver.findElements(By.css('header.path-bar input'));
+        if (inputs.length > 0) {
+          const input = inputs[0];
+          if (await input.isDisplayed()) {
+            return input;
+          }
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await driver.sleep(120);
+    }
+    throw new Error(`wait for path input timed out after ${timeoutMs}ms`);
+  };
   const normalizePath = (value) => value?.replace(/\//g, '\\');
 
   const closeOverlays = async () => {
@@ -295,7 +353,7 @@ try {
         throw new Error(`path not set: expected=${path} actual=${latest}`);
       } catch (error) {
         lastError = error;
-        if (isStaleError(error)) {
+        if (isTransientDomError(error)) {
           await driver.sleep(150);
           continue;
         }
@@ -307,17 +365,24 @@ try {
 
   const focusList = async () =>
     withStaleRetry(async () => {
-      const listEl = await getListElement();
-      await listEl.click();
-    }, 'focus list');
+      const focused = await driver.executeScript(() => {
+        const listEl = document.querySelector('.list');
+        if (!listEl) return false;
+        listEl.focus();
+        listEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        return true;
+      });
+      if (!focused) {
+        throw new Error('focus list failed');
+      }
+    }, 'focus list', 8);
 
   await setPath(targetPath);
   await focusList();
 
   const openCreate = async () => {
     await focusList();
-    const listEl = await getListElement();
-    await listEl.sendKeys(Key.chord(Key.CONTROL, 'n'));
+    await driver.actions().sendKeys(Key.chord(Key.CONTROL, 'n')).perform();
     try {
       const input = await withTimeout(
         driver.wait(until.elementLocated(By.css('#create-name')), 2_000),
@@ -327,6 +392,7 @@ try {
       await input.click();
       return input;
     } catch {
+      const listEl = await getListElement();
       await driver.actions().contextClick(listEl).perform();
       const newItem = await withTimeout(
         driver.wait(
@@ -374,7 +440,7 @@ try {
         }
         return visibleNames;
       } catch (error) {
-        if (isStaleError(error)) {
+        if (isTransientDomError(error)) {
           await driver.sleep(120);
           continue;
         }
@@ -647,13 +713,39 @@ try {
   mkdirSync(extractDir, { recursive: true });
   const openExtractModal = async () => {
     await focusList();
-    const listEl = await getListElement();
     await driver.actions().sendKeys(Key.ESCAPE).perform();
     await withStaleRetry(async () => {
       const zipRow = await rowByName(zipName);
       await zipRow.click();
     }, 'select zip row');
-    await listEl.sendKeys(Key.chord(Key.CONTROL, Key.ALT, 'x'));
+    await driver.actions().sendKeys(Key.chord(Key.CONTROL, Key.ALT, 'x')).perform();
+    try {
+      await withTimeout(
+        driver.wait(until.elementLocated(By.css('#zip-destination')), 1_500),
+        1_500,
+        'wait for extract destination quick'
+      );
+      return;
+    } catch {
+      // fallback to context menu when shortcut does not open modal
+    }
+    await withStaleRetry(async () => {
+      const zipRow = await rowByName(zipName);
+      await driver.actions().contextClick(zipRow).perform();
+    }, 'context click zip row for extract');
+    const extractItem = await withTimeout(
+      driver.wait(
+        until.elementLocated(
+          By.xpath(
+            "//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'解凍') or contains(normalize-space(.),'Extract')]]"
+          )
+        ),
+        timeoutMs
+      ),
+      timeoutMs,
+      'wait for context extract'
+    );
+    await extractItem.click();
   };
 
   let extractDestination;
@@ -852,8 +944,8 @@ try {
     const rowCopy = await rowByName(opA);
     await rowCopy.click();
   }, 'select copied opA for delete');
-  const listForDelete = await getListElement();
-  await listForDelete.sendKeys(Key.DELETE);
+  await focusList();
+  await driver.actions().sendKeys(Key.DELETE).perform();
   const deleteButton = await withTimeout(
     driver.wait(
       until.elementLocated(

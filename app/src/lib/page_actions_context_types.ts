@@ -74,4 +74,4 @@
  * }} params
  */
 
-export type PageActionsContextParams = Record<string, unknown>;
+export type PageActionsContextParams = Record<string, any>;

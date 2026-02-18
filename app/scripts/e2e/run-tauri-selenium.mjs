@@ -11,6 +11,63 @@ const appRoot = resolve(scriptDir, '..', '..');
 
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 
+const localAddressMatchesPort = (value, port) => {
+  const text = String(value ?? '').trim();
+  const lastColon = text.lastIndexOf(':');
+  if (lastColon < 0) return false;
+  const portText = text.slice(lastColon + 1).trim();
+  return Number(portText) === Number(port);
+};
+
+const findListeningPidsOnPortWin = (port) => {
+  if (process.platform !== 'win32') {
+    return [];
+  }
+  const result = spawnSync('netstat', ['-ano', '-p', 'tcp'], {
+    shell: false,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 3000,
+  });
+  if (result.status !== 0 || !result.stdout) {
+    return [];
+  }
+
+  const pids = [];
+  const lines = result.stdout.split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const cols = line.split(/\s+/);
+    if (cols.length < 5) continue;
+    const proto = cols[0].toUpperCase();
+    const localAddress = cols[1];
+    const state = cols[3].toUpperCase();
+    const pid = Number(cols[4]);
+    if (proto !== 'TCP') continue;
+    if (!Number.isFinite(pid) || pid <= 0) continue;
+    if (state !== 'LISTENING') continue;
+    if (!localAddressMatchesPort(localAddress, port)) continue;
+    pids.push(pid);
+  }
+  return [...new Set(pids)];
+};
+
+const killPidsWin = (pids, reason) => {
+  if (process.platform !== 'win32') {
+    return;
+  }
+  for (const pid of pids) {
+    if (!Number.isFinite(pid) || pid <= 0) continue;
+    console.log(`[runner] terminating pid ${pid} (${reason})...`);
+    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      shell: false,
+      stdio: 'ignore',
+      timeout: 3000,
+    });
+  }
+};
+
 const driverPort = Number(process.env.E2E_TAURI_DRIVER_PORT ?? 4444);
 const driverCmdBase =
   process.env.E2E_TAURI_DRIVER_CMD ?? `tauri-driver --port ${driverPort}`;
@@ -41,6 +98,7 @@ const appCmd =
   process.env.E2E_TAURI_APP_CMD ??
   (effectiveAppPath ? 'npm run dev' : 'npm run tauri dev');
 const killApp = process.env.E2E_TAURI_KILL_APP === '1';
+const killDriver = process.env.E2E_TAURI_KILL_DRIVER !== '0';
 const skipApp = process.env.E2E_TAURI_SKIP_APP === '1';
 const apiCmd = process.env.E2E_TAURI_API_CMD;
 const testCmd = process.env.E2E_TAURI_TEST_CMD ?? 'node e2e/tauri/smoke.mjs';
@@ -227,6 +285,28 @@ if (killApp && process.platform === 'win32') {
   });
 }
 
+if (killDriver && process.platform === 'win32') {
+  console.log('[runner] attempting to terminate existing tauri-driver.exe...');
+  spawnSync('taskkill', ['/IM', 'tauri-driver.exe', '/F'], {
+    shell: false,
+    stdio: 'ignore',
+    timeout: 3000,
+  });
+}
+
+if (process.platform === 'win32') {
+  const staleDriverPids = findListeningPidsOnPortWin(driverPort);
+  if (staleDriverPids.length > 0) {
+    killPidsWin(staleDriverPids, `port ${driverPort} occupant`);
+  }
+  if (needsAppReadyWait) {
+    const staleAppPortPids = findListeningPidsOnPortWin(appReadyPort);
+    if (staleAppPortPids.length > 0) {
+      killPidsWin(staleAppPortPids, `port ${appReadyPort} occupant`);
+    }
+  }
+}
+
 console.log(
   `[runner] app bootstrap mode: ${effectiveAppPath ? 'existing-binary + vite-dev' : 'tauri-dev build-and-run'}`
 );
@@ -263,6 +343,10 @@ try {
     console.log(`[runner] waiting for app dev server on port ${appReadyPort}...`);
     await waitForTcpPort(appReadyPort, appReadyTimeoutMs, 'app dev server', appReadyHosts);
     console.log(`[runner] app dev server is ready on port ${appReadyPort}.`);
+  }
+
+  if (app && app.exitCode !== null && app.exitCode !== 0) {
+    throw new Error(`app process exited before Selenium start (code=${app.exitCode})`);
   }
 
   for (let attempt = 0; attempt <= testRetries; attempt += 1) {

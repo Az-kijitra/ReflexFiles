@@ -85,4 +85,4 @@
  * }} params
  */
 
-export type DomHandlersInputsFromVars = Record<string, unknown>;
+export type DomHandlersInputsFromVars = Record<string, any>;

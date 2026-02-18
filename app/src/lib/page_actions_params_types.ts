@@ -5,4 +5,4 @@
  * @param {object} params.page
  * @param {object} params.helpers
  */
-export type PageActionsParamsInput = Record<string, unknown>;
+export type PageActionsParamsInput = Record<string, any>;

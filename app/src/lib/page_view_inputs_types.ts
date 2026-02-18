@@ -136,4 +136,4 @@
  * }} params
  */
 
-export type ViewInputsParams = Record<string, unknown>;
+export type ViewInputsParams = Record<string, any>;

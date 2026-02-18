@@ -124,6 +124,14 @@ const captureArtifacts = async (driver, label) => {
 };
 
 const normalizePath = (value) => String(value || "").replace(/\//g, "\\");
+const isTransientDomError = (error) => {
+  const text = String(error?.message || error || "").toLowerCase();
+  return (
+    text.includes("stale element reference") ||
+    text.includes("no such element") ||
+    text.includes("element not interactable")
+  );
+};
 
 console.log(`[settings-session] connecting to ${serverUrl}`);
 const driver = await withTimeout(
@@ -134,36 +142,191 @@ const driver = await withTimeout(
 
 try {
   await withTimeout(driver.wait(until.elementLocated(By.css("body")), timeoutMs), timeoutMs, "wait body");
+  const pickMainHandle = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const handles = await driver.getAllWindowHandles();
+      for (const handle of handles) {
+        await driver.switchTo().window(handle);
+        let currentUrl = "";
+        let title = "";
+        try {
+          currentUrl = await driver.getCurrentUrl();
+        } catch {
+          currentUrl = "";
+        }
+        try {
+          title = await driver.getTitle();
+        } catch {
+          title = "";
+        }
+        if (currentUrl && currentUrl !== "about:blank") {
+          return handle;
+        }
+        if (title && title !== "about:blank") {
+          return handle;
+        }
+      }
+      await sleep(150);
+    }
+    const fallback = await driver.getWindowHandle();
+    await driver.switchTo().window(fallback);
+    return fallback;
+  };
 
-  const getPathInput = async () => driver.findElement(By.css("header.path-bar input"));
+  const mainHandle = await pickMainHandle();
+
+  const closeExtraWindows = async () => {
+    const handles = await driver.getAllWindowHandles();
+    for (const handle of handles) {
+      if (handle === mainHandle) continue;
+      await driver.switchTo().window(handle);
+      await driver.close();
+    }
+    await driver.switchTo().window(mainHandle);
+  };
+
+  await closeExtraWindows();
+
+  const waitForMainUiReady = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await driver.switchTo().window(mainHandle);
+      try {
+        const ready = await driver.executeScript(() => {
+          const isVisible = (el) => {
+            if (!el) return false;
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== "none" &&
+              style.visibility !== "hidden"
+            );
+          };
+          const bodyReady = document.readyState === "complete";
+          const pathInput = document.querySelector("header.path-bar input");
+          const list = document.querySelector(".list");
+          return bodyReady && isVisible(pathInput) && isVisible(list);
+        });
+        if (ready) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(120);
+    }
+    throw new Error("main app UI did not become ready");
+  };
+
+  const waitVisibleElement = async (selector, label, maxWaitMs = timeoutMs) => {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      try {
+        const elements = await driver.findElements(By.css(selector));
+        if (elements.length > 0) {
+          const element = elements[0];
+          if (await element.isDisplayed()) {
+            return element;
+          }
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(120);
+    }
+    throw new Error(`${label} timed out after ${maxWaitMs}ms`);
+  };
+
+  const getPathInput = async () => {
+    return waitVisibleElement("header.path-bar input", "wait path input");
+  };
 
   const getListElement = async () => {
-    const listEl = await withTimeout(
-      driver.wait(until.elementLocated(By.css(".list")), timeoutMs),
-      timeoutMs,
-      "wait list"
+    return waitVisibleElement(".list", "wait list");
+  };
+
+  const focusList = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const focused = await driver.executeScript(() => {
+          const list = document.querySelector(".list");
+          if (!list) return false;
+          list.focus();
+          return document.activeElement === list;
+        });
+        if (focused) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(100);
+    }
+    throw new Error("list focus timed out");
+  };
+
+  const triggerShortcut = async ({ key, code, ctrl = false, shift = false, alt = false, meta = false }) => {
+    await driver.executeScript(
+      (payload) => {
+        const target = document.activeElement || document.body || window;
+        const init = {
+          key: payload.key,
+          code: payload.code,
+          ctrlKey: Boolean(payload.ctrl),
+          shiftKey: Boolean(payload.shift),
+          altKey: Boolean(payload.alt),
+          metaKey: Boolean(payload.meta),
+          bubbles: true,
+          cancelable: true,
+        };
+        target.dispatchEvent(new KeyboardEvent("keydown", init));
+        window.dispatchEvent(new KeyboardEvent("keydown", init));
+        target.dispatchEvent(new KeyboardEvent("keyup", init));
+        window.dispatchEvent(new KeyboardEvent("keyup", init));
+      },
+      { key, code, ctrl, shift, alt, meta }
     );
-    await withTimeout(driver.wait(until.elementIsVisible(listEl), timeoutMs), timeoutMs, "wait list visible");
-    return listEl;
+  };
+
+  const waitForSettingsBridgeReady = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const ready = await driver.executeScript(() => typeof window.__rf_settings_open === "boolean");
+        if (ready) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(120);
+    }
+    throw new Error("settings bridge was not initialized");
   };
 
   const collectVisibleNames = async () => {
-    const rows = await driver.findElements(By.css(".list .row .text"));
-    const values = [];
-    for (const row of rows) {
-      const text = (await row.getText()).trim();
-      if (text) values.push(text);
-    }
-    return values;
+    return driver.executeScript(() => {
+      return Array.from(document.querySelectorAll(".list .row .text"))
+        .map((el) => String(el.textContent || "").trim())
+        .filter((text) => text.length > 0);
+    });
   };
 
   const waitForVisibleName = async (name) => {
     const candidates = displayCandidates(name);
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const visible = await collectVisibleNames();
-      if (visible.some((v) => candidates.includes(v))) {
-        return;
+      try {
+        const visible = await collectVisibleNames();
+        if (visible.some((v) => candidates.includes(v))) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(200);
     }
@@ -174,41 +337,66 @@ try {
     const candidates = displayCandidates(name);
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const visible = await collectVisibleNames();
-      if (!visible.some((v) => candidates.includes(v))) {
-        return;
+      try {
+        const visible = await collectVisibleNames();
+        if (!visible.some((v) => candidates.includes(v))) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(200);
     }
     throw new Error(`wait for name gone timeout: ${name}`);
   };
 
-  const rowByName = async (name) => {
+  const clickRowByName = async (name) => {
     const candidates = displayCandidates(name);
-    const rowTexts = await driver.findElements(By.css(".list .row .text"));
-    for (const rowText of rowTexts) {
-      const text = (await rowText.getText()).trim();
-      if (candidates.includes(text)) {
-        return rowText.findElement(By.xpath("./ancestor::div[contains(@class,'row')]"));
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const clicked = await driver.executeScript((targets) => {
+          const texts = Array.from(document.querySelectorAll(".list .row .text"));
+          for (const textEl of texts) {
+            const text = String(textEl.textContent || "").trim();
+            if (!targets.includes(text)) continue;
+            const row = textEl.closest(".row");
+            if (!row) continue;
+            row.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            return true;
+          }
+          return false;
+        }, candidates);
+        if (clicked) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
+      await sleep(120);
     }
     throw new Error(`row not found: ${name}`);
   };
 
   const setPath = async (path) => {
-    const input = await getPathInput();
-    await input.click();
-    await input.sendKeys(Key.chord(Key.CONTROL, "a"));
-    await input.sendKeys(Key.DELETE);
-    await input.sendKeys(path);
-    await input.sendKeys(Key.ENTER);
-
     const expected = normalizePath(path).toLowerCase();
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const current = normalizePath(await (await getPathInput()).getAttribute("value")).toLowerCase();
-      if (current === expected) {
-        return;
+      try {
+        const input = await getPathInput();
+        await input.click();
+        await input.sendKeys(Key.chord(Key.CONTROL, "a"), Key.DELETE, path, Key.ENTER);
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+
+      try {
+        const current = normalizePath(await (await getPathInput()).getAttribute("value")).toLowerCase();
+        if (current === expected) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(200);
     }
@@ -216,17 +404,22 @@ try {
   };
 
   const openSettings = async () => {
-    await driver.executeScript("window.dispatchEvent(new Event('rf:open-settings')); ");
-    await withTimeout(
-      driver.wait(until.elementLocated(By.css(".settings-modal")), timeoutMs),
-      timeoutMs,
-      "wait settings modal"
-    );
-    await withTimeout(
-      driver.wait(until.elementLocated(By.css(".settings-sidebar")), timeoutMs),
-      timeoutMs,
-      "wait settings sidebar"
-    );
+    await waitForSettingsBridgeReady();
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        await driver.executeScript("window.dispatchEvent(new Event('rf:open-settings')); ");
+        await waitVisibleElement(".settings-modal", "wait settings modal", 1500);
+        await waitVisibleElement(".settings-sidebar", "wait settings sidebar", 1500);
+        return;
+      } catch (error) {
+        if (!isTransientDomError(error) && !String(error?.message || "").includes("timed out")) {
+          throw error;
+        }
+      }
+      await sleep(180);
+    }
+    throw new Error("settings modal did not open");
   };
 
   const closeSettings = async () => {
@@ -246,12 +439,22 @@ try {
   };
 
   const clickSettingsSection = async (index) => {
-    const buttons = await driver.findElements(By.css(".settings-sidebar button"));
-    if (index < 0 || index >= buttons.length) {
-      throw new Error(`settings section index out of range: ${index}`);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const buttons = await driver.findElements(By.css(".settings-sidebar button"));
+        if (index < 0 || index >= buttons.length) {
+          throw new Error(`settings section index out of range: ${index}`);
+        }
+        await buttons[index].click();
+        await sleep(120);
+        return;
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(100);
     }
-    await buttons[index].click();
-    await sleep(120);
+    throw new Error(`settings section click timeout: ${index}`);
   };
 
   const getIconMode = async () =>
@@ -277,11 +480,7 @@ try {
   };
 
   const clickPrimarySave = async () => {
-    const saveButton = await withTimeout(
-      driver.wait(until.elementLocated(By.css(".settings-actions button.primary")), timeoutMs),
-      timeoutMs,
-      "wait settings save button"
-    );
+    const saveButton = await waitVisibleElement(".settings-actions button.primary", "wait settings save button");
     await saveButton.click();
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -318,8 +517,10 @@ try {
   const undoFile = `undo_${testId}.txt`;
   writeFileSync(resolve(workDir, undoFile), `undo-session-${testId}\n`, "utf8");
 
+  await waitForMainUiReady();
   await setPath(workDir);
   await getListElement();
+  await focusList();
   await waitForVisibleName(undoFile);
 
   console.log("[settings-session] verify settings save persistence...");
@@ -371,10 +572,10 @@ try {
   }
 
   console.log("[settings-session] verify undo/redo behavior and session file...");
-  const listEl = await getListElement();
-  const targetRow = await rowByName(undoFile);
-  await targetRow.click();
-  await listEl.sendKeys(Key.DELETE);
+  await getListElement();
+  await clickRowByName(undoFile);
+  await focusList();
+  await driver.actions().sendKeys(Key.DELETE).perform();
 
   const deleteButton = await withTimeout(
     driver.wait(
@@ -391,12 +592,12 @@ try {
   await deleteButton.click();
   await waitForNameGone(undoFile);
 
-  await listEl.click();
-  await listEl.sendKeys(Key.chord(Key.CONTROL, "z"));
+  await focusList();
+  await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true });
   await waitForVisibleName(undoFile);
 
-  await listEl.click();
-  await listEl.sendKeys(Key.chord(Key.CONTROL, Key.SHIFT, "z"));
+  await focusList();
+  await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true, shift: true });
   await waitForNameGone(undoFile);
 
   await sleep(700);

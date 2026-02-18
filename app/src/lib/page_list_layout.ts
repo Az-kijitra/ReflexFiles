@@ -138,7 +138,7 @@ export function createListLayoutHelpers(params) {
   function scrollListHorizontallyByColumns(deltaColumns) {
     const listBodyEl = getListBodyEl();
     if (!listBodyEl) return;
-    setScrollStartColumn(getVisibleColStart() + deltaColumns);
+    setScrollStartColumn(getVisibleColStart() + deltaColumns, null);
   }
 
   return {

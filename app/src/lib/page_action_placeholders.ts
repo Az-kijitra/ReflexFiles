@@ -4,7 +4,12 @@
  *   showError?: (err: unknown) => void;
  * }} params
  */
-export function createPageActionPlaceholders(params = {}) {
+export function createPageActionPlaceholders(
+  params: {
+    setStatusMessage?: (value: string) => void;
+    showError?: (err: unknown) => void;
+  } = {}
+) {
   const noop = () => {};
   const noopAsync = async () => {};
 

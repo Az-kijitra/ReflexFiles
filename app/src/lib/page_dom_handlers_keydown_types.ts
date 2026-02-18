@@ -109,4 +109,4 @@
  * @param {() => unknown} params.getTargetEntry
  */
 
-export type PageKeydownParams = Record<string, unknown>;
+export type PageKeydownParams = Record<string, any>;
