@@ -57,7 +57,7 @@ jobs:
                 break
               }
             } catch {
-              Write-Host "Failed to resolve from $latestUrl: $($_.Exception.Message)"
+              Write-Host "Failed to resolve from ${latestUrl}: $($_.Exception.Message)"
             }
           }
 
@@ -81,7 +81,7 @@ jobs:
               $downloaded = $true
               break
             } catch {
-              Write-Host "Failed download from $zipUrl: $($_.Exception.Message)"
+              Write-Host "Failed download from ${zipUrl}: $($_.Exception.Message)"
             }
           }
 
@@ -163,7 +163,7 @@ jobs:
                 break
               }
             } catch {
-              Write-Host "Failed to resolve from $latestUrl: $($_.Exception.Message)"
+              Write-Host "Failed to resolve from ${latestUrl}: $($_.Exception.Message)"
             }
           }
 
@@ -187,7 +187,7 @@ jobs:
               $downloaded = $true
               break
             } catch {
-              Write-Host "Failed download from $zipUrl: $($_.Exception.Message)"
+              Write-Host "Failed download from ${zipUrl}: $($_.Exception.Message)"
             }
           }
 
