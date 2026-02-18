@@ -12,7 +12,7 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "audit:npm": "npm audit --audit-level=high",
     "audit:npm:prod": "npm audit --omit=dev --audit-level=high",
-    "audit:cargo": "cargo audit --manifest-path src-tauri/Cargo.toml",
+    "audit:cargo": "cargo audit --file src-tauri/Cargo.lock",
     "audit:deps": "npm run audit:npm && npm run audit:cargo",
     "e2e:tauri": "node scripts/e2e/run-tauri-selenium.mjs",
     "e2e:viewer": "node scripts/e2e/run-tauri-viewer-selenium.mjs",
