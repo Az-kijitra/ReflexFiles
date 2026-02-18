@@ -40,6 +40,7 @@ npm run audit:deps
 ## Documentation
 - User manual (English): `user_manual.md`
 - User manual (Japanese): `docs/ja/user_manual.ja.md`
+- Development guide: `docs/development_guide.md`
 - Maintenance guide (English): `docs/maintenance_guide.md`
 - Maintenance guide (Japanese): `docs/ja/maintenance_guide.ja.md`
 - Terminal profile mapping (`Ctrl+Alt+1/2/3`) is documented in the user manuals (`external_terminal_profile_cmd` / `external_terminal_profile_powershell` / `external_terminal_profile_wsl`).
