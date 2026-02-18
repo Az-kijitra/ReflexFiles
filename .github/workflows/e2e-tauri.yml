@@ -39,10 +39,56 @@ jobs:
         run: |
           $edgeVersion = (Get-Item "$Env:ProgramFiles (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.ProductVersion
           $major = $edgeVersion.Split('.')[0]
-          $latestUrl = "https://msedgedriver.azureedge.net/LATEST_RELEASE_$major"
-          $driverVersion = (Invoke-WebRequest -Uri $latestUrl -UseBasicParsing).Content.Trim()
-          $zipUrl = "https://msedgedriver.azureedge.net/$driverVersion/edgedriver_win64.zip"
-          Invoke-WebRequest -Uri $zipUrl -OutFile "$PWD\edgedriver.zip"
+          Write-Host "Edge version: $edgeVersion (major: $major)"
+
+          $latestCandidates = @(
+            "https://msedgedriver.microsoft.com/LATEST_RELEASE_$major",
+            "https://msedgewebdriverstorage.z22.web.core.windows.net/LATEST_RELEASE_$major",
+            "https://msedgedriver.azureedge.net/LATEST_RELEASE_$major"
+          )
+
+          $driverVersion = $null
+          foreach ($latestUrl in $latestCandidates) {
+            try {
+              $resolved = (Invoke-WebRequest -Uri $latestUrl -UseBasicParsing -TimeoutSec 20).Content.Trim()
+              if ($resolved) {
+                $driverVersion = $resolved
+                Write-Host "Resolved EdgeDriver version: $driverVersion from $latestUrl"
+                break
+              }
+            } catch {
+              Write-Host "Failed to resolve from $latestUrl: $($_.Exception.Message)"
+            }
+          }
+
+          if (-not $driverVersion) {
+            $driverVersion = $edgeVersion
+            Write-Host "Falling back to exact Edge version: $driverVersion"
+          }
+
+          $zipCandidates = @(
+            "https://msedgedriver.microsoft.com/$driverVersion/edgedriver_win64.zip",
+            "https://msedgewebdriverstorage.z22.web.core.windows.net/$driverVersion/edgedriver_win64.zip",
+            "https://msedgedriver.azureedge.net/$driverVersion/edgedriver_win64.zip"
+          )
+
+          $zipPath = "$PWD\edgedriver.zip"
+          $downloaded = $false
+          foreach ($zipUrl in $zipCandidates) {
+            try {
+              Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 60
+              Write-Host "Downloaded EdgeDriver from $zipUrl"
+              $downloaded = $true
+              break
+            } catch {
+              Write-Host "Failed download from $zipUrl: $($_.Exception.Message)"
+            }
+          }
+
+          if (-not $downloaded) {
+            throw "Failed to download EdgeDriver from all candidate URLs."
+          }
+
           Expand-Archive -Path "$PWD\edgedriver.zip" -DestinationPath "$PWD\edgedriver" -Force
           Copy-Item "$PWD\edgedriver\msedgedriver.exe" "$PWD\msedgedriver.exe" -Force
 
@@ -99,10 +145,56 @@ jobs:
         run: |
           $edgeVersion = (Get-Item "$Env:ProgramFiles (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.ProductVersion
           $major = $edgeVersion.Split('.')[0]
-          $latestUrl = "https://msedgedriver.azureedge.net/LATEST_RELEASE_$major"
-          $driverVersion = (Invoke-WebRequest -Uri $latestUrl -UseBasicParsing).Content.Trim()
-          $zipUrl = "https://msedgedriver.azureedge.net/$driverVersion/edgedriver_win64.zip"
-          Invoke-WebRequest -Uri $zipUrl -OutFile "$PWD\edgedriver.zip"
+          Write-Host "Edge version: $edgeVersion (major: $major)"
+
+          $latestCandidates = @(
+            "https://msedgedriver.microsoft.com/LATEST_RELEASE_$major",
+            "https://msedgewebdriverstorage.z22.web.core.windows.net/LATEST_RELEASE_$major",
+            "https://msedgedriver.azureedge.net/LATEST_RELEASE_$major"
+          )
+
+          $driverVersion = $null
+          foreach ($latestUrl in $latestCandidates) {
+            try {
+              $resolved = (Invoke-WebRequest -Uri $latestUrl -UseBasicParsing -TimeoutSec 20).Content.Trim()
+              if ($resolved) {
+                $driverVersion = $resolved
+                Write-Host "Resolved EdgeDriver version: $driverVersion from $latestUrl"
+                break
+              }
+            } catch {
+              Write-Host "Failed to resolve from $latestUrl: $($_.Exception.Message)"
+            }
+          }
+
+          if (-not $driverVersion) {
+            $driverVersion = $edgeVersion
+            Write-Host "Falling back to exact Edge version: $driverVersion"
+          }
+
+          $zipCandidates = @(
+            "https://msedgedriver.microsoft.com/$driverVersion/edgedriver_win64.zip",
+            "https://msedgewebdriverstorage.z22.web.core.windows.net/$driverVersion/edgedriver_win64.zip",
+            "https://msedgedriver.azureedge.net/$driverVersion/edgedriver_win64.zip"
+          )
+
+          $zipPath = "$PWD\edgedriver.zip"
+          $downloaded = $false
+          foreach ($zipUrl in $zipCandidates) {
+            try {
+              Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 60
+              Write-Host "Downloaded EdgeDriver from $zipUrl"
+              $downloaded = $true
+              break
+            } catch {
+              Write-Host "Failed download from $zipUrl: $($_.Exception.Message)"
+            }
+          }
+
+          if (-not $downloaded) {
+            throw "Failed to download EdgeDriver from all candidate URLs."
+          }
+
           Expand-Archive -Path "$PWD\edgedriver.zip" -DestinationPath "$PWD\edgedriver" -Force
           Copy-Item "$PWD\edgedriver\msedgedriver.exe" "$PWD\msedgedriver.exe" -Force
 
