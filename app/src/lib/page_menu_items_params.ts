@@ -19,6 +19,7 @@ export function buildMenuItemsParams(params) {
     pasteItems: params.pasteItems,
     hasOperationTargets: params.hasOperationTargets,
     hasSelection: params.hasSelection,
+    canPasteCurrentPath: params.canPasteCurrentPath,
     canCopyTargets: params.canCopyTargets,
     canDuplicateTargets: params.canDuplicateTargets,
     canPrefixDateTargets: params.canPrefixDateTargets,

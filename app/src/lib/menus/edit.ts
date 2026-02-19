@@ -11,6 +11,7 @@
  * @param {() => void} params.pasteItems
  * @param {() => boolean} [params.hasOperationTargets]
  * @param {() => boolean} [params.hasSelection]
+ * @param {() => boolean} [params.canPasteCurrentPath]
  * @param {() => boolean} [params.canCopyTargets]
  * @param {() => boolean} [params.canDuplicateTargets]
  * @param {() => boolean} [params.canPrefixDateTargets]
@@ -37,6 +38,7 @@ export function buildEditMenuItems(params) {
     pasteItems,
     hasOperationTargets,
     hasSelection,
+    canPasteCurrentPath,
     canCopyTargets,
     canDuplicateTargets,
     canPrefixDateTargets,
@@ -57,6 +59,7 @@ export function buildEditMenuItems(params) {
   const duplicateEnabled = hasTargets && (canDuplicateTargets ? canDuplicateTargets() : true);
   const prefixDateEnabled = hasTargets && (canPrefixDateTargets ? canPrefixDateTargets() : true);
   const cutEnabled = hasTargets && (canCutTargets ? canCutTargets() : true);
+  const pasteEnabled = canPasteCurrentPath ? canPasteCurrentPath() : true;
   const deleteEnabled = hasSelectedItems && (canDeleteSelection ? canDeleteSelection() : true);
   const propertiesEnabled =
     hasSelectedItems && (canOpenPropertiesSelection ? canOpenPropertiesSelection() : true);
@@ -101,7 +104,8 @@ export function buildEditMenuItems(params) {
     },
     {
       label: t("menu.paste"),
-      enabled: true,
+      enabled: pasteEnabled,
+      reason: pasteEnabled ? "" : t("capability.not_available"),
       action: () => pasteItems(),
       shortcut: getMenuShortcut("paste"),
     },

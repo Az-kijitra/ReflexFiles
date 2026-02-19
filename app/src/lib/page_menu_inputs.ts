@@ -25,6 +25,8 @@
  *       pasteItems: () => void;
  *       hasOperationTargets: () => boolean;
  *       hasSelection: () => boolean;
+ *       canCreateCurrentPath: () => boolean;
+ *       canPasteCurrentPath: () => boolean;
  *       canCopyTargets: () => boolean;
  *       canDuplicateTargets: () => boolean;
  *       canPrefixDateTargets: () => boolean;
@@ -88,6 +90,8 @@ export function buildMenuSetupInputs(params) {
       pasteItems: page.pasteItems,
       hasOperationTargets: page.hasOperationTargets,
       hasSelection: page.hasSelection,
+      canCreateCurrentPath: page.canCreateCurrentPath,
+      canPasteCurrentPath: page.canPasteCurrentPath,
       canCopyTargets: page.canCopyTargets,
       canDuplicateTargets: page.canDuplicateTargets,
       canPrefixDateTargets: page.canPrefixDateTargets,

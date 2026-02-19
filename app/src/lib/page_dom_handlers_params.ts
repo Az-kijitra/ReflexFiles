@@ -84,6 +84,8 @@ export function buildPageKeydownParams({ state, actions, helpers, constants }: P
     pasteItems: actions.pasteItems,
     hasOperationTargets: actions.hasOperationTargets,
     hasSelection: actions.hasSelection,
+    canCreateCurrentPath: actions.canCreateCurrentPath,
+    canPasteCurrentPath: actions.canPasteCurrentPath,
     canCopyTargets: actions.canCopyTargets,
     canDuplicateTargets: actions.canDuplicateTargets,
     canPrefixDateTargets: actions.canPrefixDateTargets,

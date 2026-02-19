@@ -99,6 +99,8 @@ export function createPageActionPlaceholders(
     pasteItems: noop,
     hasOperationTargets: () => false,
     hasSelection: () => false,
+    canCreateCurrentPath: () => false,
+    canPasteCurrentPath: () => false,
     canCopyTargets: () => false,
     canDuplicateTargets: () => false,
     canPrefixDateTargets: () => false,
