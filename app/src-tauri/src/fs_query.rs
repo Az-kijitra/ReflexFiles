@@ -10,7 +10,13 @@ use std::sync::{mpsc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::error::{AppError, AppResult};
-use crate::types::{DirStats, Entry, EntryType, Properties, PropertyKind, SortKey, SortOrder};
+use crate::storage_provider::{
+    provider_capabilities, provider_registry, resolve_legacy_path, ProviderRegistry,
+};
+use crate::types::{
+    DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef,
+    SortKey, SortOrder,
+};
 use crate::utils::{is_hidden, system_time_to_rfc3339};
 
 const IMAGE_CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
@@ -111,8 +117,11 @@ fn cleanup_viewer_image_cache_dir(dir: &Path) {
     }
 }
 
-fn entry_from_path(path: PathBuf) -> AppResult<Entry> {
-    let metadata = fs::metadata(&path)?;
+fn entry_from_resource_ref(registry: &ProviderRegistry, resource_ref: ResourceRef) -> AppResult<Entry> {
+    let provider = registry.provider_for_ref(&resource_ref)?;
+    let path = provider.resolve_path(&resource_ref)?;
+    let metadata = provider.metadata(&resource_ref)?;
+    let capabilities = provider_capabilities(provider);
     let entry_type = if metadata.is_dir() {
         EntryType::Dir
     } else {
@@ -134,9 +143,14 @@ fn entry_from_path(path: PathBuf) -> AppResult<Entry> {
     } else {
         0
     };
+    let display_path = provider.display_path(&resource_ref);
     Ok(Entry {
         name,
-        path: path.to_string_lossy().to_string(),
+        path: display_path.clone(),
+        display_path,
+        provider: resource_ref.provider,
+        resource_ref,
+        capabilities,
         entry_type,
         size,
         modified,
@@ -179,12 +193,14 @@ pub(crate) fn fs_list_dir_impl(
     sort_key: String,
     sort_order: String,
 ) -> AppResult<Vec<Entry>> {
+    let registry = provider_registry();
+    let dir_ref = registry.local().resource_ref_from_legacy_path(&path)?;
+    let provider = registry.provider_for_ref(&dir_ref)?;
+
     let mut entries: Vec<Entry> = vec![];
-    let read_dir = fs::read_dir(&path)?;
-    for item in read_dir {
-        let entry = item?;
-        let path = entry.path();
-        let entry = entry_from_path(path)?;
+    let resource_refs = provider.list_dir_refs(&dir_ref)?;
+    for resource_ref in resource_refs {
+        let entry = entry_from_resource_ref(registry, resource_ref)?;
         if !show_hidden && entry.hidden {
             continue;
         }
@@ -231,7 +247,8 @@ pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<Str
         return Ok(String::new());
     }
 
-    let file = fs::File::open(&path)?;
+    let resolved_path = resolve_legacy_path(&path)?;
+    let file = fs::File::open(&resolved_path)?;
     let mut limited = file.take(max_bytes as u64);
     let mut data = Vec::with_capacity(max_bytes.min(1024 * 1024));
     limited.read_to_end(&mut data)?;
@@ -242,7 +259,8 @@ pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<Str
 
 pub(crate) fn fs_is_probably_text_impl(path: String, sample_bytes: usize) -> AppResult<bool> {
     let max = sample_bytes.max(1);
-    let file = fs::File::open(&path)?;
+    let resolved_path = resolve_legacy_path(&path)?;
+    let file = fs::File::open(&resolved_path)?;
     let mut limited = file.take(max as u64);
     let mut data = Vec::with_capacity(max.min(64 * 1024));
     limited.read_to_end(&mut data)?;
@@ -363,7 +381,7 @@ fn decode_line_bytes(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn fs_text_viewport_info_impl(path: String) -> AppResult<TextViewportInfo> {
-    let path_buf = PathBuf::from(&path);
+    let path_buf = resolve_legacy_path(&path)?;
     if !path_buf.exists() {
         return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
     }
@@ -384,7 +402,7 @@ pub(crate) fn fs_read_text_viewport_lines_impl(
     start_line: usize,
     line_count: usize,
 ) -> AppResult<TextViewportChunk> {
-    let path_buf = PathBuf::from(&path);
+    let path_buf = resolve_legacy_path(&path)?;
     if !path_buf.exists() {
         return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
     }
@@ -474,7 +492,7 @@ pub(crate) fn fs_read_image_data_url_impl(path: String, normalize: bool) -> AppR
         return Ok(format!("data:image/png;base64,{body}"));
     }
 
-    let path_buf = PathBuf::from(&path);
+    let path_buf = resolve_legacy_path(&path)?;
     let bytes = fs::read(&path_buf)?;
     let mime = infer_image_mime(&path_buf, &bytes)
         .ok_or_else(|| AppError::msg("unsupported image mime".to_string()))?;
@@ -488,7 +506,7 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
     fs::create_dir_all(&dir)?;
     cleanup_viewer_image_cache_dir(&dir);
 
-    let path_buf = PathBuf::from(&path);
+    let path_buf = resolve_legacy_path(&path)?;
     let metadata = fs::metadata(&path_buf)?;
     let modified_nanos = metadata
         .modified()
@@ -540,8 +558,12 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
 }
 
 pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
-    let path_buf = PathBuf::from(&path);
-    let metadata = fs::metadata(&path_buf)?;
+    let registry = provider_registry();
+    let resource_ref = registry.local().resource_ref_from_legacy_path(&path)?;
+    let provider = registry.provider_for_ref(&resource_ref)?;
+    let path_buf = provider.resolve_path(&resource_ref)?;
+    let metadata = provider.metadata(&resource_ref)?;
+    let capabilities = provider_capabilities(provider);
     let kind = if metadata.is_dir() {
         PropertyKind::Dir
     } else {
@@ -580,9 +602,14 @@ pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
     } else {
         (metadata.len(), 0u64, 0u64, false)
     };
+    let display_path = provider.display_path(&resource_ref);
     Ok(Properties {
         name,
-        path,
+        path: display_path.clone(),
+        display_path,
+        provider: resource_ref.provider,
+        resource_ref,
+        capabilities,
         kind,
         size,
         created,
@@ -599,10 +626,18 @@ pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
     })
 }
 
+pub(crate) fn fs_get_capabilities_impl(path: String) -> AppResult<ProviderCapabilities> {
+    let registry = provider_registry();
+    let resource_ref = registry.resource_ref_from_legacy_path(&path)?;
+    let provider = registry.provider_for_ref(&resource_ref)?;
+    Ok(provider_capabilities(provider))
+}
+
 pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirStats> {
+    let resolved_path = resolve_legacy_path(&path)?;
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let (size, files, dirs) = dir_stats(Path::new(&path));
+        let (size, files, dirs) = dir_stats(Path::new(&resolved_path));
         let _ = tx.send((size, files, dirs));
     });
     match rx.recv_timeout(Duration::from_millis(timeout_ms)) {

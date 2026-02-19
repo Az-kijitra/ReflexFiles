@@ -1,4 +1,21 @@
 export type EntryType = "file" | "dir";
+export type StorageProvider = "local" | "gdrive";
+
+export interface ResourceRef {
+  provider: StorageProvider;
+  resource_id: string;
+}
+
+export interface ProviderCapabilities {
+  can_read: boolean;
+  can_create: boolean;
+  can_rename: boolean;
+  can_copy: boolean;
+  can_move: boolean;
+  can_delete: boolean;
+  can_archive_create: boolean;
+  can_archive_extract: boolean;
+}
 
 export type {
   AppConfig,
@@ -18,6 +35,10 @@ export type { DeleteSummary, TrashItem, DirStats } from "./dto/ops";
 export interface Entry {
   name: string;
   path: string;
+  display_path?: string;
+  provider?: StorageProvider;
+  ref?: ResourceRef;
+  capabilities?: ProviderCapabilities;
   type: EntryType;
   size: number;
   modified: string;
@@ -35,6 +56,10 @@ export type PropertyKind = "file" | "dir";
 export interface Properties {
   name: string;
   path: string;
+  display_path?: string;
+  provider?: StorageProvider;
+  ref?: ResourceRef;
+  capabilities?: ProviderCapabilities;
   type: PropertyKind;
   size: number;
   created: string;

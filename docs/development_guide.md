@@ -64,6 +64,8 @@ The following checks must pass before merge:
 - Development guide: `docs/development_guide.md`
 - Maintenance guide: `docs/maintenance_guide.md`
 - Viewer spec: `docs/VIEWER_SPEC.md`
+- ADR-0001 (Storage Provider boundary, EN): `docs/ADR-0001-storage-provider-boundary.md`
+- ADR-0001 (Storage Provider boundary, JA): `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
 
 ## EN/JA Mapping
 - User manual: `user_manual.md` <-> `docs/ja/user_manual.ja.md`

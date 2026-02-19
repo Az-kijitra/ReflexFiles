@@ -60,11 +60,33 @@ const killPidsWin = (pids, reason) => {
   for (const pid of pids) {
     if (!Number.isFinite(pid) || pid <= 0) continue;
     console.log(`[runner] terminating pid ${pid} (${reason})...`);
-    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+    const result = spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
       shell: false,
       stdio: 'ignore',
       timeout: 3000,
     });
+    if (result.status !== 0) {
+      console.log(`[runner] taskkill failed for pid ${pid} (${reason}), status=${result.status}`);
+    }
+  }
+};
+
+const ensurePortFreedWin = async (port, reason, timeoutMs = 10_000) => {
+  if (process.platform !== 'win32') {
+    return;
+  }
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const pids = findListeningPidsOnPortWin(port);
+    if (pids.length === 0) {
+      return;
+    }
+    killPidsWin(pids, reason);
+    await sleep(250);
+  }
+  const remaining = findListeningPidsOnPortWin(port);
+  if (remaining.length > 0) {
+    throw new Error(`[runner] port ${port} is still occupied after cleanup (${reason}): ${remaining.join(',')}`);
   }
 };
 
@@ -140,8 +162,19 @@ const collectLines = (buffer, chunk, onLine) => {
 };
 
 const logErrors = [];
+let appReadySignaled = false;
+let resolveAppReadySignal;
+const appReadySignalPromise = new Promise((resolvePromise) => {
+  resolveAppReadySignal = resolvePromise;
+});
 const onLine = (name, line) => {
   const cleanLine = line.replace(/\u001b\[[0-9;]*m/g, '');
+  if (name === 'app' && cleanLine.includes('Local:')) {
+    if (!appReadySignaled) {
+      appReadySignaled = true;
+      resolveAppReadySignal();
+    }
+  }
   if (errorRegex.test(cleanLine) && !isIgnoredLine(cleanLine)) {
     logErrors.push(`[${name}] ${cleanLine}`);
   }
@@ -295,15 +328,9 @@ if (killDriver && process.platform === 'win32') {
 }
 
 if (process.platform === 'win32') {
-  const staleDriverPids = findListeningPidsOnPortWin(driverPort);
-  if (staleDriverPids.length > 0) {
-    killPidsWin(staleDriverPids, `port ${driverPort} occupant`);
-  }
+  await ensurePortFreedWin(driverPort, `port ${driverPort} startup cleanup`);
   if (needsAppReadyWait) {
-    const staleAppPortPids = findListeningPidsOnPortWin(appReadyPort);
-    if (staleAppPortPids.length > 0) {
-      killPidsWin(staleAppPortPids, `port ${appReadyPort} occupant`);
-    }
+    await ensurePortFreedWin(appReadyPort, `port ${appReadyPort} startup cleanup`);
   }
 }
 
@@ -342,6 +369,13 @@ try {
   if (needsAppReadyWait) {
     console.log(`[runner] waiting for app dev server on port ${appReadyPort}...`);
     await waitForTcpPort(appReadyPort, appReadyTimeoutMs, 'app dev server', appReadyHosts);
+    const appLogReadyTimeoutMs = Number(
+      process.env.E2E_TAURI_APP_LOG_READY_TIMEOUT_MS ?? appReadyTimeoutMs
+    );
+    if (!appReadySignaled) {
+      console.log('[runner] waiting for app startup log signal (Vite Local URL)...');
+      await withTimeout(appReadySignalPromise, appLogReadyTimeoutMs, 'app startup log signal');
+    }
     console.log(`[runner] app dev server is ready on port ${appReadyPort}.`);
   }
 
@@ -393,6 +427,12 @@ try {
         await stopChild('app', app);
         await stopChild('api', api);
         await stopChild('driver', driver);
+        if (process.platform === 'win32') {
+          await ensurePortFreedWin(driverPort, `port ${driverPort} shutdown cleanup`, 8_000);
+          if (needsAppReadyWait) {
+            await ensurePortFreedWin(appReadyPort, `port ${appReadyPort} shutdown cleanup`, 8_000);
+          }
+        }
       })(),
       Number(process.env.E2E_TAURI_SHUTDOWN_TIMEOUT_MS ?? 10_000),
       'runner shutdown'

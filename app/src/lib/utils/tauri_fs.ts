@@ -1,4 +1,4 @@
-import type { DeleteSummary, OpSummary } from "$lib/types";
+import type { DeleteSummary, OpSummary, ProviderCapabilities } from "$lib/types";
 import { invoke } from "$lib/tauri_client";
 
 export function clipboardSetFiles(paths: string[], cut: boolean, effect: string | null = null) {
@@ -35,6 +35,10 @@ export function fsDeleteWithUndo(items: string[]): Promise<DeleteSummary> {
 
 export function fsCreate(parent: string, name: string, kind: "file" | "folder"): Promise<void> {
   return invoke("fs_create", { parent, name, kind });
+}
+
+export function fsGetCapabilities(path: string): Promise<ProviderCapabilities> {
+  return invoke("fs_get_capabilities", { path });
 }
 
 export function zipCreate(

@@ -23,6 +23,14 @@
  *       prefixDateSelected: () => void;
  *       cutSelected: () => void;
  *       pasteItems: () => void;
+ *       hasOperationTargets: () => boolean;
+ *       hasSelection: () => boolean;
+ *       canCopyTargets: () => boolean;
+ *       canDuplicateTargets: () => boolean;
+ *       canPrefixDateTargets: () => boolean;
+ *       canCutTargets: () => boolean;
+ *       canDeleteSelection: () => boolean;
+ *       canOpenPropertiesSelection: () => boolean;
  *       requestDeleteSelected: () => void;
  *       requestOpenPropertiesSelected: () => void;
  *       performUndo: () => void;
@@ -78,6 +86,14 @@ export function buildMenuSetupInputs(params) {
       prefixDateSelected: page.prefixDateSelected,
       cutSelected: page.cutSelected,
       pasteItems: page.pasteItems,
+      hasOperationTargets: page.hasOperationTargets,
+      hasSelection: page.hasSelection,
+      canCopyTargets: page.canCopyTargets,
+      canDuplicateTargets: page.canDuplicateTargets,
+      canPrefixDateTargets: page.canPrefixDateTargets,
+      canCutTargets: page.canCutTargets,
+      canDeleteSelection: page.canDeleteSelection,
+      canOpenPropertiesSelection: page.canOpenPropertiesSelection,
       requestDeleteSelected: page.requestDeleteSelected,
       requestOpenPropertiesSelected: page.requestOpenPropertiesSelected,
       invokeExit: deps.invokeExit,

@@ -246,6 +246,8 @@ Actions:
 
 ## Related Docs
 - `docs/VIEWER_SPEC.md`
+- `docs/ADR-0001-storage-provider-boundary.md`
+- `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`
