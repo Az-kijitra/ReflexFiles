@@ -8,6 +8,36 @@ Thanks for taking the time to contribute.
 3. Ensure tests and linters pass (see below).
 4. Open a Pull Request with a clear description and steps to verify.
 
+## PR Description Template
+Use this structure when opening a PR:
+```md
+## Summary
+- What changed in this PR
+
+## Why
+- Why this change is needed
+
+## Changes
+- Main implementation points
+
+## Verification
+- [x] npm run check
+- [x] cargo test --manifest-path app/src-tauri/Cargo.toml --locked
+- [x] npm run e2e:full (or targeted E2E commands)
+
+## Risks and Rollback
+- Known risks
+- Rollback plan
+```
+
+### Example (E2E stability + Rust tests)
+- Fixed E2E suite instability caused by Vite port `1422` conflicts between cases.
+- Hardened process cleanup/readiness handling in `app/scripts/e2e/run-tauri-selenium.mjs`.
+- Fixed Rust test compile errors by adding `Debug` derive to `StorageProvider` and adjusting assertions in `app/src-tauri/src/storage_provider.rs`.
+- Verified with:
+  - `npm run e2e:full`
+  - `cargo test --manifest-path app/src-tauri/Cargo.toml --locked`
+
 ## Development Setup (Windows)
 ```bash
 cd app
