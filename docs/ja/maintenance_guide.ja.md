@@ -1,5 +1,5 @@
 # メンテナンスガイド
-更新日: 2026-02-15
+更新日: 2026-02-19
 
 ## 対象と目的
 このドキュメントは ReflexFiles の**保守担当者向け**です（エンドユーザー向けではありません）。
@@ -139,6 +139,15 @@ npm run e2e:full
 - Selenium シナリオを実行
 - Windows で子プロセスを強制終了してハングを回避
 
+## Provider Capability 制御
+- 対象パスの provider capability 取得APIは `fs_get_capabilities`。
+- フロントは currentPath の capability を保持し、以下を制御:
+  - 空白コンテキストメニュー（`新規作成...` / `ペースト`）
+  - Edit メニュー（`Paste`）
+  - キーボード操作（`new_file` / `paste`）
+- 選択項目ベースの操作（`copy/move/delete/rename/zip`）は引き続き `entry.capabilities` を使用。
+- capability で拒否された操作は実行せず、`capability.not_available` を表示する。
+
 ### スイートサマリーと失敗分類
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` は以下を出力:
 - スイート `summary.json`
@@ -157,9 +166,16 @@ npm run e2e:full
 
 ## CI連携
 ワークフロー:
+- `.github/workflows/quality.yml`
 - `.github/workflows/e2e-tauri.yml`
 
 現行の分割運用:
+- **Quality gate（PR/Push）**:
+  - `npm run check`
+  - `cargo check`
+  - `cargo test`
+- **Dependency audit（nightly/manual）**:
+  - `npm run audit:deps`
 - **Pull Request**（高速セット）:
   - `e2e:tauri` + `e2e:viewer`
 - **main/master への push と nightly**（フル）:

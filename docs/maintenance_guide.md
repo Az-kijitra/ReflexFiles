@@ -1,5 +1,5 @@
 # Maintenance Guide
-Updated: 2026-02-18
+Updated: 2026-02-19
 
 ## Scope
 This document is for maintainers of ReflexFiles (not end users).
@@ -136,6 +136,15 @@ npm run e2e:full
 - Waits for app readiness on `localhost:1422` equivalents
 - Executes Selenium scenario
 - Performs aggressive child-process shutdown on Windows to avoid stale process hangs
+
+## Provider Capability Enforcement
+- `fs_get_capabilities` is the backend API to fetch provider capabilities for a target path.
+- Frontend stores current-path capabilities and uses them to gate:
+  - blank context menu (`New...`, `Paste`)
+  - Edit menu (`Paste`)
+  - keyboard actions (`new_file`, `paste`)
+- Entry-level capabilities (`entry.capabilities`) remain the source for selection-based actions (`copy/move/delete/rename/zip`).
+- If an action is denied by capability, UI shows `capability.not_available` instead of executing the operation.
 
 ### Suite summary and failure classification
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` now writes:
