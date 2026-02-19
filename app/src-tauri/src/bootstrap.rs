@@ -41,6 +41,7 @@ pub fn run() {
             crate::fs_ops_archive::zip_create,
             crate::fs_ops_archive::zip_extract,
             crate::fs_query_cmds::fs_get_properties,
+            crate::fs_query_cmds::fs_get_capabilities,
             crate::fs_query_cmds::fs_dir_stats,
             crate::fs_ops_delete::fs_delete_trash,
             crate::fs_ops_delete::fs_delete_with_undo,

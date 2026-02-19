@@ -9,6 +9,14 @@
  * @param {() => void} params.prefixDateSelected
  * @param {() => void} params.cutSelected
  * @param {() => void} params.pasteItems
+ * @param {() => boolean} [params.hasOperationTargets]
+ * @param {() => boolean} [params.hasSelection]
+ * @param {() => boolean} [params.canCopyTargets]
+ * @param {() => boolean} [params.canDuplicateTargets]
+ * @param {() => boolean} [params.canPrefixDateTargets]
+ * @param {() => boolean} [params.canCutTargets]
+ * @param {() => boolean} [params.canDeleteSelection]
+ * @param {() => boolean} [params.canOpenPropertiesSelection]
  * @param {() => void} params.requestDeleteSelected
  * @param {() => void} params.requestOpenPropertiesSelected
  * @param {() => void} params.selectAll
@@ -27,6 +35,14 @@ export function buildEditMenuItems(params) {
     prefixDateSelected,
     cutSelected,
     pasteItems,
+    hasOperationTargets,
+    hasSelection,
+    canCopyTargets,
+    canDuplicateTargets,
+    canPrefixDateTargets,
+    canCutTargets,
+    canDeleteSelection,
+    canOpenPropertiesSelection,
     requestDeleteSelected,
     requestOpenPropertiesSelected,
     selectAll,
@@ -34,6 +50,16 @@ export function buildEditMenuItems(params) {
     invertSelection,
     openSearch,
   } = params;
+
+  const hasTargets = hasOperationTargets ? hasOperationTargets() : true;
+  const hasSelectedItems = hasSelection ? hasSelection() : true;
+  const copyEnabled = hasTargets && (canCopyTargets ? canCopyTargets() : true);
+  const duplicateEnabled = hasTargets && (canDuplicateTargets ? canDuplicateTargets() : true);
+  const prefixDateEnabled = hasTargets && (canPrefixDateTargets ? canPrefixDateTargets() : true);
+  const cutEnabled = hasTargets && (canCutTargets ? canCutTargets() : true);
+  const deleteEnabled = hasSelectedItems && (canDeleteSelection ? canDeleteSelection() : true);
+  const propertiesEnabled =
+    hasSelectedItems && (canOpenPropertiesSelection ? canOpenPropertiesSelection() : true);
 
   return [
     {
@@ -51,25 +77,25 @@ export function buildEditMenuItems(params) {
     { separator: true },
     {
       label: t("menu.copy"),
-      enabled: true,
+      enabled: copyEnabled,
       action: () => copySelected(),
       shortcut: getMenuShortcut("copy"),
     },
     {
       label: t("menu.duplicate"),
-      enabled: true,
+      enabled: duplicateEnabled,
       action: () => duplicateSelected(),
       shortcut: getMenuShortcut("duplicate"),
     },
     {
       label: t("menu.prefix_date"),
-      enabled: true,
+      enabled: prefixDateEnabled,
       action: () => prefixDateSelected(),
       shortcut: getMenuShortcut("prefix_date"),
     },
     {
       label: t("menu.cut"),
-      enabled: true,
+      enabled: cutEnabled,
       action: () => cutSelected(),
       shortcut: getMenuShortcut("cut"),
     },
@@ -82,13 +108,13 @@ export function buildEditMenuItems(params) {
     { separator: true },
     {
       label: t("menu.delete"),
-      enabled: true,
+      enabled: deleteEnabled,
       action: () => requestDeleteSelected(),
       shortcut: getMenuShortcut("delete"),
     },
     {
       label: t("menu.properties"),
-      enabled: true,
+      enabled: propertiesEnabled,
       action: () => requestOpenPropertiesSelected(),
       shortcut: getMenuShortcut("properties"),
     },

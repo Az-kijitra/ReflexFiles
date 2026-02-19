@@ -15,6 +15,14 @@ import { buildMenuItems } from "$lib/page_menus";
  * @param {() => void} params.prefixDateSelected
  * @param {() => void} params.cutSelected
  * @param {() => Promise<void>} params.pasteItems
+ * @param {() => boolean} params.hasOperationTargets
+ * @param {() => boolean} params.hasSelection
+ * @param {() => boolean} params.canCopyTargets
+ * @param {() => boolean} params.canDuplicateTargets
+ * @param {() => boolean} params.canPrefixDateTargets
+ * @param {() => boolean} params.canCutTargets
+ * @param {() => boolean} params.canDeleteSelection
+ * @param {() => boolean} params.canOpenPropertiesSelection
  * @param {() => void} params.requestDeleteSelected
  * @param {() => void} params.requestOpenPropertiesSelected
  * @param {() => void} params.invokeExit

@@ -207,6 +207,17 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const entries = ctx.getEntries();
     const hasSelection = selected.length > 0;
     const isSingle = selected.length === 1;
+    const selectedEntries = selected
+      .map((path) => entries.find((entry) => entry.path === path))
+      .filter(Boolean);
+    const hasAllSelectedEntries = selectedEntries.length === selected.length;
+    const capabilityReason = ctx.t("capability.not_available");
+    const allSelectedSupport = (capabilityKey) =>
+      hasSelection &&
+      hasAllSelectedEntries &&
+      selectedEntries.every((entry) => Boolean(entry?.capabilities?.[capabilityKey] ?? true));
+    const singleSupports = (entry, capabilityKey) =>
+      !!entry && Boolean(entry?.capabilities?.[capabilityKey] ?? true);
     const clipboard = ctx.getLastClipboard ? ctx.getLastClipboard() : { paths: [] };
     const canPaste = ctx.getContextMenuCanPaste();
     const pasteReason = canPaste
@@ -242,6 +253,12 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         : !!getParentPath(ctx.getCurrentPath()));
     const selectedEntry = isSingle ? entries.find((e) => e.path === selected[0]) : null;
     const isZip = !!selectedEntry && selectedEntry.ext?.toLowerCase() === ".zip";
+    const canCopySelection = allSelectedSupport("can_copy");
+    const canMoveSelection = allSelectedSupport("can_move");
+    const canDeleteSelection = allSelectedSupport("can_delete");
+    const canArchiveCreateSelection = allSelectedSupport("can_archive_create");
+    const canRenameSingle = isSingle && singleSupports(selectedEntry, "can_rename");
+    const canExtractZip = isZip && singleSupports(selectedEntry, "can_archive_extract");
     const extApps = getExternalApps ? getExternalApps() : [];
     return normalizeMenuItems([
       {
@@ -289,25 +306,29 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       { label: "-", enabled: false },
       {
         label: ctx.t("context.copy"),
-        enabled: hasSelection,
+        enabled: canCopySelection,
+        reason: hasSelection && !canCopySelection ? capabilityReason : "",
         visible: hasSelection,
         action: onContextCopy,
       },
       {
         label: ctx.t("context.duplicate"),
-        enabled: hasSelection,
+        enabled: canCopySelection,
+        reason: hasSelection && !canCopySelection ? capabilityReason : "",
         visible: hasSelection,
         action: onContextDuplicate,
       },
       {
         label: ctx.t("context.prefix_date"),
-        enabled: hasSelection,
+        enabled: allSelectedSupport("can_rename"),
+        reason: hasSelection && !allSelectedSupport("can_rename") ? capabilityReason : "",
         visible: hasSelection,
         action: onContextPrefixDate,
       },
       {
         label: ctx.t("context.cut"),
-        enabled: hasSelection,
+        enabled: canMoveSelection,
+        reason: hasSelection && !canMoveSelection ? capabilityReason : "",
         visible: hasSelection,
         action: onContextCut,
       },
@@ -321,13 +342,15 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       { label: "-", enabled: false },
       {
         label: ctx.t("context.delete"),
-        enabled: hasSelection,
+        enabled: canDeleteSelection,
+        reason: hasSelection && !canDeleteSelection ? capabilityReason : "",
         visible: hasSelection,
         action: onContextDelete,
       },
       {
         label: ctx.t("context.rename"),
-        enabled: isSingle,
+        enabled: canRenameSingle,
+        reason: isSingle && !canRenameSingle ? capabilityReason : "",
         visible: isSingle,
         action: onContextRename,
       },
@@ -340,13 +363,15 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       { label: "-", enabled: false },
       {
         label: ctx.t("context.compress"),
-        enabled: hasSelection,
+        enabled: canArchiveCreateSelection,
+        reason: hasSelection && !canArchiveCreateSelection ? capabilityReason : "",
         visible: hasSelection,
         action: openZipCreate,
       },
       {
         label: ctx.t("context.extract"),
-        enabled: isZip,
+        enabled: canExtractZip,
+        reason: isZip && !canExtractZip ? capabilityReason : "",
         visible: isZip,
         action: openZipExtract,
       },

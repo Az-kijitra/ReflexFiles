@@ -23,6 +23,7 @@ mod fs_ops_transfer_move;
 mod fs_query;
 mod fs_query_cmds;
 mod log;
+mod storage_provider;
 mod system_cmds;
 mod utils;
 mod viewer_cmds;

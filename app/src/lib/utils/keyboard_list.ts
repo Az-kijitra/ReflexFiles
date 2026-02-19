@@ -4,6 +4,19 @@
  */
 export function handleListKey(event, ctx) {
   const active = ctx.activeElement;
+  const reportCapabilityUnavailable = () => ctx.setStatusMessage(ctx.t("capability.not_available"));
+  const isPlainDeleteKey =
+    !event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    (
+      event.key === "Delete" ||
+      event.key === "Del" ||
+      event.key === "\uE017" ||
+      event.code === "Delete" ||
+      event.keyCode === 46 ||
+      event.which === 46
+    );
   if (ctx.matchesAction(event, "undo")) {
     event.preventDefault();
     ctx.performUndo();
@@ -131,6 +144,14 @@ export function handleListKey(event, ctx) {
   }
   if (ctx.matchesAction(event, "zip_create")) {
     event.preventDefault();
+    if (
+      ctx.selectedPaths.length > 0 &&
+      typeof ctx.canZipCreateSelection === "function" &&
+      !ctx.canZipCreateSelection()
+    ) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.openZipCreate();
     return true;
   }
@@ -138,6 +159,17 @@ export function handleListKey(event, ctx) {
     event.preventDefault();
     const entry = ctx.entries[ctx.focusedIndex];
     if (entry && entry.ext?.toLowerCase() === ".zip") {
+      if (
+        typeof ctx.canZipExtractFocused === "function" &&
+        !ctx.canZipExtractFocused()
+      ) {
+        reportCapabilityUnavailable();
+        return true;
+      }
+      if (ctx.selectedPaths.length !== 1 || ctx.selectedPaths[0] !== entry.path) {
+        ctx.setSelected([entry.path]);
+        ctx.setAnchorIndex(ctx.focusedIndex);
+      }
       ctx.openZipExtract();
     }
     return true;
@@ -246,6 +278,10 @@ export function handleListKey(event, ctx) {
     event.preventDefault();
     const entry = ctx.entries[ctx.focusedIndex];
     if (!entry) return true;
+    if (typeof ctx.canRenameFocused === "function" && !ctx.canRenameFocused()) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.openRename(entry);
     return true;
   }
@@ -266,21 +302,49 @@ export function handleListKey(event, ctx) {
   }
   if (ctx.matchesAction(event, "copy")) {
     event.preventDefault();
+    const hasTargets = ctx.selectedPaths.length > 0 || !!ctx.entries[ctx.focusedIndex];
+    if (hasTargets && typeof ctx.canCopyTargets === "function" && !ctx.canCopyTargets()) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.copySelected();
     return true;
   }
   if (ctx.matchesAction(event, "duplicate")) {
     event.preventDefault();
+    const hasTargets = ctx.selectedPaths.length > 0 || !!ctx.entries[ctx.focusedIndex];
+    if (
+      hasTargets &&
+      typeof ctx.canDuplicateTargets === "function" &&
+      !ctx.canDuplicateTargets()
+    ) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.duplicateSelected();
     return true;
   }
   if (ctx.matchesAction(event, "prefix_date")) {
     event.preventDefault();
+    const hasTargets = ctx.selectedPaths.length > 0 || !!ctx.entries[ctx.focusedIndex];
+    if (
+      hasTargets &&
+      typeof ctx.canPrefixDateTargets === "function" &&
+      !ctx.canPrefixDateTargets()
+    ) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.prefixDateSelected();
     return true;
   }
   if (ctx.matchesAction(event, "cut")) {
     event.preventDefault();
+    const hasTargets = ctx.selectedPaths.length > 0 || !!ctx.entries[ctx.focusedIndex];
+    if (hasTargets && typeof ctx.canCutTargets === "function" && !ctx.canCutTargets()) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.cutSelected();
     return true;
   }
@@ -289,7 +353,7 @@ export function handleListKey(event, ctx) {
     ctx.pasteItems();
     return true;
   }
-  if (ctx.matchesAction(event, "delete")) {
+  if (ctx.matchesAction(event, "delete") || isPlainDeleteKey) {
     event.preventDefault();
     const focused = ctx.entries[ctx.focusedIndex];
     const targets =

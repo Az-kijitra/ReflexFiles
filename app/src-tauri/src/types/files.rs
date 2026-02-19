@@ -7,6 +7,39 @@ pub enum EntryType {
     Dir,
 }
 
+#[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageProvider {
+    Local,
+    Gdrive,
+    #[serde(other)]
+    Unknown,
+}
+
+impl Default for StorageProvider {
+    fn default() -> Self {
+        StorageProvider::Local
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ResourceRef {
+    pub provider: StorageProvider,
+    pub resource_id: String,
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize)]
+pub struct ProviderCapabilities {
+    pub can_read: bool,
+    pub can_create: bool,
+    pub can_rename: bool,
+    pub can_copy: bool,
+    pub can_move: bool,
+    pub can_delete: bool,
+    pub can_archive_create: bool,
+    pub can_archive_extract: bool,
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SortKey {
@@ -81,6 +114,12 @@ impl Default for SortOrder {
 pub struct Entry {
     pub name: String,
     pub path: String,
+    #[serde(rename = "display_path")]
+    pub display_path: String,
+    pub provider: StorageProvider,
+    #[serde(rename = "ref")]
+    pub resource_ref: ResourceRef,
+    pub capabilities: ProviderCapabilities,
     #[serde(rename = "type")]
     pub entry_type: EntryType,
     pub size: u64,
@@ -100,6 +139,12 @@ pub enum PropertyKind {
 pub struct Properties {
     pub name: String,
     pub path: String,
+    #[serde(rename = "display_path")]
+    pub display_path: String,
+    pub provider: StorageProvider,
+    #[serde(rename = "ref")]
+    pub resource_ref: ResourceRef,
+    pub capabilities: ProviderCapabilities,
     #[serde(rename = "type")]
     pub kind: PropertyKind,
     pub size: u64,

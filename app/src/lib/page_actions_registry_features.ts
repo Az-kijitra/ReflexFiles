@@ -142,6 +142,82 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     onContextProperties,
   } = contextMenuActions;
 
+  const getFocusedEntry = () => {
+    const entries = ctx.getEntries();
+    const focusedIndex = ctx.getFocusedIndex();
+    if (!Array.isArray(entries) || focusedIndex < 0 || focusedIndex >= entries.length) {
+      return null;
+    }
+    return entries[focusedIndex] ?? null;
+  };
+
+  const getSelectedEntries = () => {
+    const selectedPaths = ctx.getSelectedPaths();
+    const entries = ctx.getEntries();
+    if (!Array.isArray(selectedPaths) || !selectedPaths.length || !Array.isArray(entries)) {
+      return [];
+    }
+    const byPath = new Map(entries.map((entry) => [entry?.path, entry]));
+    return selectedPaths.map((path) => byPath.get(path)).filter((entry) => Boolean(entry));
+  };
+
+  const getOperationEntries = () => {
+    const selectedEntries = getSelectedEntries();
+    if (selectedEntries.length > 0) return selectedEntries;
+    const focused = getFocusedEntry();
+    return focused ? [focused] : [];
+  };
+
+  const supportsCapability = (entry: any, capabilityKey: string) =>
+    Boolean(entry?.capabilities?.[capabilityKey] ?? true);
+
+  const allEntriesSupport = (entries: any[], capabilityKey: string) =>
+    entries.length > 0 && entries.every((entry) => supportsCapability(entry, capabilityKey));
+
+  const hasOperationTargets = () => getOperationEntries().length > 0;
+  const hasSelection = () => {
+    const selectedPaths = ctx.getSelectedPaths();
+    return Array.isArray(selectedPaths) && selectedPaths.length > 0;
+  };
+
+  const canCopyTargets = () => allEntriesSupport(getOperationEntries(), "can_copy");
+  const canDuplicateTargets = () => canCopyTargets();
+  const canPrefixDateTargets = () => allEntriesSupport(getOperationEntries(), "can_rename");
+  const canCutTargets = () => allEntriesSupport(getOperationEntries(), "can_move");
+  const canRenameFocused = () => {
+    const focused = getFocusedEntry();
+    return !!focused && supportsCapability(focused, "can_rename");
+  };
+  const canDeleteSelection = () => allEntriesSupport(getSelectedEntries(), "can_delete");
+  const canOpenPropertiesSelection = () => hasSelection();
+  const canZipCreateSelection = () => allEntriesSupport(getSelectedEntries(), "can_archive_create");
+  const canZipExtractSelection = () => {
+    const selectedEntries = getSelectedEntries();
+    if (selectedEntries.length !== 1) return false;
+    const entry = selectedEntries[0];
+    return entry?.ext?.toLowerCase() === ".zip" && supportsCapability(entry, "can_archive_extract");
+  };
+  const canZipExtractFocused = () => {
+    const focused = getFocusedEntry();
+    if (!focused || focused.ext?.toLowerCase() !== ".zip") return false;
+    return supportsCapability(focused, "can_archive_extract");
+  };
+
+  const canDeleteTargets = () => {
+    const focused = getFocusedEntry();
+    const selectedPaths = ctx.getSelectedPaths();
+    const deleteTargetEntries =
+      Array.isArray(selectedPaths) &&
+      selectedPaths.length > 0 &&
+      focused?.path &&
+      selectedPaths.includes(focused.path)
+        ? getSelectedEntries()
+        : focused
+          ? [focused]
+          : [];
+    return allEntriesSupport(deleteTargetEntries, "can_delete");
+  };
+
   return {
     confirmPasteOverwrite,
     confirmPasteSkip,
@@ -196,6 +272,19 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     runPaste,
     duplicateSelected,
     prefixDateSelected,
+    hasOperationTargets,
+    hasSelection,
+    canCopyTargets,
+    canDuplicateTargets,
+    canPrefixDateTargets,
+    canCutTargets,
+    canRenameFocused,
+    canDeleteSelection,
+    canDeleteTargets,
+    canOpenPropertiesSelection,
+    canZipCreateSelection,
+    canZipExtractSelection,
+    canZipExtractFocused,
     pushUndoEntry,
     performUndo,
     performRedo,
