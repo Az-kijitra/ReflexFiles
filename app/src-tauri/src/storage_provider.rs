@@ -218,7 +218,7 @@ fn normalize_local_resource_id(path: &Path) -> AppResult<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_legacy_path_for, ProviderCapability, ProviderRegistry, StorageProviderBackend};
+    use super::{resolve_legacy_path_for, ProviderCapability, ProviderRegistry};
     use crate::types::{ResourceRef, StorageProvider};
 
     #[test]
@@ -239,9 +239,10 @@ mod tests {
             provider: StorageProvider::Gdrive,
             resource_id: "x".to_string(),
         };
-        let err = registry
-            .provider_for_ref(&gdrive_ref)
-            .expect_err("must reject gdrive for now");
+        let err = match registry.provider_for_ref(&gdrive_ref) {
+            Ok(_) => panic!("must reject gdrive for now"),
+            Err(err) => err,
+        };
         assert_eq!(err.code(), "unknown");
     }
 

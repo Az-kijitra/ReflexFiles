@@ -7,7 +7,7 @@ pub enum EntryType {
     Dir,
 }
 
-#[derive(Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum StorageProvider {
     Local,
