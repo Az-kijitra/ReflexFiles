@@ -14,6 +14,7 @@ import { getParentPath } from "$lib/utils/path";
  * @param {(path: string) => void} ctx.openProperties
  * @param {() => string} ctx.getCurrentPath
  * @param {(key: string, vars?: Record<string, string | number>) => string} ctx.t
+ * @param {() => import("$lib/types").ProviderCapabilities | null} [ctx.getCurrentPathCapabilities]
  * @param {() => boolean} ctx.getContextMenuCanPaste
  * @param {() => "blank" | "item"} ctx.getContextMenuMode
  * @param {() => { paths: string[], cut: boolean }} ctx.getLastClipboard
@@ -212,6 +213,15 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       .filter(Boolean);
     const hasAllSelectedEntries = selectedEntries.length === selected.length;
     const capabilityReason = ctx.t("capability.not_available");
+    const currentPathCaps =
+      typeof ctx.getCurrentPathCapabilities === "function"
+        ? ctx.getCurrentPathCapabilities()
+        : null;
+    const currentPathSupports = (capabilityKey) =>
+      Boolean(currentPathCaps?.[capabilityKey] ?? true);
+    const canCreateInCurrentPath = currentPathSupports("can_create");
+    const canPasteIntoCurrentPath =
+      currentPathSupports("can_copy") || currentPathSupports("can_move");
     const allSelectedSupport = (capabilityKey) =>
       hasSelection &&
       hasAllSelectedEntries &&
@@ -219,17 +229,20 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const singleSupports = (entry, capabilityKey) =>
       !!entry && Boolean(entry?.capabilities?.[capabilityKey] ?? true);
     const clipboard = ctx.getLastClipboard ? ctx.getLastClipboard() : { paths: [] };
-    const canPaste = ctx.getContextMenuCanPaste();
-    const pasteReason = canPaste
-      ? ""
-      : clipboard?.paths?.length
-        ? ctx.t("paste.nothing")
-        : ctx.t("paste.empty_clipboard");
+    const canPaste = canPasteIntoCurrentPath && ctx.getContextMenuCanPaste();
+    const pasteReason = !canPasteIntoCurrentPath
+      ? capabilityReason
+      : canPaste
+        ? ""
+        : clipboard?.paths?.length
+          ? ctx.t("paste.nothing")
+          : ctx.t("paste.empty_clipboard");
     if (ctx.getContextMenuMode() === "blank") {
       return normalizeMenuItems([
         {
           label: ctx.t("context.new"),
-          enabled: true,
+          enabled: canCreateInCurrentPath,
+          reason: canCreateInCurrentPath ? "" : capabilityReason,
           visible: true,
           action: () => {
             closeContextMenu();

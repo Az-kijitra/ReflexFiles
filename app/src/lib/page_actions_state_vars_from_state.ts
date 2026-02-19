@@ -35,6 +35,7 @@ export function buildPageActionsStateVarsFromState(params) {
     failureModalTitle: state.failureModalTitle,
     failureItems: state.failureItems,
     currentPath: state.currentPath,
+    currentPathCapabilities: state.currentPathCapabilities,
     entries: state.entries,
     focusedIndex: state.focusedIndex,
     selectedPaths: state.selectedPaths,

@@ -49,6 +49,7 @@ export function buildPageActionsState(params: PageActionsContextParams) {
     failureModalTitle: failure.failureModalTitle,
     failureItems: failure.failureItems,
     currentPath: listing.currentPath,
+    currentPathCapabilities: listing.currentPathCapabilities,
     entries: listing.entries,
     focusedIndex: listing.focusedIndex,
     selectedPaths: listing.selectedPaths,
@@ -124,6 +125,7 @@ export function buildPageActionsStateFromVars(
     },
     listing: {
       currentPath: getter("currentPath"),
+      currentPathCapabilities: getter("currentPathCapabilities"),
       entries: getter("entries"),
       focusedIndex: getter("focusedIndex"),
       selectedPaths: getter("selectedPaths"),

@@ -93,6 +93,8 @@ export function buildDomHandlersSetupInputsFromVars(params: DomHandlersInputsFro
       pasteItems: action("pasteItems"),
       hasOperationTargets: action("hasOperationTargets"),
       hasSelection: action("hasSelection"),
+      canCreateCurrentPath: action("canCreateCurrentPath"),
+      canPasteCurrentPath: action("canPasteCurrentPath"),
       canCopyTargets: action("canCopyTargets"),
       canDuplicateTargets: action("canDuplicateTargets"),
       canPrefixDateTargets: action("canPrefixDateTargets"),

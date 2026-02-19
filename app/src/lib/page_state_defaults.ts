@@ -1,6 +1,16 @@
 export function createPageStateDefaults() {
   return {
     currentPath: "",
+    currentPathCapabilities: {
+      can_read: true,
+      can_create: true,
+      can_rename: true,
+      can_copy: true,
+      can_move: true,
+      can_delete: true,
+      can_archive_create: true,
+      can_archive_extract: true,
+    },
     entries: [],
     loading: false,
     error: "",

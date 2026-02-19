@@ -99,6 +99,7 @@ export function buildPageActionsPage(params: PageActionsPageParams) {
     setPasteApplyAll: paste.setPasteApplyAll,
     loadDir: deps.loadDir,
     getCurrentPath: () => resolve(state.currentPath),
+    getCurrentPathCapabilities: () => resolve(state.currentPathCapabilities),
     getEntries: () => resolve(state.entries),
     getFocusedIndex: () => resolve(state.focusedIndex),
     getSelectedPaths: () => resolve(state.selectedPaths),

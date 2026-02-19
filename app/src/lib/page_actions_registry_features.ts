@@ -179,6 +179,15 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     const selectedPaths = ctx.getSelectedPaths();
     return Array.isArray(selectedPaths) && selectedPaths.length > 0;
   };
+  const getCurrentPathCapabilities = () => {
+    const reader = (ctx as any).getCurrentPathCapabilities;
+    return typeof reader === "function" ? reader() : null;
+  };
+  const currentPathSupports = (capabilityKey: string) =>
+    Boolean(getCurrentPathCapabilities()?.[capabilityKey] ?? true);
+  const canCreateCurrentPath = () => currentPathSupports("can_create");
+  const canPasteCurrentPath = () =>
+    currentPathSupports("can_copy") || currentPathSupports("can_move");
 
   const canCopyTargets = () => allEntriesSupport(getOperationEntries(), "can_copy");
   const canDuplicateTargets = () => canCopyTargets();
@@ -274,6 +283,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     prefixDateSelected,
     hasOperationTargets,
     hasSelection,
+    canCreateCurrentPath,
+    canPasteCurrentPath,
     canCopyTargets,
     canDuplicateTargets,
     canPrefixDateTargets,

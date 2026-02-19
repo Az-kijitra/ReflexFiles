@@ -151,6 +151,19 @@
 
   const t = createTranslator(() => state.ui_language);
 
+  function normalizeProviderCapabilities(value) {
+    return {
+      can_read: Boolean(value?.can_read ?? true),
+      can_create: Boolean(value?.can_create ?? true),
+      can_rename: Boolean(value?.can_rename ?? true),
+      can_copy: Boolean(value?.can_copy ?? true),
+      can_move: Boolean(value?.can_move ?? true),
+      can_delete: Boolean(value?.can_delete ?? true),
+      can_archive_create: Boolean(value?.can_archive_create ?? true),
+      can_archive_extract: Boolean(value?.can_archive_extract ?? true),
+    };
+  }
+
   let shellRefs = $state({
     /** @type {HTMLElement | null} */
     menuBarEl: null,
@@ -395,6 +408,34 @@
   $effect(() => actions.recomputeDropdownItems());
   $effect(() => actions.recomputeStatusItems());
   $effect(() => actions.clampDropdownSelection());
+  $effect(() => {
+    const path = String(state.currentPath || "").trim();
+    let cancelled = false;
+
+    if (!path) {
+      state.currentPathCapabilities = normalizeProviderCapabilities(null);
+      return;
+    }
+
+    (async () => {
+      try {
+        const capabilities = await invoke("fs_get_capabilities", { path });
+        if (cancelled) return;
+        if (state.currentPath === path) {
+          state.currentPathCapabilities = normalizeProviderCapabilities(capabilities);
+        }
+      } catch {
+        if (cancelled) return;
+        if (state.currentPath === path) {
+          state.currentPathCapabilities = normalizeProviderCapabilities(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  });
 
   const {
     listEffectConfig,

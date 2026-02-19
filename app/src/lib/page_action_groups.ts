@@ -81,6 +81,8 @@ export function buildPageActionGroups(params) {
       prefixDateSelected: pageActions.prefixDateSelected,
       hasOperationTargets: pageActions.hasOperationTargets,
       hasSelection: pageActions.hasSelection,
+      canCreateCurrentPath: pageActions.canCreateCurrentPath,
+      canPasteCurrentPath: pageActions.canPasteCurrentPath,
       canCopyTargets: pageActions.canCopyTargets,
       canDuplicateTargets: pageActions.canDuplicateTargets,
       canPrefixDateTargets: pageActions.canPrefixDateTargets,

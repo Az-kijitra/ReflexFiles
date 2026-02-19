@@ -132,6 +132,7 @@ export function buildPageActionsParams({ deps, properties, page, helpers }: Page
       loadDir: page.loadDir,
       basename: deps.basename,
       getCurrentPath: page.getCurrentPath,
+      getCurrentPathCapabilities: page.getCurrentPathCapabilities,
       getEntries: page.getEntries,
       getFocusedIndex: page.getFocusedIndex,
       getSelectedPaths: page.getSelectedPaths,

@@ -205,6 +205,13 @@ export function handleListKey(event, ctx) {
   if (!ctx.entries.length) {
     if (ctx.matchesAction(event, "paste")) {
       event.preventDefault();
+      if (
+        typeof ctx.canPasteCurrentPath === "function" &&
+        !ctx.canPasteCurrentPath()
+      ) {
+        reportCapabilityUnavailable();
+        return true;
+      }
       ctx.pasteItems();
       return true;
     }
@@ -287,6 +294,13 @@ export function handleListKey(event, ctx) {
   }
   if (ctx.matchesAction(event, "new_file")) {
     event.preventDefault();
+    if (
+      typeof ctx.canCreateCurrentPath === "function" &&
+      !ctx.canCreateCurrentPath()
+    ) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.openCreate("file");
     return true;
   }
@@ -350,6 +364,13 @@ export function handleListKey(event, ctx) {
   }
   if (ctx.matchesAction(event, "paste")) {
     event.preventDefault();
+    if (
+      typeof ctx.canPasteCurrentPath === "function" &&
+      !ctx.canPasteCurrentPath()
+    ) {
+      reportCapabilityUnavailable();
+      return true;
+    }
     ctx.pasteItems();
     return true;
   }
