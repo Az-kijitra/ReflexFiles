@@ -402,6 +402,38 @@ try {
     return false;
   };
 
+  const waitNameGoneOrFileMissing = async (name, maxWaitMs) => {
+    try {
+      await waitForNameGoneWithin(name, maxWaitMs);
+      return true;
+    } catch {
+      const filePath = resolve(workDir, name);
+      if (!existsSync(filePath)) {
+        return true;
+      }
+      return false;
+    }
+  };
+
+  const applyRedoWithFallbacks = async (name) => {
+    await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true, shift: true });
+    if (await waitNameGoneOrFileMissing(name, 5000)) {
+      return;
+    }
+
+    const menuRedoApplied = await clickRedoFromEditMenu();
+    if (menuRedoApplied && (await waitNameGoneOrFileMissing(name, 5000))) {
+      return;
+    }
+
+    await triggerShortcut({ key: "F5", code: "F5" });
+    if (await waitNameGoneOrFileMissing(name, 8000)) {
+      return;
+    }
+
+    throw new Error("redo did not remove file after shortcut/menu/refresh fallbacks");
+  };
+
   const clickRowByName = async (name) => {
     const candidates = displayCandidates(name);
     const deadline = Date.now() + timeoutMs;
@@ -659,16 +691,7 @@ try {
   await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true });
   await waitForVisibleName(undoFile);
 
-  await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true, shift: true });
-  try {
-    await waitForNameGoneWithin(undoFile, 5000);
-  } catch {
-    const menuRedoApplied = await clickRedoFromEditMenu();
-    if (!menuRedoApplied) {
-      throw new Error("redo shortcut did not apply and edit menu fallback failed");
-    }
-    await waitForNameGone(undoFile);
-  }
+  await applyRedoWithFallbacks(undoFile);
 
   await sleep(700);
   if (!undoSessionPath || !existsSync(undoSessionPath)) {
