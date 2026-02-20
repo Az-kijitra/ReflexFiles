@@ -1,5 +1,5 @@
 # Development Guide
-Updated: 2026-02-18
+Updated: 2026-02-20
 
 ## Scope
 This guide is for day-to-day development contributors.
@@ -41,6 +41,7 @@ cargo check --manifest-path src-tauri/Cargo.toml --locked
 ```
 4. Run targeted E2E based on changed area:
 - file operation changes: `npm run e2e:tauri`
+- provider capability / gating changes: `npm run e2e:capability`
 - viewer changes: `npm run e2e:viewer`
 - settings/config changes: `npm run e2e:settings`
 5. Update docs affected by behavior or interface changes.
@@ -50,6 +51,35 @@ cargo check --manifest-path src-tauri/Cargo.toml --locked
 The following checks must pass before merge:
 - `quality / quality`
 - `e2e-tauri / e2e_pr_quick`
+
+`e2e:full` is manual-only and is not a required PR status check.
+
+## Google Drive Gate 0 DoD (Definition of Done)
+Use this checklist before starting Google Drive implementation work.
+References:
+- `docs/ADR-0001-storage-provider-boundary.md`
+- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
+
+Mandatory:
+1. Architecture boundary is fixed by ADR.
+- ADR-0001 status is accepted, and provider boundary rules are reflected in current code.
+2. Security baseline is fixed by threat model.
+- Gate 0 threat model is reviewed, with no unresolved critical/high risk items.
+3. Quality baseline is stable on current local-provider behavior.
+- `npm run check` and `cargo check --manifest-path src-tauri/Cargo.toml --locked` pass.
+- Required PR gates (`quality`, `e2e_pr_quick`) pass.
+4. Capability control regression is covered.
+- Non-supported provider actions are blocked in UI/commands with explicit user feedback.
+- `e2e:capability` passes.
+5. Secret handling rules are documented and enforceable.
+- OAuth/token handling policy is documented (no token/plain secret logging, protected storage target defined).
+6. Public docs are synchronized.
+- Related EN docs in `docs/` and JA docs in `docs/ja/` are updated together.
+
+Recommended:
+1. Run `npm run e2e:full` manually before Gate 0 review meeting.
+2. Record explicit rollback strategy for provider-related changes.
+3. Prepare minimal operations checklist (incident contact, log locations, first-response steps).
 
 ## Documentation Policy
 - Files under `development_documents/` are work-in-progress records and are not intended for GitHub publication.
@@ -66,11 +96,14 @@ The following checks must pass before merge:
 - Viewer spec: `docs/VIEWER_SPEC.md`
 - ADR-0001 (Storage Provider boundary, EN): `docs/ADR-0001-storage-provider-boundary.md`
 - ADR-0001 (Storage Provider boundary, JA): `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
+- Google Drive Gate 0 threat model (EN): `docs/THREAT_MODEL_GDRIVE_GATE0.md`
+- Google Drive Gate 0 threat model (JA): `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
 
 ## EN/JA Mapping
 - User manual: `user_manual.md` <-> `docs/ja/user_manual.ja.md`
 - Maintenance guide: `docs/maintenance_guide.md` <-> `docs/ja/maintenance_guide.ja.md`
 - Security policy: `docs/SECURITY.md` <-> `docs/ja/SECURITY.ja.md`
+- Google Drive Gate 0 threat model: `docs/THREAT_MODEL_GDRIVE_GATE0.md` <-> `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
 - Contributing guide: `docs/CONTRIBUTING.md` <-> `docs/ja/CONTRIBUTING.ja.md`
 - Release notes 0.2.0: `docs/RELEASE_NOTES_0.2.0.md` <-> `docs/ja/RELEASE_NOTES_0.2.0.ja.md`
 

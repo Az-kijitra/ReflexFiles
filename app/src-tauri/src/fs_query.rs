@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::error::{AppError, AppResult};
 use crate::storage_provider::{
-    provider_capabilities, provider_registry, resolve_legacy_path, ProviderRegistry,
+    provider_capabilities, provider_registry, resolve_legacy_path,
 };
 use crate::types::{
     DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef,
@@ -117,7 +117,8 @@ fn cleanup_viewer_image_cache_dir(dir: &Path) {
     }
 }
 
-fn entry_from_resource_ref(registry: &ProviderRegistry, resource_ref: ResourceRef) -> AppResult<Entry> {
+fn entry_from_resource_ref(resource_ref: ResourceRef) -> AppResult<Entry> {
+    let registry = provider_registry();
     let provider = registry.provider_for_ref(&resource_ref)?;
     let path = provider.resolve_path(&resource_ref)?;
     let metadata = provider.metadata(&resource_ref)?;
@@ -159,6 +160,17 @@ fn entry_from_resource_ref(registry: &ProviderRegistry, resource_ref: ResourceRe
     })
 }
 
+fn resolve_existing_file_path(path: &str) -> AppResult<PathBuf> {
+    let path_buf = resolve_legacy_path(path)?;
+    if !path_buf.exists() {
+        return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
+    }
+    if !path_buf.is_file() {
+        return Err(AppError::msg(format!("not a file: {}", path_buf.display())));
+    }
+    Ok(path_buf)
+}
+
 fn dir_stats(path: &Path) -> (u64, u64, u64) {
     let mut total_size = 0u64;
     let mut file_count = 0u64;
@@ -194,13 +206,12 @@ pub(crate) fn fs_list_dir_impl(
     sort_order: String,
 ) -> AppResult<Vec<Entry>> {
     let registry = provider_registry();
-    let dir_ref = registry.local().resource_ref_from_legacy_path(&path)?;
-    let provider = registry.provider_for_ref(&dir_ref)?;
+    let (dir_ref, provider) = registry.provider_for_legacy_path(&path)?;
 
     let mut entries: Vec<Entry> = vec![];
     let resource_refs = provider.list_dir_refs(&dir_ref)?;
     for resource_ref in resource_refs {
-        let entry = entry_from_resource_ref(registry, resource_ref)?;
+        let entry = entry_from_resource_ref(resource_ref)?;
         if !show_hidden && entry.hidden {
             continue;
         }
@@ -381,13 +392,7 @@ fn decode_line_bytes(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn fs_text_viewport_info_impl(path: String) -> AppResult<TextViewportInfo> {
-    let path_buf = resolve_legacy_path(&path)?;
-    if !path_buf.exists() {
-        return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
-    }
-    if !path_buf.is_file() {
-        return Err(AppError::msg(format!("not a file: {}", path_buf.display())));
-    }
+    let path_buf = resolve_existing_file_path(&path)?;
 
     let index = get_or_build_sparse_line_index(&path_buf)?;
     Ok(TextViewportInfo {
@@ -402,13 +407,7 @@ pub(crate) fn fs_read_text_viewport_lines_impl(
     start_line: usize,
     line_count: usize,
 ) -> AppResult<TextViewportChunk> {
-    let path_buf = resolve_legacy_path(&path)?;
-    if !path_buf.exists() {
-        return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
-    }
-    if !path_buf.is_file() {
-        return Err(AppError::msg(format!("not a file: {}", path_buf.display())));
-    }
+    let path_buf = resolve_existing_file_path(&path)?;
 
     let index = get_or_build_sparse_line_index(&path_buf)?;
     let total_lines = index.total_lines.max(1);
@@ -559,8 +558,7 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
 
 pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
     let registry = provider_registry();
-    let resource_ref = registry.local().resource_ref_from_legacy_path(&path)?;
-    let provider = registry.provider_for_ref(&resource_ref)?;
+    let (resource_ref, provider) = registry.provider_for_legacy_path(&path)?;
     let path_buf = provider.resolve_path(&resource_ref)?;
     let metadata = provider.metadata(&resource_ref)?;
     let capabilities = provider_capabilities(provider);
@@ -628,8 +626,7 @@ pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
 
 pub(crate) fn fs_get_capabilities_impl(path: String) -> AppResult<ProviderCapabilities> {
     let registry = provider_registry();
-    let resource_ref = registry.resource_ref_from_legacy_path(&path)?;
-    let provider = registry.provider_for_ref(&resource_ref)?;
+    let (_, provider) = registry.provider_for_legacy_path(&path)?;
     Ok(provider_capabilities(provider))
 }
 
