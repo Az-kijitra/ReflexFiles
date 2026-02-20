@@ -255,8 +255,18 @@ try {
         const focused = await driver.executeScript(() => {
           const list = document.querySelector(".list");
           if (!list) return false;
+          list.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+          list.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
+          list.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
           list.focus();
-          return document.activeElement === list;
+          const active = document.activeElement;
+          if (active === list) return true;
+          if (active && list.contains(active)) return true;
+          const activeInList =
+            active &&
+            typeof active.closest === "function" &&
+            active.closest(".list") === list;
+          return Boolean(activeInList);
         });
         if (focused) {
           return;
@@ -560,6 +570,7 @@ try {
   );
 
   await closeSettings();
+  await waitForMainUiReady();
 
   const backupFilesAfter = listFilesSafe(backupsDir, /^config-\d{8}-\d{6}\.toml$/i);
   const zipReportsAfter = listFilesSafe(diagnosticsDir, /^diagnostic-\d{8}-\d{6}\.zip$/i);
@@ -575,20 +586,30 @@ try {
   await getListElement();
   await clickRowByName(undoFile);
   await focusList();
-  await driver.actions().sendKeys(Key.DELETE).perform();
+  await triggerShortcut({ key: "Delete", code: "Delete" });
 
-  const deleteButton = await withTimeout(
-    driver.wait(
-      until.elementLocated(
-        By.xpath(
-          "//div[contains(@class,'modal')]//button[normalize-space(text())='削除' or normalize-space(text())='Delete']"
-        )
+  const waitDeleteButton = async (waitMs) =>
+    withTimeout(
+      driver.wait(
+        until.elementLocated(
+          By.xpath(
+            "//div[contains(@class,'modal')]//button[normalize-space(text())='削除' or normalize-space(text())='Delete']"
+          )
+        ),
+        waitMs
       ),
-      timeoutMs
-    ),
-    timeoutMs,
-    "wait delete confirm"
-  );
+      waitMs,
+      "wait delete confirm"
+    );
+
+  let deleteButton;
+  try {
+    deleteButton = await waitDeleteButton(5000);
+  } catch {
+    await focusList();
+    await driver.actions().sendKeys(Key.DELETE).perform();
+    deleteButton = await waitDeleteButton(timeoutMs);
+  }
   await deleteButton.click();
   await waitForNameGone(undoFile);
 

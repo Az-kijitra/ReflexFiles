@@ -318,17 +318,33 @@ try {
     throw new Error("viewer window did not open");
   };
 
-  const waitTitleContains = async (needle) => {
+  const waitViewerInteractive = async () => {
     const deadline = Date.now() + timeoutMs;
-    const target = String(needle).toLowerCase();
     while (Date.now() < deadline) {
-      const title = String(await driver.getTitle()).toLowerCase();
-      if (title.includes(target)) {
-        return;
+      try {
+        const ready = await driver.executeScript(() => {
+          const root = document.querySelector("main.viewer-root");
+          if (!root) return false;
+          const loading = root.querySelector(".loading");
+          if (!loading) return true;
+          const rect = loading.getBoundingClientRect();
+          const style = window.getComputedStyle(loading);
+          const visible =
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden";
+          return !visible;
+        });
+        if (ready) {
+          return;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
       }
       await sleep(120);
     }
-    throw new Error(`viewer title does not contain "${needle}"`);
+    throw new Error("viewer did not become interactive");
   };
 
   const waitVisibleCss = async (selector, label) => {
@@ -392,11 +408,13 @@ try {
 
   const openViewerForFile = async (name) => {
     await driver.switchTo().window(mainHandle);
+    await waitForMainUiReady();
+    await waitForVisibleName(name);
     await clickRowByName(name);
     viewerHandle = await waitForViewerHandle(viewerHandle);
     await driver.switchTo().window(viewerHandle);
     await withTimeout(driver.wait(until.elementLocated(By.css("main.viewer-root")), timeoutMs), timeoutMs, "wait viewer root");
-    await waitTitleContains(name);
+    await waitViewerInteractive();
   };
 
   console.log("[viewer-flow] verify text file rendering...");
