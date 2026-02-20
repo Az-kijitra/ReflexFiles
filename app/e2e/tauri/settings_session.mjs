@@ -345,8 +345,12 @@ try {
   };
 
   const waitForNameGone = async (name) => {
+    return waitForNameGoneWithin(name, timeoutMs);
+  };
+
+  const waitForNameGoneWithin = async (name, maxWaitMs) => {
     const candidates = displayCandidates(name);
-    const deadline = Date.now() + timeoutMs;
+    const deadline = Date.now() + maxWaitMs;
     while (Date.now() < deadline) {
       try {
         const visible = await collectVisibleNames();
@@ -359,6 +363,43 @@ try {
       await sleep(200);
     }
     throw new Error(`wait for name gone timeout: ${name}`);
+  };
+
+  const clickRedoFromEditMenu = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const clicked = await driver.executeScript(() => {
+          const textOf = (el) => String(el?.textContent || "").trim();
+
+          const menuButtons = Array.from(document.querySelectorAll(".menu-bar .menu-button"));
+          const editButton = menuButtons.find((btn) => {
+            const value = textOf(btn);
+            return value === "Edit" || value === "編集";
+          });
+          if (!editButton) return false;
+
+          editButton.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+          const menuItems = Array.from(document.querySelectorAll(".menu-dropdown .menu-item"));
+          for (const item of menuItems) {
+            const label = textOf(item.querySelector(".menu-label"));
+            if (label !== "Redo" && label !== "やり直し") continue;
+            if (item.classList.contains("disabled")) return false;
+            item.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+            return true;
+          }
+          return false;
+        });
+        if (clicked) {
+          return true;
+        }
+      } catch (error) {
+        if (!isTransientDomError(error)) throw error;
+      }
+      await sleep(140);
+    }
+    return false;
   };
 
   const clickRowByName = async (name) => {
@@ -619,7 +660,15 @@ try {
   await waitForVisibleName(undoFile);
 
   await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true, shift: true });
-  await waitForNameGone(undoFile);
+  try {
+    await waitForNameGoneWithin(undoFile, 5000);
+  } catch {
+    const menuRedoApplied = await clickRedoFromEditMenu();
+    if (!menuRedoApplied) {
+      throw new Error("redo shortcut did not apply and edit menu fallback failed");
+    }
+    await waitForNameGone(undoFile);
+  }
 
   await sleep(700);
   if (!undoSessionPath || !existsSync(undoSessionPath)) {
