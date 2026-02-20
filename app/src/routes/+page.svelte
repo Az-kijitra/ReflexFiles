@@ -150,6 +150,7 @@
   let statusTimer = null;
 
   const t = createTranslator(() => state.ui_language);
+  let testCapabilityOverride = null;
 
   function normalizeProviderCapabilities(value) {
     return {
@@ -411,6 +412,11 @@
   $effect(() => {
     const path = String(state.currentPath || "").trim();
     let cancelled = false;
+
+    if (import.meta.env.DEV && testCapabilityOverride) {
+      state.currentPathCapabilities = normalizeProviderCapabilities(testCapabilityOverride);
+      return;
+    }
 
     if (!path) {
       state.currentPathCapabilities = normalizeProviderCapabilities(null);
@@ -1018,6 +1024,127 @@
     if (typeof window !== "undefined") {
       window.__rf_settings_open = settingsOpen;
     }
+  });
+
+  $effect(() => {
+    if (typeof window === "undefined" || !import.meta.env.DEV) {
+      return;
+    }
+
+    const parseBindingToKeyboardEvent = (binding) => {
+      const tokens = String(binding || "")
+        .split("+")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (!tokens.length) return null;
+
+      const mods = {
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+        metaKey: false,
+      };
+      const keyTokens = [];
+      for (const token of tokens) {
+        const normalized = token.toLowerCase();
+        if (normalized === "ctrl" || normalized === "control") {
+          mods.ctrlKey = true;
+        } else if (normalized === "shift") {
+          mods.shiftKey = true;
+        } else if (normalized === "alt") {
+          mods.altKey = true;
+        } else if (
+          normalized === "meta" ||
+          normalized === "cmd" ||
+          normalized === "command" ||
+          normalized === "win" ||
+          normalized === "super"
+        ) {
+          mods.metaKey = true;
+        } else {
+          keyTokens.push(token);
+        }
+      }
+      if (!keyTokens.length) return null;
+      const rawKey = keyTokens[keyTokens.length - 1];
+      const lower = rawKey.toLowerCase();
+      const named = {
+        enter: { key: "Enter", code: "Enter" },
+        tab: { key: "Tab", code: "Tab" },
+        escape: { key: "Escape", code: "Escape" },
+        esc: { key: "Escape", code: "Escape" },
+        space: { key: " ", code: "Space" },
+        delete: { key: "Delete", code: "Delete" },
+        backspace: { key: "Backspace", code: "Backspace" },
+        up: { key: "ArrowUp", code: "ArrowUp" },
+        down: { key: "ArrowDown", code: "ArrowDown" },
+        left: { key: "ArrowLeft", code: "ArrowLeft" },
+        right: { key: "ArrowRight", code: "ArrowRight" },
+      };
+      const namedHit = named[lower];
+      if (namedHit) {
+        return { ...mods, key: namedHit.key, code: namedHit.code };
+      }
+      if (/^f\d{1,2}$/i.test(rawKey)) {
+        const upper = rawKey.toUpperCase();
+        return { ...mods, key: upper, code: upper };
+      }
+      if (/^[a-z]$/i.test(rawKey)) {
+        const upper = rawKey.toUpperCase();
+        return { ...mods, key: rawKey.toLowerCase(), code: `Key${upper}` };
+      }
+      if (/^[0-9]$/.test(rawKey)) {
+        return { ...mods, key: rawKey, code: `Digit${rawKey}` };
+      }
+      return { ...mods, key: rawKey, code: rawKey };
+    };
+
+    const triggerBinding = (binding) => {
+      const init = parseBindingToKeyboardEvent(binding);
+      if (!init) return false;
+      const target = document.activeElement || document.body || window;
+      target.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
+      target.dispatchEvent(new KeyboardEvent("keyup", { ...init, bubbles: true, cancelable: true }));
+      window.dispatchEvent(new KeyboardEvent("keyup", { ...init, bubbles: true, cancelable: true }));
+      return true;
+    };
+
+    const hooks = {
+      setCurrentPathCapabilities: (value) => {
+        testCapabilityOverride = value ? normalizeProviderCapabilities(value) : null;
+        state.currentPathCapabilities = normalizeProviderCapabilities(testCapabilityOverride);
+      },
+      getCurrentPathCapabilities: () => ({ ...state.currentPathCapabilities }),
+      getStatusMessage: () => String(state.statusMessage || ""),
+      clearStatusMessage: () => {
+        state.statusMessage = "";
+      },
+      canCreateCurrentPath: () =>
+        typeof actions.canCreateCurrentPath === "function"
+          ? Boolean(actions.canCreateCurrentPath())
+          : false,
+      canPasteCurrentPath: () =>
+        typeof actions.canPasteCurrentPath === "function"
+          ? Boolean(actions.canPasteCurrentPath())
+          : false,
+      getActionBinding: (actionId) => {
+        const bindings = keymapBindings.getActionBindings(String(actionId || ""));
+        return Array.isArray(bindings) && bindings.length > 0 ? String(bindings[0] || "") : "";
+      },
+      triggerActionShortcut: (actionId) => {
+        const binding = hooks.getActionBinding(actionId);
+        if (!binding) return false;
+        return triggerBinding(binding);
+      },
+    };
+
+    window.__rf_test_hooks = hooks;
+    return () => {
+      if (window.__rf_test_hooks === hooks) {
+        delete window.__rf_test_hooks;
+      }
+    };
   });
 </script>
 

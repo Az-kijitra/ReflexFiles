@@ -1,5 +1,5 @@
 # ADR-0001: 外部ストレージ統合のための Storage Provider 境界
-更新日: 2026-02-18
+更新日: 2026-02-19
 ステータス: 提案中
 担当: ReflexFiles maintainers
 
@@ -113,5 +113,5 @@ Google Drive 初期導入では以下を必須とする。
 - local provider のみで既存E2Eが通過する
 - 既存 path 入力は互換層で吸収される
 - セキュリティレビューでトークン漏えいがない
+- Gate 0 の脅威モデル文書がレビュー済みである（`docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`）
 - Google Drive 本実装マージ前にこのADRが承認される
-

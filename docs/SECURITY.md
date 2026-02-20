@@ -35,3 +35,7 @@ If `cargo audit` is not installed:
 ```bash
 cargo install cargo-audit
 ```
+
+## External Provider Baseline (Google Drive)
+- Gate 0 threat model: `docs/THREAT_MODEL_GDRIVE_GATE0.md`
+- Storage provider ADR: `docs/ADR-0001-storage-provider-boundary.md`

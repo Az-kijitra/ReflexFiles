@@ -14,6 +14,7 @@ mkdirSync(casesDir, { recursive: true });
 
 const cases = [
   { name: "smoke", cmd: "node e2e/tauri/smoke.mjs" },
+  { name: "capability_guard", cmd: "node e2e/tauri/capability_guard.mjs" },
   { name: "viewer_flow", cmd: "node e2e/tauri/viewer_flow.mjs" },
   { name: "settings_session", cmd: "node e2e/tauri/settings_session.mjs" },
 ];
@@ -22,6 +23,7 @@ const classifyFailure = (name, exitCode, spawnError) => {
   if (spawnError) return "runner_spawn_error";
   if (exitCode === 0) return null;
   if (name === "smoke") return "smoke_flow_failed";
+  if (name === "capability_guard") return "capability_guard_failed";
   if (name === "viewer_flow") return "viewer_flow_failed";
   if (name === "settings_session") return "settings_session_failed";
   return "unknown_case_failed";

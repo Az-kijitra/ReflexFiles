@@ -28,6 +28,11 @@ function Resolve-LatestReleaseForMajor {
     try {
       $resolved = (Invoke-WebRequest -Uri $latestUrl -UseBasicParsing -TimeoutSec 20).Content.Trim()
       if ($resolved) {
+        $resolvedMajor = $resolved.Split('.')[0]
+        if ($resolvedMajor -ne $Major) {
+          Write-Host "Ignoring mismatched major from ${latestUrl}: requested=$Major resolved=$resolved"
+          continue
+        }
         Write-Host "Resolved latest EdgeDriver for major $Major from ${latestUrl}: $resolved"
         return $resolved
       }
@@ -135,4 +140,3 @@ Copy-Item "$PWD\edgedriver\msedgedriver.exe" "$PWD\msedgedriver.exe" -Force
 
 Write-Host "Installed EdgeDriver version candidate: $installedVersion"
 & "$PWD\msedgedriver.exe" --version
-

@@ -34,3 +34,7 @@ npm run audit:deps
 ```bash
 cargo install cargo-audit
 ```
+
+## 外部Providerの基準（Google Drive）
+- Gate 0 脅威モデル: `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Storage Provider ADR: `docs/ja/ADR-0001-storage-provider-boundary.ja.md`

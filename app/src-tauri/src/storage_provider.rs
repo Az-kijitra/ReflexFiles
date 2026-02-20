@@ -111,10 +111,6 @@ impl ProviderRegistry {
         }
     }
 
-    pub fn local(&self) -> &LocalStorageProvider {
-        &self.local
-    }
-
     pub fn resource_ref_from_legacy_path(&self, raw_path: &str) -> AppResult<ResourceRef> {
         let trimmed = raw_path.trim();
         if let Some(rest) = trimmed.strip_prefix("gdrive://") {
@@ -149,6 +145,34 @@ impl ProviderRegistry {
             )),
         }
     }
+
+    pub fn provider_for_legacy_path(
+        &self,
+        raw_path: &str,
+    ) -> AppResult<(ResourceRef, &dyn StorageProviderBackend)> {
+        let resource_ref = self.resource_ref_from_legacy_path(raw_path)?;
+        let provider = self.provider_for_ref(&resource_ref)?;
+        Ok((resource_ref, provider))
+    }
+
+    pub fn resolve_path_for_ref(
+        &self,
+        resource_ref: &ResourceRef,
+        capability: ProviderCapability,
+    ) -> AppResult<PathBuf> {
+        let provider = self.provider_for_ref(resource_ref)?;
+        ensure_provider_capability(provider, capability)?;
+        provider.resolve_path(resource_ref)
+    }
+
+    pub fn resolve_legacy_path_for(
+        &self,
+        raw_path: &str,
+        capability: ProviderCapability,
+    ) -> AppResult<PathBuf> {
+        let resource_ref = self.resource_ref_from_legacy_path(raw_path)?;
+        self.resolve_path_for_ref(&resource_ref, capability)
+    }
 }
 
 impl Default for ProviderRegistry {
@@ -169,15 +193,7 @@ pub fn resolve_legacy_path(path: &str) -> AppResult<PathBuf> {
 
 pub fn resolve_legacy_path_for(path: &str, capability: ProviderCapability) -> AppResult<PathBuf> {
     let registry = provider_registry();
-    let resource_ref = registry.resource_ref_from_legacy_path(path)?;
-    let provider = registry.provider_for_ref(&resource_ref)?;
-    if !provider.supports(capability) {
-        return Err(AppError::with_kind(
-            AppErrorKind::Permission,
-            format!("provider capability denied: {}", capability.as_str()),
-        ));
-    }
-    provider.resolve_path(&resource_ref)
+    registry.resolve_legacy_path_for(path, capability)
 }
 
 pub fn resolve_legacy_paths_for(
@@ -204,6 +220,19 @@ pub fn provider_capabilities(provider: &dyn StorageProviderBackend) -> ProviderC
     }
 }
 
+fn ensure_provider_capability(
+    provider: &dyn StorageProviderBackend,
+    capability: ProviderCapability,
+) -> AppResult<()> {
+    if provider.supports(capability) {
+        return Ok(());
+    }
+    Err(AppError::with_kind(
+        AppErrorKind::Permission,
+        format!("provider capability denied: {}", capability.as_str()),
+    ))
+}
+
 fn normalize_local_resource_id(path: &Path) -> AppResult<String> {
     if path.as_os_str().is_empty() {
         return Err(AppError::with_kind(AppErrorKind::InvalidPath, "path is empty"));
@@ -218,13 +247,12 @@ fn normalize_local_resource_id(path: &Path) -> AppResult<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_legacy_path_for, ProviderCapability, ProviderRegistry};
+    use super::{resolve_legacy_path_for, LocalStorageProvider, ProviderCapability, ProviderRegistry};
     use crate::types::{ResourceRef, StorageProvider};
 
     #[test]
     fn local_provider_normalizes_relative_path() {
-        let registry = ProviderRegistry::new();
-        let local = registry.local();
+        let local = LocalStorageProvider;
         let resource_ref = local
             .resource_ref_from_legacy_path(".")
             .expect("resource ref");

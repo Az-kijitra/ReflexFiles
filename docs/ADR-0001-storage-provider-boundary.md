@@ -1,5 +1,5 @@
 # ADR-0001: Storage Provider Boundary for External Storage Integration
-Updated: 2026-02-18
+Updated: 2026-02-19
 Status: Proposed
 Owners: ReflexFiles maintainers
 
@@ -113,5 +113,5 @@ Trade-offs:
 - Local provider only mode passes existing E2E suite
 - Legacy path calls are adapted through compatibility layer
 - Security review confirms no token leakage in logs
+- Threat model document for Gate 0 is reviewed (`docs/THREAT_MODEL_GDRIVE_GATE0.md`)
 - Maintainer review approves this ADR before Google Drive code merges
-

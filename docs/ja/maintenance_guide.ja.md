@@ -1,5 +1,5 @@
 # メンテナンスガイド
-更新日: 2026-02-19
+更新日: 2026-02-20
 
 ## 対象と目的
 このドキュメントは ReflexFiles の**保守担当者向け**です（エンドユーザー向けではありません）。
@@ -46,6 +46,7 @@ ReflexFiles/
       build_manual.mjs
       e2e/
         run-tauri-selenium.mjs
+        run-tauri-capability-selenium.mjs
         run-tauri-viewer-selenium.mjs
         run-tauri-settings-selenium.mjs
         run-tauri-suite-selenium.mjs
@@ -116,14 +117,16 @@ npm run tauri build
 ## 自動E2Eテスト運用
 ### テストレイヤー
 - `e2e:tauri` -> smoke（ファイル操作の基礎フロー）
+- `e2e:capability` -> provider capability ガード（メニュー/コンテキスト/操作可否）
 - `e2e:viewer` -> viewer フロー
 - `e2e:settings` -> 設定保存・バックアップ/レポート・undo/redo
-- `e2e:full` -> 総合スイート（`smoke` -> `viewer_flow` -> `settings_session`）
+- `e2e:full` -> 総合スイート（`smoke` -> `capability_guard` -> `viewer_flow` -> `settings_session`）
 
 ### 実行コマンド
 `app/` で実行:
 ```bash
 npm run e2e:tauri
+npm run e2e:capability
 npm run e2e:viewer
 npm run e2e:settings
 npm run e2e:full
@@ -135,6 +138,7 @@ npm run e2e:full
 - 起動モードを選択
   - debug EXE が存在する場合: `existing-binary + vite-dev`
   - それ以外: `tauri dev`
+- Windows では起動前に、このリポジトリ配下で残留した `vite dev`（node）プロセスを明示終了
 - アプリ起動待機を実施
 - Selenium シナリオを実行
 - Windows で子プロセスを強制終了してハングを回避
@@ -154,6 +158,7 @@ npm run e2e:full
 - 失敗時の `failureOverview`
 - ケースごとの `failureCategory`（例）:
   - `smoke_flow_failed`
+  - `capability_guard_failed`
   - `viewer_flow_failed`
   - `settings_session_failed`
   - `runner_spawn_error`
@@ -177,16 +182,39 @@ npm run e2e:full
 - **Dependency audit（nightly/manual）**:
   - `npm run audit:deps`
 - **Pull Request**（高速セット）:
-  - `e2e:tauri` + `e2e:viewer`
-- **main/master への push と nightly**（フル）:
-  - `e2e:full`
+  - `e2e:tauri` + `e2e:capability` + `e2e:viewer`
+- `e2e:full` は GitHub Actions では実行しない。必要時に手動実行する。
 
-両ジョブ共通:
+E2E 高速ジョブの構成:
 - `windows-latest` で実行
 - Node + Rust + `tauri-driver` セットアップ
 - 対応する `msedgedriver` を取得
 - debug ビルド
 - `e2e_artifacts/**` をアップロード
+
+## テスト運用方針（優先順位と代替案提示）
+基本原則:
+- テストの目的は、アプリ品質を守ること。
+- 「テストを通すこと」自体は最終目的ではない。
+- 品質は必須だが、担保手段はテストだけに限定しない（設計境界、コードレビュー、ログ、運用ルールを併用する）。
+
+運用方針:
+- PR の必須チェックは、安定した品質ゲート（`quality`、`e2e_pr_quick`）に限定する。
+- `e2e:full` は手動の回帰確認として扱い、マージブロッカーにはしない。
+- 不具合対応の優先順位は「プロダクトリスクの修正」を先、テスト不安定化対応を後とする。
+
+時間制限とエスカレーション:
+- 同一カテゴリの E2E 失敗に対する試行錯誤が `45分` を超えたら、深追いを止めて代替案を提示する。
+- 同一カテゴリの失敗が CI で `2回` 連続再現したら、即時に代替案を提示する。
+- 代替案には必ず以下を含める:
+  - 何を変更するか
+  - 品質への影響/リスク
+  - 推奨案
+
+推奨される代替案:
+1. 不安定なスイートを必須チェックから一時的に外し、監視運用に切り替える。
+2. 不安定な E2E を統合テストへ分割し、短い手動受け入れチェックリストを併用する。
+3. E2E 安定化までの間、対象機能のログ/診断/ガードを強化して品質を補完する。
 
 ## リリース事前検証（1コマンド）
 `app/` で実行:
@@ -229,6 +257,14 @@ npm run check
 - 既存 ReflexFiles プロセスを終了
 - E2E実行時に `E2E_TAURI_KILL_APP=1` を有効化
 
+### スイート実行で `Port 1422 is already in use`
+症状:
+- 後続ケースで Vite ポート競合が発生し、アプリ起動に失敗する
+対応:
+- `E2E_TAURI_KILL_APP=1` を維持する
+- `E2E_TAURI_KILL_VITE_DEV=1`（既定値）を維持する
+- ランナーログで startup/shutdown のポートクリーンアップ行を確認する
+
 ### E2E がケース後に止まる
 対応:
 - ランナーログで以下を確認
@@ -260,6 +296,10 @@ npm run check
 ## 関連ドキュメント
 - `docs/maintenance_guide.md`
 - `docs/VIEWER_SPEC.md`
+- `docs/ADR-0001-storage-provider-boundary.md`
+- `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
+- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
+- `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`
