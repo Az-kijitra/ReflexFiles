@@ -39,18 +39,44 @@ const findListeningPidsOnPortWin = (port) => {
     const line = rawLine.trim();
     if (!line) continue;
     const cols = line.split(/\s+/);
-    if (cols.length < 5) continue;
+    if (cols.length < 4) continue;
     const proto = cols[0].toUpperCase();
     const localAddress = cols[1];
-    const state = cols[3].toUpperCase();
-    const pid = Number(cols[4]);
+    const pid = Number(cols.at(-1));
     if (proto !== 'TCP') continue;
     if (!Number.isFinite(pid) || pid <= 0) continue;
-    if (state !== 'LISTENING') continue;
     if (!localAddressMatchesPort(localAddress, port)) continue;
     pids.push(pid);
   }
   return [...new Set(pids)];
+};
+
+const quotePs = (value) => `'${String(value).replace(/'/g, "''")}'`;
+
+const findViteDevPidsWin = (rootPath) => {
+  if (process.platform !== 'win32') {
+    return [];
+  }
+  const rootQuoted = quotePs(rootPath);
+  const command = [
+    `$root = ${rootQuoted}`,
+    '$procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |',
+    "  Where-Object { $_.Name -ieq 'node.exe' -and $_.CommandLine -like '*vite dev*' -and $_.CommandLine -like ('*' + $root + '*') }",
+    '$procs | Select-Object -ExpandProperty ProcessId',
+  ].join(' ');
+  const result = spawnSync('powershell', ['-NoProfile', '-Command', command], {
+    shell: false,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 5000,
+  });
+  if (result.status !== 0 || !result.stdout) {
+    return [];
+  }
+  return [...new Set(result.stdout
+    .split(/\r?\n/)
+    .map((line) => Number(line.trim()))
+    .filter((pid) => Number.isFinite(pid) && pid > 0))];
 };
 
 const killPidsWin = (pids, reason) => {
@@ -71,16 +97,30 @@ const killPidsWin = (pids, reason) => {
   }
 };
 
-const ensurePortFreedWin = async (port, reason, timeoutMs = 10_000) => {
+const ensurePortFreedWin = async (
+  port,
+  reason,
+  timeoutMs = 10_000,
+  stableFreeMs = 1_200
+) => {
   if (process.platform !== 'win32') {
     return;
   }
   const startedAt = Date.now();
+  let freeSince = null;
   while (Date.now() - startedAt < timeoutMs) {
     const pids = findListeningPidsOnPortWin(port);
     if (pids.length === 0) {
-      return;
+      if (freeSince === null) {
+        freeSince = Date.now();
+      }
+      if (Date.now() - freeSince >= stableFreeMs) {
+        return;
+      }
+      await sleep(200);
+      continue;
     }
+    freeSince = null;
     killPidsWin(pids, reason);
     await sleep(250);
   }
@@ -88,6 +128,18 @@ const ensurePortFreedWin = async (port, reason, timeoutMs = 10_000) => {
   if (remaining.length > 0) {
     throw new Error(`[runner] port ${port} is still occupied after cleanup (${reason}): ${remaining.join(',')}`);
   }
+  throw new Error(`[runner] port ${port} did not remain free long enough after cleanup (${reason})`);
+};
+
+const killLingeringViteDevWin = (rootPath, reason) => {
+  if (process.platform !== 'win32') {
+    return;
+  }
+  const pids = findViteDevPidsWin(rootPath);
+  if (pids.length === 0) {
+    return;
+  }
+  killPidsWin(pids, reason);
 };
 
 const driverPort = Number(process.env.E2E_TAURI_DRIVER_PORT ?? 4444);
@@ -121,6 +173,7 @@ const appCmd =
   (effectiveAppPath ? 'npm run dev' : 'npm run tauri dev');
 const killApp = process.env.E2E_TAURI_KILL_APP === '1';
 const killDriver = process.env.E2E_TAURI_KILL_DRIVER !== '0';
+const killViteDev = process.env.E2E_TAURI_KILL_VITE_DEV !== '0';
 const skipApp = process.env.E2E_TAURI_SKIP_APP === '1';
 const apiCmd = process.env.E2E_TAURI_API_CMD;
 const testCmd = process.env.E2E_TAURI_TEST_CMD ?? 'node e2e/tauri/smoke.mjs';
@@ -163,6 +216,7 @@ const collectLines = (buffer, chunk, onLine) => {
 
 const logErrors = [];
 let appReadySignaled = false;
+let appPortConflictDetected = false;
 let resolveAppReadySignal;
 const appReadySignalPromise = new Promise((resolvePromise) => {
   resolveAppReadySignal = resolvePromise;
@@ -174,6 +228,12 @@ const onLine = (name, line) => {
       appReadySignaled = true;
       resolveAppReadySignal();
     }
+  }
+  if (
+    name === 'app' &&
+    cleanLine.includes(`Port ${appReadyPort} is already in use`)
+  ) {
+    appPortConflictDetected = true;
   }
   if (errorRegex.test(cleanLine) && !isIgnoredLine(cleanLine)) {
     logErrors.push(`[${name}] ${cleanLine}`);
@@ -328,6 +388,9 @@ if (killDriver && process.platform === 'win32') {
 }
 
 if (process.platform === 'win32') {
+  if (killViteDev) {
+    killLingeringViteDevWin(appRoot, 'vite-dev startup cleanup');
+  }
   await ensurePortFreedWin(driverPort, `port ${driverPort} startup cleanup`);
   if (needsAppReadyWait) {
     await ensurePortFreedWin(appReadyPort, `port ${appReadyPort} startup cleanup`);
@@ -347,12 +410,7 @@ if (needsAppReadyWait) {
 }
 
 const driver = startProcess('driver', driverCmd);
-const app = skipApp
-  ? null
-  : startProcess('app', appCmd, {
-      TAURI_DRIVER_PORT: String(driverPort),
-      ...(effectiveAppPath ? { E2E_TAURI_APP_PATH: effectiveAppPath } : {}),
-    });
+let app = null;
 const api = apiCmd ? startProcess('api', apiCmd) : null;
 
 let lastCode = 0;
@@ -366,6 +424,19 @@ try {
   );
   console.log(`[runner] tauri-driver is ready on port ${driverPort}.`);
 
+  if (!skipApp) {
+    if (process.platform === 'win32' && needsAppReadyWait) {
+      if (killViteDev) {
+        killLingeringViteDevWin(appRoot, 'vite-dev pre-app-start cleanup');
+      }
+      await ensurePortFreedWin(appReadyPort, `port ${appReadyPort} pre-app-start cleanup`, 12_000, 1_500);
+    }
+    app = startProcess('app', appCmd, {
+      TAURI_DRIVER_PORT: String(driverPort),
+      ...(effectiveAppPath ? { E2E_TAURI_APP_PATH: effectiveAppPath } : {}),
+    });
+  }
+
   if (needsAppReadyWait) {
     console.log(`[runner] waiting for app dev server on port ${appReadyPort}...`);
     await waitForTcpPort(appReadyPort, appReadyTimeoutMs, 'app dev server', appReadyHosts);
@@ -374,7 +445,24 @@ try {
     );
     if (!appReadySignaled) {
       console.log('[runner] waiting for app startup log signal (Vite Local URL)...');
-      await withTimeout(appReadySignalPromise, appLogReadyTimeoutMs, 'app startup log signal');
+      await withTimeout(
+        (async () => {
+          while (true) {
+            if (appReadySignaled) {
+              return;
+            }
+            if (app && app.exitCode !== null) {
+              if (appPortConflictDetected) {
+                throw new Error(`app failed to start: port ${appReadyPort} is already in use`);
+              }
+              throw new Error(`app process exited before startup log signal (code=${app.exitCode})`);
+            }
+            await sleep(100);
+          }
+        })(),
+        appLogReadyTimeoutMs,
+        'app startup log signal'
+      );
     }
     console.log(`[runner] app dev server is ready on port ${appReadyPort}.`);
   }
@@ -428,6 +516,9 @@ try {
         await stopChild('api', api);
         await stopChild('driver', driver);
         if (process.platform === 'win32') {
+          if (killViteDev) {
+            killLingeringViteDevWin(appRoot, 'vite-dev shutdown cleanup');
+          }
           await ensurePortFreedWin(driverPort, `port ${driverPort} shutdown cleanup`, 8_000);
           if (needsAppReadyWait) {
             await ensurePortFreedWin(appReadyPort, `port ${appReadyPort} shutdown cleanup`, 8_000);
