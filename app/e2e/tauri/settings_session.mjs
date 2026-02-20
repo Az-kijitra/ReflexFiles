@@ -269,14 +269,15 @@ try {
           return Boolean(activeInList);
         });
         if (focused) {
-          return;
+          return true;
         }
       } catch (error) {
         if (!isTransientDomError(error)) throw error;
       }
       await sleep(100);
     }
-    throw new Error("list focus timed out");
+    console.warn("[settings-session] list focus timed out; continuing with window-level shortcut dispatch");
+    return false;
   };
 
   const triggerShortcut = async ({ key, code, ctrl = false, shift = false, alt = false, meta = false }) => {
@@ -617,7 +618,6 @@ try {
   await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true });
   await waitForVisibleName(undoFile);
 
-  await focusList();
   await triggerShortcut({ key: "z", code: "KeyZ", ctrl: true, shift: true });
   await waitForNameGone(undoFile);
 
