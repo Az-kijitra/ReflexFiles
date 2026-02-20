@@ -29,4 +29,25 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  // Avoid first-use dependency optimization reloads during E2E runs.
+  optimizeDeps: {
+    include: [
+      "@tauri-apps/api/app",
+      "@tauri-apps/api/core",
+      "@tauri-apps/api/event",
+      "@tauri-apps/api/path",
+      "@tauri-apps/api/window",
+      "@tauri-apps/plugin-opener",
+      "markdown-it",
+      "highlight.js/lib/core",
+      "highlight.js/lib/languages/c",
+      "highlight.js/lib/languages/cpp",
+      "highlight.js/lib/languages/rust",
+      "highlight.js/lib/languages/javascript",
+      "highlight.js/lib/languages/typescript",
+      "highlight.js/lib/languages/python",
+      "highlight.js/lib/languages/json",
+      "highlight.js/lib/languages/markdown",
+    ],
+  },
 }));
