@@ -145,12 +145,25 @@ npm run e2e:full
 
 ## Provider Capability 制御
 - 対象パスの provider capability 取得APIは `fs_get_capabilities`。
+- ResourceRef 直受けの provider capability API として `fs_get_capabilities_by_ref` を追加（Gate 1 の移行経路）。
+- currentPath の capability 取得は、`gdrive://` パスでは `fs_get_capabilities_by_ref` を使用し、ローカルパスは `fs_get_capabilities(path)` を継続利用する。
+- `gdrive://` パスの read 系処理は ResourceRef 直受けコマンドを使用する:
+  - `fs_list_dir_by_ref`
+  - `fs_get_properties_by_ref`
 - フロントは currentPath の capability を保持し、以下を制御:
   - 空白コンテキストメニュー（`新規作成...` / `ペースト`）
   - Edit メニュー（`Paste`）
   - キーボード操作（`new_file` / `paste`）
 - 選択項目ベースの操作（`copy/move/delete/rename/zip`）は引き続き `entry.capabilities` を使用。
 - capability で拒否された操作は実行せず、`capability.not_available` を表示する。
+- Google Drive read-only バックエンドの骨格は Rust feature flag `gdrive-readonly-stub` で制御する（既定: 無効）。
+- provider 境界を変更した場合は、通常構成と feature 有効構成の両方で確認する:
+```bash
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+```
 
 ### スイートサマリーと失敗分類
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` は以下を出力:
@@ -173,12 +186,16 @@ npm run e2e:full
 ワークフロー:
 - `.github/workflows/quality.yml`
 - `.github/workflows/e2e-tauri.yml`
+- `e2e-tauri.yml` のトリガーは `pull_request` のみ。
 
 現行の分割運用:
 - **Quality gate（PR/Push）**:
   - `npm run check`
   - `cargo check`
   - `cargo test`
+- **Gate 1 stub probe（手動/夜間、非ブロッカー）**:
+  - `cargo check --features gdrive-readonly-stub`
+  - `cargo test --features gdrive-readonly-stub`
 - **Dependency audit（nightly/manual）**:
   - `npm run audit:deps`
 - **Pull Request**（高速セット）:

@@ -12,6 +12,8 @@
 
   import { EVENT_FS_CHANGED, EVENT_OP_PROGRESS } from "$lib/events";
   import { KEYMAP_ACTIONS, MENU_GROUPS } from "$lib/ui_constants";
+  import { toGdriveResourceRef } from "$lib/utils/resource_ref";
+  import { fsGetCapabilities, fsGetCapabilitiesByRef } from "$lib/utils/tauri_fs";
 
   import { formatModified, formatName, formatSize } from "$lib/utils/format";
   import { formatError } from "$lib/utils/error_format";
@@ -425,7 +427,10 @@
 
     (async () => {
       try {
-        const capabilities = await invoke("fs_get_capabilities", { path });
+        const gdriveRef = toGdriveResourceRef(path);
+        const capabilities = gdriveRef
+          ? await fsGetCapabilitiesByRef(gdriveRef)
+          : await fsGetCapabilities(path);
         if (cancelled) return;
         if (state.currentPath === path) {
           state.currentPathCapabilities = normalizeProviderCapabilities(capabilities);

@@ -1,6 +1,6 @@
 # Google Drive Gate 0 Threat Model
-Updated: 2026-02-19
-Status: Draft for review
+Updated: 2026-02-20
+Status: Approved
 Owners: ReflexFiles maintainers
 
 ## Scope
@@ -107,3 +107,7 @@ Required evidence before Gate 1:
 - Refresh token rotation policy is not yet finalized.
 - Incident response runbook for external provider outage is pending.
 - Threat model must be re-reviewed before enabling write scopes (Gate 3).
+
+## Review Decision
+- Reviewed by maintainers on 2026-02-20.
+- Decision: Approved for Gate 0 (read-only) entry.

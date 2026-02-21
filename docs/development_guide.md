@@ -54,6 +54,21 @@ The following checks must pass before merge:
 
 `e2e:full` is manual-only and is not a required PR status check.
 
+## Test Role Split
+- PR merge blockers are limited to stable quality gates (`quality`, `e2e_pr_quick`).
+- `e2e:full` is a manual regression check and is not used as a merge blocker.
+- When tests fail, evaluate product-quality risk first. If risk is low and test flakiness is suspected, switch to an agreed alternative validation path instead of prolonged test-only debugging.
+
+## Gate 1 Experimental Flag
+- Google Drive read-only backend skeleton is controlled by Rust feature flag `gdrive-readonly-stub`.
+- Default build keeps this flag disabled (local-provider behavior unchanged).
+- To validate Gate 1 code path locally:
+```bash
+cd app
+cargo check --manifest-path src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+cargo test --manifest-path src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+```
+
 ## Google Drive Gate 0 DoD (Definition of Done)
 Use this checklist before starting Google Drive implementation work.
 References:

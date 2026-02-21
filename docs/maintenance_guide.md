@@ -143,12 +143,25 @@ npm run e2e:full
 
 ## Provider Capability Enforcement
 - `fs_get_capabilities` is the backend API to fetch provider capabilities for a target path.
+- `fs_get_capabilities_by_ref` is the ResourceRef-first API for provider capability lookup (Gate 1 migration path).
+- Current UI uses `fs_get_capabilities_by_ref` for `gdrive://` paths and falls back to `fs_get_capabilities(path)` for local paths.
+- Current UI also uses ResourceRef-first commands for gdrive path handling:
+  - `fs_list_dir_by_ref`
+  - `fs_get_properties_by_ref`
 - Frontend stores current-path capabilities and uses them to gate:
   - blank context menu (`New...`, `Paste`)
   - Edit menu (`Paste`)
   - keyboard actions (`new_file`, `paste`)
 - Entry-level capabilities (`entry.capabilities`) remain the source for selection-based actions (`copy/move/delete/rename/zip`).
 - If an action is denied by capability, UI shows `capability.not_available` instead of executing the operation.
+- Google Drive read-only backend skeleton is available behind Rust feature flag `gdrive-readonly-stub` (default: disabled).
+- Validate both variants when touching provider-boundary logic:
+```bash
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+```
 
 ### Suite summary and failure classification
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` now writes:
@@ -171,12 +184,16 @@ When running from `app/`, artifacts are written under repository root:
 Workflow file:
 - `.github/workflows/quality.yml`
 - `.github/workflows/e2e-tauri.yml`
+- `e2e-tauri.yml` trigger is `pull_request` only.
 
 Current CI split:
 - **Quality gate (PR/Push)**:
   - `npm run check`
   - `cargo check`
   - `cargo test`
+- **Gate 1 stub probe (manual/nightly, non-blocking)**:
+  - `cargo check --features gdrive-readonly-stub`
+  - `cargo test --features gdrive-readonly-stub`
 - **Dependency audit (nightly/manual)**:
   - `npm run audit:deps`
 - **Pull Request** job (quick):

@@ -10,9 +10,7 @@ use std::sync::{mpsc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::error::{AppError, AppResult};
-use crate::storage_provider::{
-    provider_capabilities, provider_registry, resolve_legacy_path,
-};
+use crate::storage_provider::{provider_capabilities, provider_registry, resolve_legacy_path};
 use crate::types::{
     DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef,
     SortKey, SortOrder,
@@ -163,7 +161,10 @@ fn entry_from_resource_ref(resource_ref: ResourceRef) -> AppResult<Entry> {
 fn resolve_existing_file_path(path: &str) -> AppResult<PathBuf> {
     let path_buf = resolve_legacy_path(path)?;
     if !path_buf.exists() {
-        return Err(AppError::msg(format!("file not found: {}", path_buf.display())));
+        return Err(AppError::msg(format!(
+            "file not found: {}",
+            path_buf.display()
+        )));
     }
     if !path_buf.is_file() {
         return Err(AppError::msg(format!("not a file: {}", path_buf.display())));
@@ -199,27 +200,9 @@ fn dir_stats(path: &Path) -> (u64, u64, u64) {
     (total_size, file_count, dir_count)
 }
 
-pub(crate) fn fs_list_dir_impl(
-    path: String,
-    show_hidden: bool,
-    sort_key: String,
-    sort_order: String,
-) -> AppResult<Vec<Entry>> {
-    let registry = provider_registry();
-    let (dir_ref, provider) = registry.provider_for_legacy_path(&path)?;
-
-    let mut entries: Vec<Entry> = vec![];
-    let resource_refs = provider.list_dir_refs(&dir_ref)?;
-    for resource_ref in resource_refs {
-        let entry = entry_from_resource_ref(resource_ref)?;
-        if !show_hidden && entry.hidden {
-            continue;
-        }
-        entries.push(entry);
-    }
-
-    let key = SortKey::parse(&sort_key);
-    let order = SortOrder::parse(&sort_order);
+fn sort_entries(entries: &mut [Entry], sort_key: &str, sort_order: &str) {
+    let key = SortKey::parse(sort_key);
+    let order = SortOrder::parse(sort_order);
     entries.sort_by(|a, b| {
         let cmp = match key {
             SortKey::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
@@ -249,8 +232,39 @@ pub(crate) fn fs_list_dir_impl(
             SortOrder::Unknown => cmp,
         }
     });
+}
 
+pub(crate) fn fs_list_dir_by_ref_impl(
+    dir_ref: ResourceRef,
+    show_hidden: bool,
+    sort_key: String,
+    sort_order: String,
+) -> AppResult<Vec<Entry>> {
+    let registry = provider_registry();
+    let provider = registry.provider_for_ref(&dir_ref)?;
+
+    let mut entries: Vec<Entry> = vec![];
+    let resource_refs = provider.list_dir_refs(&dir_ref)?;
+    for resource_ref in resource_refs {
+        let entry = entry_from_resource_ref(resource_ref)?;
+        if !show_hidden && entry.hidden {
+            continue;
+        }
+        entries.push(entry);
+    }
+    sort_entries(&mut entries, &sort_key, &sort_order);
     Ok(entries)
+}
+
+pub(crate) fn fs_list_dir_impl(
+    path: String,
+    show_hidden: bool,
+    sort_key: String,
+    sort_order: String,
+) -> AppResult<Vec<Entry>> {
+    let registry = provider_registry();
+    let (dir_ref, _) = registry.provider_for_legacy_path(&path)?;
+    fs_list_dir_by_ref_impl(dir_ref, show_hidden, sort_key, sort_order)
 }
 
 pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<String> {
@@ -325,7 +339,11 @@ fn text_index_cache_key(path: &Path) -> String {
     path.to_string_lossy().to_lowercase()
 }
 
-fn build_sparse_line_index(path: &Path, file_size: u64, modified_nanos: u128) -> AppResult<SparseLineIndex> {
+fn build_sparse_line_index(
+    path: &Path,
+    file_size: u64,
+    modified_nanos: u128,
+) -> AppResult<SparseLineIndex> {
     let mut reader = BufReader::new(fs::File::open(path)?);
     let mut buf = Vec::with_capacity(4096);
     let mut offset = 0u64;
@@ -556,9 +574,9 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
     Ok(out_path.to_string_lossy().to_string())
 }
 
-pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
+pub(crate) fn fs_get_properties_by_ref_impl(resource_ref: ResourceRef) -> AppResult<Properties> {
     let registry = provider_registry();
-    let (resource_ref, provider) = registry.provider_for_legacy_path(&path)?;
+    let provider = registry.provider_for_ref(&resource_ref)?;
     let path_buf = provider.resolve_path(&resource_ref)?;
     let metadata = provider.metadata(&resource_ref)?;
     let capabilities = provider_capabilities(provider);
@@ -624,9 +642,23 @@ pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
     })
 }
 
+pub(crate) fn fs_get_properties_impl(path: String) -> AppResult<Properties> {
+    let registry = provider_registry();
+    let (resource_ref, _) = registry.provider_for_legacy_path(&path)?;
+    fs_get_properties_by_ref_impl(resource_ref)
+}
+
 pub(crate) fn fs_get_capabilities_impl(path: String) -> AppResult<ProviderCapabilities> {
     let registry = provider_registry();
     let (_, provider) = registry.provider_for_legacy_path(&path)?;
+    Ok(provider_capabilities(provider))
+}
+
+pub(crate) fn fs_get_capabilities_by_ref_impl(
+    resource_ref: ResourceRef,
+) -> AppResult<ProviderCapabilities> {
+    let registry = provider_registry();
+    let provider = registry.provider_for_ref(&resource_ref)?;
     Ok(provider_capabilities(provider))
 }
 
@@ -657,10 +689,12 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
 #[cfg(test)]
 mod tests {
     use super::{
-        cleanup_viewer_image_cache_dir, fs_is_probably_text_impl, fs_read_image_data_url_impl,
-        fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
+        cleanup_viewer_image_cache_dir, fs_get_capabilities_by_ref_impl,
+        fs_get_properties_by_ref_impl, fs_is_probably_text_impl, fs_list_dir_by_ref_impl,
+        fs_read_image_data_url_impl, fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
         fs_read_text_viewport_lines_impl, fs_text_viewport_info_impl, infer_image_mime,
     };
+    use crate::types::{PropertyKind, ResourceRef, StorageProvider};
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -719,17 +753,13 @@ mod tests {
         }
         fs::write(&path, text.as_bytes()).expect("write viewport sample");
 
-        let info = fs_text_viewport_info_impl(path.to_string_lossy().to_string())
-            .expect("viewport info");
+        let info =
+            fs_text_viewport_info_impl(path.to_string_lossy().to_string()).expect("viewport info");
         assert!(info.file_size > 0);
         assert_eq!(info.total_lines, 5000);
 
-        let chunk = fs_read_text_viewport_lines_impl(
-            path.to_string_lossy().to_string(),
-            1234,
-            5,
-        )
-        .expect("viewport chunk");
+        let chunk = fs_read_text_viewport_lines_impl(path.to_string_lossy().to_string(), 1234, 5)
+            .expect("viewport chunk");
 
         assert_eq!(chunk.start_line, 1234);
         assert_eq!(chunk.total_lines, 5000);
@@ -868,5 +898,71 @@ mod tests {
         assert!(png_count <= 400);
         assert!(txt_exists);
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_list_dir_by_ref_lists_local_entries() {
+        let dir = unique_temp_dir("rf-fs-query-list-by-ref");
+        let file_path = write_temp_file(&dir, "a.txt", b"hello");
+        let entries = fs_list_dir_by_ref_impl(
+            ResourceRef {
+                provider: StorageProvider::Local,
+                resource_id: dir.to_string_lossy().to_string(),
+            },
+            true,
+            "name".to_string(),
+            "asc".to_string(),
+        )
+        .expect("list by ref");
+        assert!(entries.iter().any(|e| e.path.ends_with("a.txt")));
+        let _ = fs::remove_file(file_path);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn fs_get_properties_by_ref_reads_local_file() {
+        let dir = unique_temp_dir("rf-fs-query-props-by-ref");
+        let file_path = write_temp_file(&dir, "a.txt", b"hello");
+        let properties = fs_get_properties_by_ref_impl(ResourceRef {
+            provider: StorageProvider::Local,
+            resource_id: file_path.to_string_lossy().to_string(),
+        })
+        .expect("properties by ref");
+        assert_eq!(properties.provider, StorageProvider::Local);
+        assert_eq!(properties.name, "a.txt");
+        assert!(matches!(properties.kind, PropertyKind::File));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_get_capabilities_by_ref_reports_gdrive_readonly() {
+        let capabilities = fs_get_capabilities_by_ref_impl(ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root".to_string(),
+        })
+        .expect("gdrive capabilities");
+        assert!(capabilities.can_read);
+        assert!(!capabilities.can_create);
+        assert!(!capabilities.can_rename);
+        assert!(!capabilities.can_copy);
+        assert!(!capabilities.can_move);
+        assert!(!capabilities.can_delete);
+        assert!(!capabilities.can_archive_create);
+        assert!(!capabilities.can_archive_extract);
+    }
+
+    #[test]
+    #[cfg(not(feature = "gdrive-readonly-stub"))]
+    fn fs_get_capabilities_by_ref_rejects_gdrive_when_stub_disabled() {
+        let result = fs_get_capabilities_by_ref_impl(ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root".to_string(),
+        });
+        let err = match result {
+            Ok(_) => panic!("gdrive must be rejected"),
+            Err(err) => err,
+        };
+        assert_eq!(err.code(), "unknown");
     }
 }

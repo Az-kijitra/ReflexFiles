@@ -18,6 +18,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "ReflexFiles"
 path = "src/main.rs"
 
+[features]
+default = []
+gdrive-readonly-stub = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -44,4 +48,3 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-global-shortcut = "2"
-

@@ -26,6 +26,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             crate::fs_query_cmds::fs_list_dir,
+            crate::fs_query_cmds::fs_list_dir_by_ref,
             crate::fs_ops_transfer_copy::fs_copy,
             crate::fs_ops_transfer_copy::fs_copy_pairs,
             crate::fs_ops_transfer_move::fs_move,
@@ -41,7 +42,9 @@ pub fn run() {
             crate::fs_ops_archive::zip_create,
             crate::fs_ops_archive::zip_extract,
             crate::fs_query_cmds::fs_get_properties,
+            crate::fs_query_cmds::fs_get_properties_by_ref,
             crate::fs_query_cmds::fs_get_capabilities,
+            crate::fs_query_cmds::fs_get_capabilities_by_ref,
             crate::fs_query_cmds::fs_dir_stats,
             crate::fs_ops_delete::fs_delete_trash,
             crate::fs_ops_delete::fs_delete_with_undo,
@@ -107,4 +110,3 @@ fn configure_windows_webview_logging() {
 
 #[cfg(not(target_os = "windows"))]
 fn configure_windows_webview_logging() {}
-

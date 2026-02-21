@@ -1,4 +1,11 @@
-import type { DeleteSummary, OpSummary, ProviderCapabilities } from "$lib/types";
+import type {
+  DeleteSummary,
+  Entry,
+  OpSummary,
+  Properties,
+  ProviderCapabilities,
+  ResourceRef,
+} from "$lib/types";
 import { invoke } from "$lib/tauri_client";
 
 export function clipboardSetFiles(paths: string[], cut: boolean, effect: string | null = null) {
@@ -39,6 +46,23 @@ export function fsCreate(parent: string, name: string, kind: "file" | "folder"):
 
 export function fsGetCapabilities(path: string): Promise<ProviderCapabilities> {
   return invoke("fs_get_capabilities", { path });
+}
+
+export function fsGetCapabilitiesByRef(resourceRef: ResourceRef): Promise<ProviderCapabilities> {
+  return invoke("fs_get_capabilities_by_ref", { resourceRef });
+}
+
+export function fsListDirByRef(
+  resourceRef: ResourceRef,
+  showHidden: boolean,
+  sortKey: string,
+  sortOrder: string
+): Promise<Entry[]> {
+  return invoke("fs_list_dir_by_ref", { resourceRef, showHidden, sortKey, sortOrder });
+}
+
+export function fsGetPropertiesByRef(resourceRef: ResourceRef): Promise<Properties> {
+  return invoke("fs_get_properties_by_ref", { resourceRef });
 }
 
 export function zipCreate(

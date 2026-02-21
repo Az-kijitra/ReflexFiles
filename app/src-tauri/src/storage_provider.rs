@@ -47,13 +47,47 @@ impl LocalStorageProvider {
     pub fn resource_ref_from_legacy_path(&self, raw_path: &str) -> AppResult<ResourceRef> {
         let trimmed = raw_path.trim();
         if trimmed.is_empty() {
-            return Err(AppError::with_kind(AppErrorKind::InvalidPath, "path is empty"));
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                "path is empty",
+            ));
         }
         let normalized = normalize_local_resource_id(Path::new(trimmed))?;
         Ok(ResourceRef {
             provider: StorageProvider::Local,
             resource_id: normalized,
         })
+    }
+}
+
+#[cfg(feature = "gdrive-readonly-stub")]
+#[derive(Default)]
+pub struct GdriveStorageProvider;
+
+#[cfg(feature = "gdrive-readonly-stub")]
+impl GdriveStorageProvider {
+    fn validate_resource_ref<'a>(&self, resource_ref: &'a ResourceRef) -> AppResult<&'a str> {
+        if resource_ref.provider != StorageProvider::Gdrive {
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                "provider mismatch for gdrive resource ref",
+            ));
+        }
+        let id = resource_ref.resource_id.trim();
+        if id.is_empty() {
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                "gdrive resource id is empty",
+            ));
+        }
+        Ok(id)
+    }
+
+    fn not_implemented(&self, op: &str) -> AppError {
+        AppError::with_kind(
+            AppErrorKind::Unknown,
+            format!("gdrive {} is not implemented yet", op),
+        )
     }
 }
 
@@ -71,7 +105,10 @@ impl StorageProviderBackend for LocalStorageProvider {
         }
         let id = resource_ref.resource_id.trim();
         if id.is_empty() {
-            return Err(AppError::with_kind(AppErrorKind::InvalidPath, "resource id is empty"));
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                "resource id is empty",
+            ));
         }
         Ok(PathBuf::from(id))
     }
@@ -100,14 +137,47 @@ impl StorageProviderBackend for LocalStorageProvider {
     }
 }
 
+#[cfg(feature = "gdrive-readonly-stub")]
+impl StorageProviderBackend for GdriveStorageProvider {
+    fn supports(&self, capability: ProviderCapability) -> bool {
+        matches!(capability, ProviderCapability::Read)
+    }
+
+    fn resolve_path(&self, resource_ref: &ResourceRef) -> AppResult<PathBuf> {
+        let _ = self.validate_resource_ref(resource_ref)?;
+        Err(self.not_implemented("path resolution"))
+    }
+
+    fn display_path(&self, resource_ref: &ResourceRef) -> String {
+        match self.validate_resource_ref(resource_ref) {
+            Ok(id) => format!("gdrive://{id}"),
+            Err(_) => "gdrive://".to_string(),
+        }
+    }
+
+    fn metadata(&self, resource_ref: &ResourceRef) -> AppResult<fs::Metadata> {
+        let _ = self.validate_resource_ref(resource_ref)?;
+        Err(self.not_implemented("metadata access"))
+    }
+
+    fn list_dir_refs(&self, dir_ref: &ResourceRef) -> AppResult<Vec<ResourceRef>> {
+        let _ = self.validate_resource_ref(dir_ref)?;
+        Err(self.not_implemented("directory listing"))
+    }
+}
+
 pub struct ProviderRegistry {
     local: LocalStorageProvider,
+    #[cfg(feature = "gdrive-readonly-stub")]
+    gdrive: GdriveStorageProvider,
 }
 
 impl ProviderRegistry {
     pub fn new() -> Self {
         Self {
             local: LocalStorageProvider,
+            #[cfg(feature = "gdrive-readonly-stub")]
+            gdrive: GdriveStorageProvider,
         }
     }
 
@@ -135,10 +205,19 @@ impl ProviderRegistry {
     ) -> AppResult<&dyn StorageProviderBackend> {
         match resource_ref.provider {
             StorageProvider::Local => Ok(&self.local),
-            StorageProvider::Gdrive => Err(AppError::with_kind(
-                AppErrorKind::Unknown,
-                "storage provider not implemented: gdrive",
-            )),
+            StorageProvider::Gdrive => {
+                #[cfg(feature = "gdrive-readonly-stub")]
+                {
+                    return Ok(&self.gdrive);
+                }
+                #[cfg(not(feature = "gdrive-readonly-stub"))]
+                {
+                    return Err(AppError::with_kind(
+                        AppErrorKind::Unknown,
+                        "storage provider not implemented: gdrive",
+                    ));
+                }
+            }
             StorageProvider::Unknown => Err(AppError::with_kind(
                 AppErrorKind::InvalidPath,
                 "unsupported storage provider",
@@ -235,7 +314,10 @@ fn ensure_provider_capability(
 
 fn normalize_local_resource_id(path: &Path) -> AppResult<String> {
     if path.as_os_str().is_empty() {
-        return Err(AppError::with_kind(AppErrorKind::InvalidPath, "path is empty"));
+        return Err(AppError::with_kind(
+            AppErrorKind::InvalidPath,
+            "path is empty",
+        ));
     }
     let absolute = if path.is_absolute() {
         path.to_path_buf()
@@ -247,7 +329,11 @@ fn normalize_local_resource_id(path: &Path) -> AppResult<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_legacy_path_for, LocalStorageProvider, ProviderCapability, ProviderRegistry};
+    #[cfg(feature = "gdrive-readonly-stub")]
+    use super::{provider_capabilities, GdriveStorageProvider, StorageProviderBackend};
+    use super::{
+        resolve_legacy_path_for, LocalStorageProvider, ProviderCapability, ProviderRegistry,
+    };
     use crate::types::{ResourceRef, StorageProvider};
 
     #[test]
@@ -261,6 +347,45 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn registry_resolves_gdrive_provider() {
+        let registry = ProviderRegistry::new();
+        let gdrive_ref = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "x".to_string(),
+        };
+        let provider = registry.provider_for_ref(&gdrive_ref).expect("provider");
+        let capabilities = provider_capabilities(provider);
+        assert!(capabilities.can_read);
+        assert!(!capabilities.can_create);
+        assert!(!capabilities.can_rename);
+        assert!(!capabilities.can_copy);
+        assert!(!capabilities.can_move);
+        assert!(!capabilities.can_delete);
+        assert!(!capabilities.can_archive_create);
+        assert!(!capabilities.can_archive_extract);
+    }
+
+    #[test]
+    fn capability_resolve_rejects_unimplemented_provider() {
+        let err = resolve_legacy_path_for("gdrive://folder/file", ProviderCapability::Read)
+            .expect_err("must reject gdrive");
+        assert_eq!(err.code(), "unknown");
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn gdrive_provider_reports_display_path() {
+        let gdrive = GdriveStorageProvider;
+        let resource_ref = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "folder/file".to_string(),
+        };
+        assert_eq!(gdrive.display_path(&resource_ref), "gdrive://folder/file");
+    }
+
+    #[test]
+    #[cfg(not(feature = "gdrive-readonly-stub"))]
     fn registry_rejects_unimplemented_provider() {
         let registry = ProviderRegistry::new();
         let gdrive_ref = ResourceRef {
@@ -268,16 +393,9 @@ mod tests {
             resource_id: "x".to_string(),
         };
         let err = match registry.provider_for_ref(&gdrive_ref) {
-            Ok(_) => panic!("must reject gdrive for now"),
+            Ok(_) => panic!("must reject gdrive when readonly stub is disabled"),
             Err(err) => err,
         };
-        assert_eq!(err.code(), "unknown");
-    }
-
-    #[test]
-    fn capability_resolve_rejects_unimplemented_provider() {
-        let err = resolve_legacy_path_for("gdrive://folder/file", ProviderCapability::Read)
-            .expect_err("must reject gdrive");
         assert_eq!(err.code(), "unknown");
     }
 

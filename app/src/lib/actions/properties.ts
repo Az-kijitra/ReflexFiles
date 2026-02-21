@@ -1,3 +1,5 @@
+import { toGdriveResourceRef } from "$lib/utils/resource_ref";
+
 /**
  * @param {object} ctx
  * @param {object} helpers
@@ -16,7 +18,10 @@ export function createPropertiesActions(ctx, helpers) {
         ctx.setDirStatsRequestId(ctx.getDirStatsRequestId() + 1);
         ctx.setDirStatsInFlight(false);
       }
-      const data = await ctx.invoke("fs_get_properties", { path });
+      const gdriveRef = toGdriveResourceRef(path);
+      const data = gdriveRef
+        ? await ctx.invoke("fs_get_properties_by_ref", { resourceRef: gdriveRef })
+        : await ctx.invoke("fs_get_properties", { path });
       ctx.setPropertiesPath(path);
       const cached = cacheGetDirStats(path);
       ctx.setPropertiesData(

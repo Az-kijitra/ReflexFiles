@@ -5,10 +5,84 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
     if (typeof window !== "undefined" && (window as any).__rf_settings_open === true) {
       return;
     }
+    const activeElement = document.activeElement;
+    const pathInputEl = params.getPathInputEl();
+    const ctrlPressed = event.ctrlKey || event.getModifierState?.("Control");
+    const altPressed = event.altKey || event.getModifierState?.("Alt");
+    const metaPressed = event.metaKey || event.getModifierState?.("Meta");
+    const isCtrlOnly = ctrlPressed && !altPressed && !metaPressed;
+    const isCtrlLetter = (letter: string, code: number) =>
+      isCtrlOnly &&
+      (event.code === `Key${letter}` ||
+        event.key === letter ||
+        event.key === letter.toLowerCase() ||
+        event.key === letter.toUpperCase() ||
+        event.keyCode === code ||
+        event.which === code);
+    const hasOperationTargets =
+      params.getSelectedPaths().length > 0 || Boolean(params.getEntries()[params.getFocusedIndex()]);
+    const hasBlockingOverlay =
+      params.getPasteConfirmOpen() ||
+      params.getDeleteConfirmOpen() ||
+      params.getJumpUrlOpen() ||
+      params.getSortMenuOpen() ||
+      params.getZipModalOpen() ||
+      params.getFailureModalOpen() ||
+      params.getDropdownOpen() ||
+      params.getRenameOpen() ||
+      params.getCreateOpen() ||
+      params.getPropertiesOpen() ||
+      params.getContextMenuOpen();
+
+    // WebView/IME differences occasionally break keymap matching for these basic shortcuts.
+    // Keep a direct fallback at the top-level keydown entry.
+    if (!hasBlockingOverlay) {
+      if (isCtrlLetter("N", 78)) {
+        event.preventDefault();
+        if (import.meta.env.DEV) {
+          params.setStatusMessage("DBG Ctrl+N");
+        }
+        params.openCreate("file");
+        return;
+      }
+      if (isCtrlLetter("C", 67)) {
+        event.preventDefault();
+        if (!hasOperationTargets) {
+          params.setStatusMessage(params.t("status.no_selection"));
+          return;
+        }
+        if (import.meta.env.DEV) {
+          params.setStatusMessage("DBG Ctrl+C");
+        }
+        params.copySelected();
+        return;
+      }
+      if (isCtrlLetter("X", 88)) {
+        event.preventDefault();
+        if (!hasOperationTargets) {
+          params.setStatusMessage(params.t("status.no_selection"));
+          return;
+        }
+        if (import.meta.env.DEV) {
+          params.setStatusMessage("DBG Ctrl+X");
+        }
+        params.cutSelected();
+        return;
+      }
+      if (isCtrlLetter("V", 86)) {
+        event.preventDefault();
+        if (import.meta.env.DEV) {
+          params.setStatusMessage("DBG Ctrl+V");
+        }
+        params.pasteItems();
+        return;
+      }
+    }
+
     const handled = params.handleGlobalKey(event, {
-      activeElement: document.activeElement,
+      activeElement,
       listEl: params.getListEl(),
-      pathInputEl: params.getPathInputEl(),
+      pathInputEl,
       treeEl: params.getTreeEl(),
       dropdownEl: params.getDropdownEl(),
       contextMenuEl: params.getContextMenuEl(),
