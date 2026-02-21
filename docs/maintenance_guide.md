@@ -114,7 +114,7 @@ npm run tauri build
 
 ## Automated E2E Strategy
 ### Test layers
-- `e2e:tauri` -> smoke flow (file operations baseline)
+- `e2e:tauri` -> smoke flow (file operations baseline + keyboard regression guard: `Ctrl+N`, `Ctrl+C/X/V`, PATH `Tab` completion)
 - `e2e:capability` -> provider capability guard flow (menu/context/action gating)
   - Also verifies Google Drive paste-disabled reason text (`paste.destination_not_writable`) on both context menu and Edit menu.
   - Also verifies `rf:open-settings` event routing opens Settings at `advanced` section and can switch section while Settings is already open.

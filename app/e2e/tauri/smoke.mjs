@@ -368,14 +368,52 @@ try {
       const focused = await driver.executeScript(() => {
         const listEl = document.querySelector('.list');
         if (!listEl) return false;
+        listEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        listEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
         listEl.focus();
         listEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        return true;
+        const active = document.activeElement;
+        if (active === listEl) return true;
+        if (active && listEl.contains(active)) return true;
+        if (active && typeof active.closest === 'function') {
+          return active.closest('.list') === listEl;
+        }
+        return false;
       });
       if (!focused) {
         throw new Error('focus list failed');
       }
     }, 'focus list', 8);
+
+  const triggerShortcut = async ({
+    key,
+    code,
+    ctrl = false,
+    shift = false,
+    alt = false,
+    meta = false,
+  }) => {
+    await driver.executeScript(
+      (payload) => {
+        const target = document.activeElement || document.body || window;
+        const init = {
+          key: payload.key,
+          code: payload.code,
+          ctrlKey: Boolean(payload.ctrl),
+          shiftKey: Boolean(payload.shift),
+          altKey: Boolean(payload.alt),
+          metaKey: Boolean(payload.meta),
+          bubbles: true,
+          cancelable: true,
+        };
+        target.dispatchEvent(new KeyboardEvent('keydown', init));
+        window.dispatchEvent(new KeyboardEvent('keydown', init));
+        target.dispatchEvent(new KeyboardEvent('keyup', init));
+        window.dispatchEvent(new KeyboardEvent('keyup', init));
+      },
+      { key, code, ctrl, shift, alt, meta }
+    );
+  };
 
   await setPath(targetPath);
   await focusList();
@@ -475,6 +513,30 @@ try {
     }
   };
 
+  const openCreateViaShortcutOnly = async () => {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await closeOverlays();
+        await focusList();
+        await triggerShortcut({ key: 'n', code: 'KeyN', ctrl: true });
+        const input = await withTimeout(
+          driver.wait(until.elementLocated(By.css('#create-name')), 4_000),
+          4_000,
+          'wait for create input (ctrl+n strict)'
+        );
+        await input.click();
+        return input;
+      } catch (error) {
+        lastError = error;
+        if (isTransientDomError(error)) {
+          await driver.sleep(150);
+        }
+      }
+    }
+    throw lastError ?? new Error('ctrl+n strict create failed');
+  };
+
   const displayCandidates = (name) => {
     const dot = name.lastIndexOf('.');
     if (dot > 0) {
@@ -522,6 +584,55 @@ try {
     throw new Error(
       `wait for ${name} timed out after ${timeoutMs}ms\n` +
         `visible=${visibleNames.join(', ')}`
+    );
+  };
+
+  const confirmCreateViaShortcutOnly = async (name) => {
+    const input = await openCreateViaShortcutOnly();
+    await input.clear();
+    await input.sendKeys(name);
+    const createButton = await withTimeout(
+      driver.wait(
+        until.elementLocated(
+          By.xpath(
+            "//div[contains(@class,'modal')]//button[normalize-space(text())='作成' or normalize-space(text())='Create']"
+          )
+        ),
+        timeoutMs
+      ),
+      timeoutMs,
+      'wait for create button (ctrl+n strict)'
+    );
+    await createButton.click();
+    await withTimeout(
+      driver.wait(until.stalenessOf(input), timeoutMs),
+      timeoutMs,
+      'wait for create modal close (ctrl+n strict)'
+    );
+    await waitForVisibleName(name);
+  };
+
+  const assertPathTabCompletion = async ({ basePath, targetName, typedPrefix }) => {
+    const expectedPath = normalizePath(resolve(basePath, targetName)).toLowerCase();
+    await setPath(basePath);
+    const input = await getPathInput();
+    await input.click();
+    await input.sendKeys(Key.chord(Key.CONTROL, 'a'));
+    await input.sendKeys(Key.DELETE);
+    await input.sendKeys(`${basePath}\\${typedPrefix}`);
+    await input.sendKeys(Key.TAB);
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const current = normalizePath(await (await getPathInput()).getAttribute('value')).toLowerCase();
+      if (current === expectedPath) {
+        return;
+      }
+      await driver.sleep(120);
+    }
+    const latest = normalizePath(await (await getPathInput()).getAttribute('value'));
+    throw new Error(
+      `path tab completion failed: expected=${expectedPath} actual=${latest}`
     );
   };
 
@@ -648,6 +759,10 @@ try {
     throw new Error(`${label} was not created: ${path}`);
   };
 
+  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH Tab completion)...');
+  const shortcutProbeFile = `e2e_${testId}_shortcut_probe.txt`;
+  await confirmCreateViaShortcutOnly(shortcutProbeFile);
+
   console.log('[smoke] creating files...');
   await confirmCreate(fileA);
   await confirmCreate(fileB);
@@ -669,6 +784,14 @@ try {
   const nestedFilePath = resolve(nestedDirPath, nestedFileName);
   writeFileSync(nestedFilePath, nestedContent, 'utf8');
   await waitForFileContent(nestedFilePath, nestedContent, 'nested file');
+
+  const tabCompleteDirName = `tab_complete_${testId}`;
+  await confirmCreateFolder(tabCompleteDirName);
+  await assertPathTabCompletion({
+    basePath: targetPath,
+    targetName: tabCompleteDirName,
+    typedPrefix: `tab_com`,
+  });
 
   const bigFileName = `e2e_${testId}_big.bin`;
   const bigFilePath = resolve(targetPath, bigFileName);
@@ -921,32 +1044,20 @@ try {
   await waitForVisibleName(opB);
   await focusList();
 
-  const clickContextMenuItemById = async (menuId, labelEn) => {
-    const item = await withTimeout(
-      driver.wait(
-        until.elementLocated(By.css(`.context-menu-item[data-menu-id='${menuId}']`)),
-        timeoutMs
-      ),
-      timeoutMs,
-      `wait for context ${labelEn}`
-    );
-    await item.click();
-  };
-
   await withStaleRetry(async () => {
     const rowA = await rowByName(opA);
     await rowA.click();
-  }, 'select opA for copy');
-  await driver.actions().contextClick(await rowByName(opA)).perform();
-  await clickContextMenuItemById('ctx-copy', 'Copy');
+  }, 'select opA for keyboard copy');
+  await focusList();
+  await triggerShortcut({ key: 'c', code: 'KeyC', ctrl: true });
   await setPath(opsRoot);
   await openDirByName('dst', 'open ops dst');
   await waitForPathValue(opsDstDir);
-  await driver.actions().contextClick(await getListElement()).perform();
-  await clickContextMenuItemById('ctx-paste', 'Paste');
+  await focusList();
+  await triggerShortcut({ key: 'v', code: 'KeyV', ctrl: true });
   await waitForVisibleName(opA);
-  await waitForFsPath(resolve(opsDstDir, opA), 'copied opA');
-  await waitForFileContent(resolve(opsDstDir, opA), opAContent, 'copy opA');
+  await waitForFsPath(resolve(opsDstDir, opA), 'keyboard copied opA');
+  await waitForFileContent(resolve(opsDstDir, opA), opAContent, 'keyboard copy opA');
 
   await setPath(opsRoot);
   await openDirByName('src', 'open ops src for move');
@@ -954,17 +1065,17 @@ try {
   await withStaleRetry(async () => {
     const rowB = await rowByName(opB);
     await rowB.click();
-  }, 'select opB for move');
-  await driver.actions().contextClick(await rowByName(opB)).perform();
-  await clickContextMenuItemById('ctx-cut', 'Cut');
+  }, 'select opB for keyboard move');
+  await focusList();
+  await triggerShortcut({ key: 'x', code: 'KeyX', ctrl: true });
   await setPath(opsRoot);
   await openDirByName('dst', 'open ops dst for move');
   await waitForPathValue(opsDstDir);
-  await driver.actions().contextClick(await getListElement()).perform();
-  await clickContextMenuItemById('ctx-paste', 'Paste');
+  await focusList();
+  await triggerShortcut({ key: 'v', code: 'KeyV', ctrl: true });
   await waitForVisibleName(opB);
-  await waitForFsPath(resolve(opsDstDir, opB), 'moved opB');
-  await waitForFileContent(resolve(opsDstDir, opB), opBContent, 'move opB');
+  await waitForFsPath(resolve(opsDstDir, opB), 'keyboard moved opB');
+  await waitForFileContent(resolve(opsDstDir, opB), opBContent, 'keyboard move opB');
   if (existsSync(resolve(opsSrcDir, opB))) {
     throw new Error('move opB did not remove original');
   }

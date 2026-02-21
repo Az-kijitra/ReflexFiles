@@ -116,7 +116,7 @@ npm run tauri build
 
 ## 自動E2Eテスト運用
 ### テストレイヤー
-- `e2e:tauri` -> smoke（ファイル操作の基礎フロー）
+- `e2e:tauri` -> smoke（ファイル操作の基礎フロー + キーボード回帰ガード: `Ctrl+N` / `Ctrl+C/X/V` / PATH `Tab` 補完）
 - `e2e:capability` -> provider capability ガード（メニュー/コンテキスト/操作可否）
   - Google Drive 宛て Paste 無効時の理由文言（`paste.destination_not_writable`）を、コンテキストメニューと Edit メニューの両方で検証する。
   - `rf:open-settings` イベントで設定画面が「詳細」セクションを開くこと、および設定表示中でもセクション切替できることを検証する。
