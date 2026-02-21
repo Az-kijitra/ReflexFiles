@@ -73,14 +73,20 @@ pub struct AppConfig {
     pub external_vscode_path: String,
     #[serde(rename = "external_terminal_profile", alias = "terminal_profile")]
     pub external_terminal_profile: String,
-    #[serde(rename = "external_terminal_profile_cmd", alias = "terminal_profile_cmd")]
+    #[serde(
+        rename = "external_terminal_profile_cmd",
+        alias = "terminal_profile_cmd"
+    )]
     pub external_terminal_profile_cmd: String,
     #[serde(
         rename = "external_terminal_profile_powershell",
         alias = "terminal_profile_powershell"
     )]
     pub external_terminal_profile_powershell: String,
-    #[serde(rename = "external_terminal_profile_wsl", alias = "terminal_profile_wsl")]
+    #[serde(
+        rename = "external_terminal_profile_wsl",
+        alias = "terminal_profile_wsl"
+    )]
     pub external_terminal_profile_wsl: String,
     #[serde(rename = "log_path", alias = "log_file")]
     pub log_path: String,
@@ -252,4 +258,3 @@ pub struct HistoryFile {
 pub struct JumpListFile {
     pub jump_list: Vec<JumpItem>,
 }
-

@@ -3,9 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::error::{AppError, AppErrorKind, AppResult};
-use crate::types::{ProviderCapabilities, ResourceRef, StorageProvider};
 #[cfg(feature = "gdrive-readonly-stub")]
 use crate::gdrive_stub::gdrive_stub_children_for_resource_ref;
+use crate::types::{ProviderCapabilities, ResourceRef, StorageProvider};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ProviderCapability {
@@ -408,8 +408,9 @@ mod tests {
         let my_drive_children = gdrive
             .list_dir_refs(&my_drive_ref)
             .expect("gdrive my-drive list dir refs");
-        assert_eq!(my_drive_children.len(), 3);
+        assert_eq!(my_drive_children.len(), 4);
         assert_eq!(my_drive_children[2].resource_id, "root/my-drive/readme.txt");
+        assert_eq!(my_drive_children[3].resource_id, "root/my-drive/cover.png");
 
         let leaf_ref = ResourceRef {
             provider: StorageProvider::Gdrive,

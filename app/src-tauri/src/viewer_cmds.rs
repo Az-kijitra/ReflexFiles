@@ -1,3 +1,5 @@
+use crate::storage_provider::{provider_capabilities, provider_registry};
+use crate::types::{ResourceRef, StorageProvider};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -62,16 +64,67 @@ fn normalize_windows_verbatim_path(path: &str) -> String {
 }
 
 fn normalize_file_path(path: &str) -> Result<String, String> {
-    let raw = PathBuf::from(path);
-    if !raw.exists() {
-        return Err(format!("file not found: {}", raw.display()));
+    let raw_input = path.trim();
+    if raw_input.is_empty() {
+        return Err("path is empty".to_string());
     }
-    if !raw.is_file() {
-        return Err(format!("not a file: {}", raw.display()));
+
+    let registry = provider_registry();
+    let resource_ref = registry
+        .resource_ref_from_legacy_path(raw_input)
+        .map_err(|e| format!("code={}; {}", e.code(), e))?;
+
+    if matches!(resource_ref.provider, StorageProvider::Local) {
+        let raw = PathBuf::from(raw_input);
+        if !raw.exists() {
+            return Err(format!("file not found: {}", raw.display()));
+        }
+        if !raw.is_file() {
+            return Err(format!("not a file: {}", raw.display()));
+        }
+        return raw
+            .canonicalize()
+            .map_err(|e| format!("canonicalize failed: {e}"))
+            .map(|p| normalize_windows_verbatim_path(&p.to_string_lossy()));
     }
-    raw.canonicalize()
-        .map_err(|e| format!("canonicalize failed: {e}"))
-        .map(|p| normalize_windows_verbatim_path(&p.to_string_lossy()))
+
+    let provider = registry
+        .provider_for_ref(&resource_ref)
+        .map_err(|e| format!("code={}; {}", e.code(), e))?;
+    let capabilities = provider_capabilities(provider);
+    if !capabilities.can_read {
+        return Err("provider capability denied: read".to_string());
+    }
+    Ok(provider.display_path(&resource_ref))
+}
+
+fn normalize_resource_ref_path(resource_ref: &ResourceRef) -> Result<String, String> {
+    let registry = provider_registry();
+    let provider = registry
+        .provider_for_ref(resource_ref)
+        .map_err(|e| format!("code={}; {}", e.code(), e))?;
+    let capabilities = provider_capabilities(provider);
+    if !capabilities.can_read {
+        return Err("provider capability denied: read".to_string());
+    }
+
+    if matches!(resource_ref.provider, StorageProvider::Local) {
+        let raw = provider
+            .resolve_path(resource_ref)
+            .map_err(|e| format!("code={}; {}", e.code(), e))?;
+        if !raw.exists() {
+            return Err(format!("file not found: {}", raw.display()));
+        }
+        if !raw.is_file() {
+            return Err(format!("not a file: {}", raw.display()));
+        }
+        return raw
+            .canonicalize()
+            .map_err(|e| format!("canonicalize failed: {e}"))
+            .map(|p| normalize_windows_verbatim_path(&p.to_string_lossy()));
+    }
+
+    Ok(provider.display_path(resource_ref))
 }
 
 fn set_pending_open(payload: Option<ViewerOpenPayload>) -> Result<(), String> {
@@ -178,10 +231,17 @@ fn install_viewer_window_state_handlers(window: &WebviewWindow) {
 #[tauri::command]
 pub async fn open_viewer(
     app: tauri::AppHandle,
-    path: String,
+    path: Option<String>,
+    resource_ref: Option<ResourceRef>,
     jump_hint: Option<String>,
 ) -> Result<(), String> {
-    let resolved = normalize_file_path(&path)?;
+    let resolved = if let Some(resource_ref) = resource_ref.as_ref() {
+        normalize_resource_ref_path(resource_ref)?
+    } else if let Some(path) = path.as_ref() {
+        normalize_file_path(path)?
+    } else {
+        return Err("path or resource_ref is required".to_string());
+    };
     let payload = ViewerOpenPayload {
         path: resolved.clone(),
         jump_hint,
@@ -242,4 +302,3 @@ pub async fn viewer_take_pending_open() -> Result<Option<ViewerOpenPayload>, Str
         .map_err(|_| "viewer pending path lock poisoned".to_string())?;
     Ok(guard.take())
 }
-

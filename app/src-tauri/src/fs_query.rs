@@ -9,21 +9,19 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::storage_provider::{provider_capabilities, provider_registry, resolve_legacy_path};
 use crate::types::{
-    DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef, SortKey,
-    SortOrder,
+    DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef,
+    SortKey, SortOrder,
 };
 use crate::utils::{is_hidden, system_time_to_rfc3339};
 
 #[cfg(feature = "gdrive-readonly-stub")]
-use crate::error::AppErrorKind;
-
-#[cfg(feature = "gdrive-readonly-stub")]
 use crate::gdrive_stub::{
+    gdrive_stub_image_payload_for_resource_ref, gdrive_stub_is_probably_text_for_resource_ref,
     gdrive_stub_resource_ext, gdrive_stub_resource_kind, gdrive_stub_resource_name,
-    GdriveStubNodeKind,
+    gdrive_stub_text_content_for_resource_ref, GdriveStubNodeKind,
 };
 
 #[cfg(feature = "gdrive-readonly-stub")]
@@ -220,6 +218,48 @@ fn resolve_existing_file_path(path: &str) -> AppResult<PathBuf> {
     Ok(path_buf)
 }
 
+#[cfg(feature = "gdrive-readonly-stub")]
+fn gdrive_resource_ref_from_legacy_path(path: &str) -> AppResult<Option<ResourceRef>> {
+    let trimmed = path.trim();
+    if !trimmed.starts_with("gdrive://") {
+        return Ok(None);
+    }
+    let registry = provider_registry();
+    let resource_ref = registry.resource_ref_from_legacy_path(trimmed)?;
+    if !matches!(resource_ref.provider, StorageProvider::Gdrive) {
+        return Ok(None);
+    }
+    Ok(Some(resource_ref))
+}
+
+#[cfg(feature = "gdrive-readonly-stub")]
+fn text_line_count(content: &str) -> usize {
+    if content.is_empty() {
+        return 1;
+    }
+    let newline_count = content.as_bytes().iter().filter(|&&b| b == b'\n').count();
+    if content.ends_with('\n') {
+        newline_count.max(1)
+    } else {
+        (newline_count + 1).max(1)
+    }
+}
+
+#[cfg(feature = "gdrive-readonly-stub")]
+fn text_lines_for_viewport(content: &str) -> Vec<String> {
+    let mut lines = content
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line).to_string())
+        .collect::<Vec<_>>();
+    if content.ends_with('\n') && !lines.is_empty() {
+        lines.pop();
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
+}
+
 fn dir_stats(path: &Path) -> (u64, u64, u64) {
     let mut total_size = 0u64;
     let mut file_count = 0u64;
@@ -315,9 +355,46 @@ pub(crate) fn fs_list_dir_impl(
     fs_list_dir_by_ref_impl(dir_ref, show_hidden, sort_key, sort_order)
 }
 
+fn display_path_for_read(resource_ref: &ResourceRef) -> AppResult<String> {
+    let registry = provider_registry();
+    let provider = registry.provider_for_ref(resource_ref)?;
+    let capabilities = provider_capabilities(provider);
+    if !capabilities.can_read {
+        return Err(AppError::with_kind(
+            AppErrorKind::Permission,
+            "provider capability denied: read",
+        ));
+    }
+    Ok(provider.display_path(resource_ref))
+}
+
+pub(crate) fn fs_read_text_by_ref_impl(
+    resource_ref: ResourceRef,
+    max_bytes: usize,
+) -> AppResult<String> {
+    let path = display_path_for_read(&resource_ref)?;
+    fs_read_text_impl(path, max_bytes)
+}
+
+pub(crate) fn fs_is_probably_text_by_ref_impl(
+    resource_ref: ResourceRef,
+    sample_bytes: usize,
+) -> AppResult<bool> {
+    let path = display_path_for_read(&resource_ref)?;
+    fs_is_probably_text_impl(path, sample_bytes)
+}
+
 pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<String> {
     if max_bytes == 0 {
         return Ok(String::new());
+    }
+
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(&path)? {
+        let text = gdrive_stub_text_content_for_resource_ref(&resource_ref)?;
+        let bytes = text.as_bytes();
+        let take = bytes.len().min(max_bytes);
+        return Ok(String::from_utf8_lossy(&bytes[..take]).to_string());
     }
 
     let resolved_path = resolve_legacy_path(&path)?;
@@ -331,6 +408,11 @@ pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<Str
 }
 
 pub(crate) fn fs_is_probably_text_impl(path: String, sample_bytes: usize) -> AppResult<bool> {
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(&path)? {
+        return gdrive_stub_is_probably_text_for_resource_ref(&resource_ref);
+    }
+
     let max = sample_bytes.max(1);
     let resolved_path = resolve_legacy_path(&path)?;
     let file = fs::File::open(&resolved_path)?;
@@ -458,6 +540,16 @@ fn decode_line_bytes(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn fs_text_viewport_info_impl(path: String) -> AppResult<TextViewportInfo> {
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(&path)? {
+        let text = gdrive_stub_text_content_for_resource_ref(&resource_ref)?;
+        return Ok(TextViewportInfo {
+            file_size: text.as_bytes().len() as u64,
+            total_lines: text_line_count(&text),
+            line_step: TEXT_INDEX_LINE_STEP,
+        });
+    }
+
     let path_buf = resolve_existing_file_path(&path)?;
 
     let index = get_or_build_sparse_line_index(&path_buf)?;
@@ -468,11 +560,43 @@ pub(crate) fn fs_text_viewport_info_impl(path: String) -> AppResult<TextViewport
     })
 }
 
+pub(crate) fn fs_text_viewport_info_by_ref_impl(
+    resource_ref: ResourceRef,
+) -> AppResult<TextViewportInfo> {
+    let path = display_path_for_read(&resource_ref)?;
+    fs_text_viewport_info_impl(path)
+}
+
 pub(crate) fn fs_read_text_viewport_lines_impl(
     path: String,
     start_line: usize,
     line_count: usize,
 ) -> AppResult<TextViewportChunk> {
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(&path)? {
+        let text = gdrive_stub_text_content_for_resource_ref(&resource_ref)?;
+        let lines = text_lines_for_viewport(&text);
+        let total_lines = lines.len().max(1);
+        let safe_start = start_line.min(total_lines.saturating_sub(1));
+        let mut requested = line_count.max(1).min(TEXT_VIEWPORT_MAX_LINES);
+        if safe_start + requested > total_lines {
+            requested = total_lines - safe_start;
+        }
+
+        let chunk_lines = lines
+            .iter()
+            .skip(safe_start)
+            .take(requested)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        return Ok(TextViewportChunk {
+            start_line: safe_start,
+            total_lines,
+            lines: chunk_lines,
+        });
+    }
+
     let path_buf = resolve_existing_file_path(&path)?;
 
     let index = get_or_build_sparse_line_index(&path_buf)?;
@@ -525,6 +649,30 @@ pub(crate) fn fs_read_text_viewport_lines_impl(
     })
 }
 
+pub(crate) fn fs_read_text_viewport_lines_by_ref_impl(
+    resource_ref: ResourceRef,
+    start_line: usize,
+    line_count: usize,
+) -> AppResult<TextViewportChunk> {
+    let path = display_path_for_read(&resource_ref)?;
+    fs_read_text_viewport_lines_impl(path, start_line, line_count)
+}
+
+pub(crate) fn fs_read_image_data_url_by_ref_impl(
+    resource_ref: ResourceRef,
+    normalize: bool,
+) -> AppResult<String> {
+    let path = display_path_for_read(&resource_ref)?;
+    fs_read_image_data_url_impl(path, normalize)
+}
+
+pub(crate) fn fs_read_image_normalized_temp_path_by_ref_impl(
+    resource_ref: ResourceRef,
+) -> AppResult<String> {
+    let path = display_path_for_read(&resource_ref)?;
+    fs_read_image_normalized_temp_path_impl(path)
+}
+
 fn infer_image_mime(path: &Path, bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n']) {
         return Some("image/png");
@@ -557,6 +705,13 @@ pub(crate) fn fs_read_image_data_url_impl(path: String, normalize: bool) -> AppR
         return Ok(format!("data:image/png;base64,{body}"));
     }
 
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(&path)? {
+        let (mime, bytes) = gdrive_stub_image_payload_for_resource_ref(&resource_ref)?;
+        let body = base64::engine::general_purpose::STANDARD.encode(bytes);
+        return Ok(format!("data:{mime};base64,{body}"));
+    }
+
     let path_buf = resolve_legacy_path(&path)?;
     let bytes = fs::read(&path_buf)?;
     let mime = infer_image_mime(&path_buf, &bytes)
@@ -570,6 +725,47 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
     dir.push("reflexfiles-viewer-image-cache");
     fs::create_dir_all(&dir)?;
     cleanup_viewer_image_cache_dir(&dir);
+
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(&path)? {
+        let (_, bytes) = gdrive_stub_image_payload_for_resource_ref(&resource_ref)?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        resource_ref.resource_id.hash(&mut hasher);
+        bytes.hash(&mut hasher);
+        let cache_key = format!("{:016x}", hasher.finish());
+
+        let mut out_path = dir.clone();
+        out_path.push(format!("{cache_key}.png"));
+        if out_path.exists() {
+            return Ok(out_path.to_string_lossy().to_string());
+        }
+
+        let image = image::load_from_memory(bytes).map_err(|e| AppError::msg(e.to_string()))?;
+        let mut out = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut out);
+        image
+            .write_to(&mut cursor, image::ImageFormat::Png)
+            .map_err(|e| AppError::msg(e.to_string()))?;
+
+        let mut tmp_path = dir;
+        tmp_path.push(format!(
+            "{cache_key}.{}.{}.tmp",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| AppError::msg(e.to_string()))?
+                .as_nanos()
+        ));
+        fs::write(&tmp_path, out)?;
+        match fs::rename(&tmp_path, &out_path) {
+            Ok(_) => {}
+            Err(_) => {
+                let _ = fs::remove_file(&tmp_path);
+            }
+        }
+
+        return Ok(out_path.to_string_lossy().to_string());
+    }
 
     let path_buf = resolve_legacy_path(&path)?;
     let metadata = fs::metadata(&path_buf)?;
@@ -781,9 +977,12 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
 mod tests {
     use super::{
         cleanup_viewer_image_cache_dir, fs_get_capabilities_by_ref_impl,
-        fs_get_properties_by_ref_impl, fs_is_probably_text_impl, fs_list_dir_by_ref_impl,
-        fs_read_image_data_url_impl, fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
-        fs_read_text_viewport_lines_impl, fs_text_viewport_info_impl, infer_image_mime,
+        fs_get_properties_by_ref_impl, fs_is_probably_text_by_ref_impl, fs_is_probably_text_impl,
+        fs_list_dir_by_ref_impl, fs_read_image_data_url_by_ref_impl, fs_read_image_data_url_impl,
+        fs_read_image_normalized_temp_path_by_ref_impl, fs_read_image_normalized_temp_path_impl,
+        fs_read_text_by_ref_impl, fs_read_text_impl, fs_read_text_viewport_lines_by_ref_impl,
+        fs_read_text_viewport_lines_impl, fs_text_viewport_info_by_ref_impl,
+        fs_text_viewport_info_impl, infer_image_mime,
     };
     use crate::types::{PropertyKind, ResourceRef, StorageProvider};
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
@@ -1041,7 +1240,10 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].name, "my-drive");
         assert_eq!(entries[0].path, "gdrive://root/my-drive");
-        assert!(matches!(entries[0].entry_type, crate::types::EntryType::Dir));
+        assert!(matches!(
+            entries[0].entry_type,
+            crate::types::EntryType::Dir
+        ));
         assert_eq!(entries[1].name, "shared-with-me");
         assert_eq!(entries[1].path, "gdrive://root/shared-with-me");
     }
@@ -1059,16 +1261,19 @@ mod tests {
             "asc".to_string(),
         )
         .expect("gdrive my-drive list by ref");
-        assert_eq!(entries.len(), 3);
+        assert_eq!(entries.len(), 4);
         let readme = entries
             .iter()
             .find(|entry| entry.name == "readme.txt")
             .expect("readme entry");
-        assert!(matches!(
-            readme.entry_type,
-            crate::types::EntryType::File
-        ));
+        assert!(matches!(readme.entry_type, crate::types::EntryType::File));
         assert_eq!(readme.ext, ".txt");
+        let cover = entries
+            .iter()
+            .find(|entry| entry.name == "cover.png")
+            .expect("cover entry");
+        assert!(matches!(cover.entry_type, crate::types::EntryType::File));
+        assert_eq!(cover.ext, ".png");
     }
 
     #[test]
@@ -1119,6 +1324,134 @@ mod tests {
         assert!(!capabilities.can_delete);
         assert!(!capabilities.can_archive_create);
         assert!(!capabilities.can_archive_extract);
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_read_text_reads_gdrive_stub_file() {
+        let text = fs_read_text_impl("gdrive://root/my-drive/readme.txt".to_string(), 4096)
+            .expect("gdrive text read");
+        assert!(text.contains("Google Drive read-only stub"));
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_read_text_by_ref_reads_gdrive_stub_file() {
+        let text = fs_read_text_by_ref_impl(
+            ResourceRef {
+                provider: StorageProvider::Gdrive,
+                resource_id: "root/my-drive/readme.txt".to_string(),
+            },
+            4096,
+        )
+        .expect("gdrive text read by ref");
+        assert!(text.contains("Google Drive read-only stub"));
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_text_viewport_info_and_chunk_work_for_gdrive_stub_file() {
+        let info =
+            fs_text_viewport_info_impl("gdrive://root/shared-with-me/welcome.md".to_string())
+                .expect("gdrive viewport info");
+        assert!(info.file_size > 0);
+        assert!(info.total_lines >= 2);
+
+        let chunk = fs_read_text_viewport_lines_impl(
+            "gdrive://root/shared-with-me/welcome.md".to_string(),
+            0,
+            2,
+        )
+        .expect("gdrive viewport lines");
+        assert_eq!(chunk.start_line, 0);
+        assert!(chunk.total_lines >= 2);
+        assert_eq!(chunk.lines[0], "# Welcome");
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_text_viewport_info_and_chunk_by_ref_work_for_gdrive_stub_file() {
+        let resource_ref = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/shared-with-me/welcome.md".to_string(),
+        };
+        let info = fs_text_viewport_info_by_ref_impl(resource_ref.clone())
+            .expect("gdrive viewport info by ref");
+        assert!(info.file_size > 0);
+        assert!(info.total_lines >= 2);
+
+        let chunk = fs_read_text_viewport_lines_by_ref_impl(resource_ref, 0, 2)
+            .expect("gdrive viewport lines by ref");
+        assert_eq!(chunk.start_line, 0);
+        assert!(chunk.total_lines >= 2);
+        assert_eq!(chunk.lines[0], "# Welcome");
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_is_probably_text_returns_false_for_gdrive_directory() {
+        let is_text = fs_is_probably_text_impl("gdrive://root/my-drive".to_string(), 1024)
+            .expect("gdrive is text");
+        assert!(!is_text);
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_is_probably_text_by_ref_returns_false_for_gdrive_directory() {
+        let is_text = fs_is_probably_text_by_ref_impl(
+            ResourceRef {
+                provider: StorageProvider::Gdrive,
+                resource_id: "root/my-drive".to_string(),
+            },
+            1024,
+        )
+        .expect("gdrive is text by ref");
+        assert!(!is_text);
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_read_image_data_url_reads_gdrive_stub_image() {
+        let data_url =
+            fs_read_image_data_url_impl("gdrive://root/my-drive/cover.png".to_string(), false)
+                .expect("gdrive image data url");
+        assert!(data_url.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_read_image_normalized_temp_path_writes_gdrive_stub_image() {
+        let path =
+            fs_read_image_normalized_temp_path_impl("gdrive://root/my-drive/cover.png".to_string())
+                .expect("gdrive normalized temp path");
+        assert!(path.ends_with(".png"));
+        assert!(std::path::Path::new(&path).exists());
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_read_image_data_url_by_ref_reads_gdrive_stub_image() {
+        let data_url = fs_read_image_data_url_by_ref_impl(
+            ResourceRef {
+                provider: StorageProvider::Gdrive,
+                resource_id: "root/my-drive/cover.png".to_string(),
+            },
+            false,
+        )
+        .expect("gdrive image data url by ref");
+        assert!(data_url.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_read_image_normalized_temp_path_by_ref_writes_gdrive_stub_image() {
+        let path = fs_read_image_normalized_temp_path_by_ref_impl(ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/my-drive/cover.png".to_string(),
+        })
+        .expect("gdrive normalized temp path by ref");
+        assert!(path.ends_with(".png"));
+        assert!(std::path::Path::new(&path).exists());
     }
 
     #[test]

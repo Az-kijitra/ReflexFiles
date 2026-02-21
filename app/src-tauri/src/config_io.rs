@@ -415,7 +415,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
             out.push('\n');
         }
     } else {
-        out.push_str("# Terminal profile name (global fallback). Empty uses Windows Terminal default.\n");
+        out.push_str(
+            "# Terminal profile name (global fallback). Empty uses Windows Terminal default.\n",
+        );
         out.push_str(&format!(
             "external_terminal_profile = {}\n\n",
             toml_string(&config.external_terminal_profile)
@@ -485,5 +487,3 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     file.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
-
-

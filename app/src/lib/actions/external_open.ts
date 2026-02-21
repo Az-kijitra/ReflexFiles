@@ -1,4 +1,5 @@
 import { getParentPath } from "$lib/utils/path";
+import { toGdriveResourceRef } from "$lib/utils/resource_ref";
 import { STATUS_LONG_MS, STATUS_SHORT_MS } from "$lib/ui_durations";
 import { formatError } from "$lib/utils/error_format";
 const VIEWER_SUPPORTED_EXTS = new Set([
@@ -87,9 +88,28 @@ export function createExternalActions(ctx, helpers) {
     return VIEWER_SUPPORTED_EXTS.has(ext);
   }
 
+  function resolveResourceRef(path, entry = null) {
+    const fromEntry = entry?.ref;
+    if (
+      fromEntry &&
+      (fromEntry.provider === "local" || fromEntry.provider === "gdrive") &&
+      String(fromEntry.resource_id || "").trim().length > 0
+    ) {
+      return fromEntry;
+    }
+    return toGdriveResourceRef(path);
+  }
+
   /** @param {string} path */
-  async function isProbablyTextByContent(path) {
+  async function isProbablyTextByContent(path, resourceRef = null) {
     try {
+      if (resourceRef) {
+        const result = await ctx.invoke("fs_is_probably_text_by_ref", {
+          resourceRef,
+          sampleBytes: 65536,
+        });
+        return !!result;
+      }
       const result = await ctx.invoke("fs_is_probably_text", { path, sampleBytes: 65536 });
       return !!result;
     } catch {
@@ -101,8 +121,13 @@ export function createExternalActions(ctx, helpers) {
    * @param {string} path
    * @param {string | undefined} jumpHint
    */
-  async function openViewerWindow(path, jumpHint = undefined) {
-    await ctx.invoke("open_viewer", { path, jumpHint, jump_hint: jumpHint });
+  async function openViewerWindow(path, jumpHint = undefined, resourceRef = null) {
+    await ctx.invoke("open_viewer", {
+      path,
+      resourceRef,
+      jumpHint,
+      jump_hint: jumpHint,
+    });
   }
 
   /** @param {string} path */
@@ -121,9 +146,10 @@ export function createExternalActions(ctx, helpers) {
       return;
     }
     const forceAssociatedApp = !!options?.forceAssociatedApp;
+    const resourceRef = resolveResourceRef(entry.path, entry);
     if (!forceAssociatedApp && isViewerTarget(entry)) {
       try {
-        await openViewerWindow(entry.path);
+        await openViewerWindow(entry.path, undefined, resourceRef);
         return;
       } catch (err) {
         showError(err);
@@ -131,10 +157,10 @@ export function createExternalActions(ctx, helpers) {
       }
     }
     if (!forceAssociatedApp) {
-      const contentLooksText = await isProbablyTextByContent(entry.path);
+      const contentLooksText = await isProbablyTextByContent(entry.path, resourceRef);
       if (contentLooksText) {
         try {
-          await openViewerWindow(entry.path);
+          await openViewerWindow(entry.path, undefined, resourceRef);
           return;
         } catch (err) {
           showError(err);

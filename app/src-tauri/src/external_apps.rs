@@ -200,7 +200,10 @@ fn open_windows_terminal(path: &str, profile: &str) -> AppResult<()> {
     }
     spawn_with_args("wt.exe", &[String::from("-d"), path.to_string()])
 }
-fn resolve_terminal_profile_for_kind(config: &crate::config_types::AppConfig, kind: &str) -> AppResult<String> {
+fn resolve_terminal_profile_for_kind(
+    config: &crate::config_types::AppConfig,
+    kind: &str,
+) -> AppResult<String> {
     let specific = match kind {
         "cmd" => config.external_terminal_profile_cmd.trim(),
         "powershell" => config.external_terminal_profile_powershell.trim(),
@@ -258,7 +261,6 @@ pub(crate) fn external_open_cmd_impl(path: String) -> AppResult<()> {
     let cmd = format!("cd /d \"{}\"", path);
     spawn_with_args("cmd.exe", &[String::from("/K"), cmd])
 }
-
 
 pub(crate) fn external_open_terminal_profile_impl(path: String, profile: String) -> AppResult<()> {
     let profile = require_non_empty("profile", &profile)?;

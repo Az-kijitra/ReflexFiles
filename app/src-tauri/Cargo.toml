@@ -19,7 +19,7 @@ name = "ReflexFiles"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["gdrive-readonly-stub"]
 gdrive-readonly-stub = []
 
 [build-dependencies]

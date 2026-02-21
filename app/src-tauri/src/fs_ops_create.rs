@@ -10,7 +10,12 @@ pub fn fs_create(parent: String, name: String, kind: String) -> Result<(), Strin
     let resolved_parent = match resolve_legacy_path_for(&parent, ProviderCapability::Create) {
         Ok(path) => path,
         Err(err) => {
-            crate::log_error("create", &parent, &name, &format!("code={}; {}", err.code(), err));
+            crate::log_error(
+                "create",
+                &parent,
+                &name,
+                &format!("code={}; {}", err.code(), err),
+            );
             return Err(format!("code={}; {}", err.code(), err));
         }
     };

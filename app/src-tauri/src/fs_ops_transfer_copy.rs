@@ -44,7 +44,12 @@ pub fn fs_copy(
         let resolved = match resolve_legacy_path_for(item, ProviderCapability::Copy) {
             Ok(path) => path,
             Err(err) => {
-                crate::log_error("copy", item, &destination, &format!("code={}; {}", err.code(), err));
+                crate::log_error(
+                    "copy",
+                    item,
+                    &destination,
+                    &format!("code={}; {}", err.code(), err),
+                );
                 return Err(format!("code={}; {}", err.code(), err));
             }
         };
@@ -197,14 +202,24 @@ pub fn fs_copy_pairs(app: AppHandle, pairs: Vec<CopyPair>) -> Result<OpSummary, 
         let resolved_from = match resolve_legacy_path_for(from_raw, ProviderCapability::Copy) {
             Ok(path) => path,
             Err(err) => {
-                crate::log_error("copy", from_raw, to_raw, &format!("code={}; {}", err.code(), err));
+                crate::log_error(
+                    "copy",
+                    from_raw,
+                    to_raw,
+                    &format!("code={}; {}", err.code(), err),
+                );
                 return Err(format!("code={}; {}", err.code(), err));
             }
         };
         let resolved_to = match resolve_legacy_path_for(to_raw, ProviderCapability::Create) {
             Ok(path) => path,
             Err(err) => {
-                crate::log_error("copy", from_raw, to_raw, &format!("code={}; {}", err.code(), err));
+                crate::log_error(
+                    "copy",
+                    from_raw,
+                    to_raw,
+                    &format!("code={}; {}", err.code(), err),
+                );
                 return Err(format!("code={}; {}", err.code(), err));
             }
         };

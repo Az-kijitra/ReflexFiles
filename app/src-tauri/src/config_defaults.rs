@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::config_io::{config_path, load_history, load_jump_list};
-use crate::config_types::{AppConfig, FileIconMode, KeymapProfile, Language, SortKey, SortOrder, Theme};
+use crate::config_types::{
+    AppConfig, FileIconMode, KeymapProfile, Language, SortKey, SortOrder, Theme,
+};
 
 pub fn default_app_config() -> AppConfig {
     AppConfig {
@@ -133,7 +135,8 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
 
     config.external_vscode_path = normalize_executable_path(&config.external_vscode_path);
     config.external_git_client_path = normalize_executable_path(&config.external_git_client_path);
-    config.external_terminal_profile = normalize_single_line(&config.external_terminal_profile, 256);
+    config.external_terminal_profile =
+        normalize_single_line(&config.external_terminal_profile, 256);
     config.external_terminal_profile_cmd =
         normalize_single_line(&config.external_terminal_profile_cmd, 256);
     config.external_terminal_profile_powershell =
