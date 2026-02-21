@@ -22,6 +22,8 @@ mod fs_ops_transfer_helpers;
 mod fs_ops_transfer_move;
 mod fs_query;
 mod fs_query_cmds;
+#[cfg(feature = "gdrive-readonly-stub")]
+mod gdrive_stub;
 mod log;
 mod storage_provider;
 mod system_cmds;

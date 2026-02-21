@@ -12,10 +12,22 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::error::{AppError, AppResult};
 use crate::storage_provider::{provider_capabilities, provider_registry, resolve_legacy_path};
 use crate::types::{
-    DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef,
-    SortKey, SortOrder,
+    DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef, SortKey,
+    SortOrder,
 };
 use crate::utils::{is_hidden, system_time_to_rfc3339};
+
+#[cfg(feature = "gdrive-readonly-stub")]
+use crate::error::AppErrorKind;
+
+#[cfg(feature = "gdrive-readonly-stub")]
+use crate::gdrive_stub::{
+    gdrive_stub_resource_ext, gdrive_stub_resource_kind, gdrive_stub_resource_name,
+    GdriveStubNodeKind,
+};
+
+#[cfg(feature = "gdrive-readonly-stub")]
+use crate::types::StorageProvider;
 
 const IMAGE_CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
 const IMAGE_CACHE_MAX_FILES: usize = 400;
@@ -118,9 +130,45 @@ fn cleanup_viewer_image_cache_dir(dir: &Path) {
 fn entry_from_resource_ref(resource_ref: ResourceRef) -> AppResult<Entry> {
     let registry = provider_registry();
     let provider = registry.provider_for_ref(&resource_ref)?;
+    let capabilities = provider_capabilities(provider);
+
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if matches!(resource_ref.provider, StorageProvider::Gdrive) {
+        let name = gdrive_stub_resource_name(&resource_ref).ok_or_else(|| {
+            AppError::with_kind(
+                AppErrorKind::NotFound,
+                format!("gdrive resource not found: {}", resource_ref.resource_id),
+            )
+        })?;
+        let kind = gdrive_stub_resource_kind(&resource_ref).ok_or_else(|| {
+            AppError::with_kind(
+                AppErrorKind::NotFound,
+                format!("gdrive resource not found: {}", resource_ref.resource_id),
+            )
+        })?;
+        let entry_type = match kind {
+            GdriveStubNodeKind::Dir => EntryType::Dir,
+            GdriveStubNodeKind::File => EntryType::File,
+        };
+        let ext = gdrive_stub_resource_ext(&resource_ref).unwrap_or_default();
+        let display_path = provider.display_path(&resource_ref);
+        return Ok(Entry {
+            name,
+            path: display_path.clone(),
+            display_path,
+            provider: resource_ref.provider,
+            resource_ref,
+            capabilities,
+            entry_type,
+            size: 0,
+            modified: String::new(),
+            hidden: false,
+            ext,
+        });
+    }
+
     let path = provider.resolve_path(&resource_ref)?;
     let metadata = provider.metadata(&resource_ref)?;
-    let capabilities = provider_capabilities(provider);
     let entry_type = if metadata.is_dir() {
         EntryType::Dir
     } else {
@@ -577,9 +625,53 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
 pub(crate) fn fs_get_properties_by_ref_impl(resource_ref: ResourceRef) -> AppResult<Properties> {
     let registry = provider_registry();
     let provider = registry.provider_for_ref(&resource_ref)?;
+    let capabilities = provider_capabilities(provider);
+    let display_path = provider.display_path(&resource_ref);
+
+    #[cfg(feature = "gdrive-readonly-stub")]
+    if matches!(resource_ref.provider, StorageProvider::Gdrive) {
+        let name = gdrive_stub_resource_name(&resource_ref).ok_or_else(|| {
+            AppError::with_kind(
+                AppErrorKind::NotFound,
+                format!("gdrive resource not found: {}", resource_ref.resource_id),
+            )
+        })?;
+        let kind = gdrive_stub_resource_kind(&resource_ref).ok_or_else(|| {
+            AppError::with_kind(
+                AppErrorKind::NotFound,
+                format!("gdrive resource not found: {}", resource_ref.resource_id),
+            )
+        })?;
+        let property_kind = match kind {
+            GdriveStubNodeKind::Dir => PropertyKind::Dir,
+            GdriveStubNodeKind::File => PropertyKind::File,
+        };
+        let ext = gdrive_stub_resource_ext(&resource_ref).unwrap_or_default();
+        return Ok(Properties {
+            name,
+            path: display_path.clone(),
+            display_path,
+            provider: resource_ref.provider,
+            resource_ref,
+            capabilities,
+            kind: property_kind,
+            size: 0,
+            created: String::new(),
+            modified: String::new(),
+            accessed: String::new(),
+            hidden: false,
+            readonly: true,
+            system: false,
+            ext,
+            files: 0,
+            dirs: 0,
+            dir_stats_pending: false,
+            dir_stats_timeout: false,
+        });
+    }
+
     let path_buf = provider.resolve_path(&resource_ref)?;
     let metadata = provider.metadata(&resource_ref)?;
-    let capabilities = provider_capabilities(provider);
     let kind = if metadata.is_dir() {
         PropertyKind::Dir
     } else {
@@ -618,7 +710,6 @@ pub(crate) fn fs_get_properties_by_ref_impl(resource_ref: ResourceRef) -> AppRes
     } else {
         (metadata.len(), 0u64, 0u64, false)
     };
-    let display_path = provider.display_path(&resource_ref);
     Ok(Properties {
         name,
         path: display_path.clone(),
@@ -932,6 +1023,84 @@ mod tests {
         assert_eq!(properties.name, "a.txt");
         assert!(matches!(properties.kind, PropertyKind::File));
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_list_dir_by_ref_returns_virtual_entries_for_gdrive_stub() {
+        let entries = fs_list_dir_by_ref_impl(
+            ResourceRef {
+                provider: StorageProvider::Gdrive,
+                resource_id: "root".to_string(),
+            },
+            true,
+            "name".to_string(),
+            "asc".to_string(),
+        )
+        .expect("gdrive list by ref");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].name, "my-drive");
+        assert_eq!(entries[0].path, "gdrive://root/my-drive");
+        assert!(matches!(entries[0].entry_type, crate::types::EntryType::Dir));
+        assert_eq!(entries[1].name, "shared-with-me");
+        assert_eq!(entries[1].path, "gdrive://root/shared-with-me");
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_list_dir_by_ref_includes_file_nodes_for_gdrive_stub() {
+        let entries = fs_list_dir_by_ref_impl(
+            ResourceRef {
+                provider: StorageProvider::Gdrive,
+                resource_id: "root/my-drive".to_string(),
+            },
+            true,
+            "name".to_string(),
+            "asc".to_string(),
+        )
+        .expect("gdrive my-drive list by ref");
+        assert_eq!(entries.len(), 3);
+        let readme = entries
+            .iter()
+            .find(|entry| entry.name == "readme.txt")
+            .expect("readme entry");
+        assert!(matches!(
+            readme.entry_type,
+            crate::types::EntryType::File
+        ));
+        assert_eq!(readme.ext, ".txt");
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_get_properties_by_ref_returns_gdrive_stub_dir() {
+        let properties = fs_get_properties_by_ref_impl(ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/my-drive".to_string(),
+        })
+        .expect("gdrive properties by ref");
+        assert_eq!(properties.provider, StorageProvider::Gdrive);
+        assert_eq!(properties.path, "gdrive://root/my-drive");
+        assert_eq!(properties.display_path, "gdrive://root/my-drive");
+        assert_eq!(properties.name, "my-drive");
+        assert!(matches!(properties.kind, PropertyKind::Dir));
+        assert!(properties.readonly);
+        assert!(properties.capabilities.can_read);
+        assert!(!properties.capabilities.can_create);
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn fs_get_properties_by_ref_returns_gdrive_stub_file() {
+        let properties = fs_get_properties_by_ref_impl(ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/my-drive/readme.txt".to_string(),
+        })
+        .expect("gdrive file properties by ref");
+        assert!(matches!(properties.kind, PropertyKind::File));
+        assert_eq!(properties.name, "readme.txt");
+        assert_eq!(properties.ext, ".txt");
+        assert!(properties.readonly);
     }
 
     #[test]

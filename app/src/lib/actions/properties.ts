@@ -45,7 +45,7 @@ export function createPropertiesActions(ctx, helpers) {
       } else {
         ctx.getPropertiesModalEl()?.focus();
       }
-      if (data.type === "dir") {
+      if (data.type === "dir" && data.provider !== "gdrive") {
         if (!cached) {
           startDirStats(path);
         }

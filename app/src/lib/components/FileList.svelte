@@ -13,6 +13,7 @@
   export let entries = [];
   export let focusedIndex = 0;
   export let anchorIndex = null;
+  export let dropdownOpen = false;
   export let overflowLeft = false;
   export let overflowRight = false;
   export let visibleColStart = 0;
@@ -55,6 +56,9 @@
   aria-activedescendant={getActiveDescendant()}
   bind:this={listEl}
   oncontextmenu={openContextMenu}
+  onfocus={() => {
+    dropdownOpen = false;
+  }}
 >
   <div class="list-body" bind:this={listBodyEl}>
     {#if loading}

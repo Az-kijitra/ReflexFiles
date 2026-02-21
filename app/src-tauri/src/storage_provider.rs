@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::types::{ProviderCapabilities, ResourceRef, StorageProvider};
+#[cfg(feature = "gdrive-readonly-stub")]
+use crate::gdrive_stub::gdrive_stub_children_for_resource_ref;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ProviderCapability {
@@ -162,7 +164,7 @@ impl StorageProviderBackend for GdriveStorageProvider {
 
     fn list_dir_refs(&self, dir_ref: &ResourceRef) -> AppResult<Vec<ResourceRef>> {
         let _ = self.validate_resource_ref(dir_ref)?;
-        Err(self.not_implemented("directory listing"))
+        gdrive_stub_children_for_resource_ref(dir_ref)
     }
 }
 
@@ -382,6 +384,41 @@ mod tests {
             resource_id: "folder/file".to_string(),
         };
         assert_eq!(gdrive.display_path(&resource_ref), "gdrive://folder/file");
+    }
+
+    #[test]
+    #[cfg(feature = "gdrive-readonly-stub")]
+    fn gdrive_provider_lists_virtual_tree_in_stub_mode() {
+        let gdrive = GdriveStorageProvider;
+        let root_ref = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root".to_string(),
+        };
+        let root_children = gdrive
+            .list_dir_refs(&root_ref)
+            .expect("gdrive root list dir refs");
+        assert_eq!(root_children.len(), 2);
+        assert_eq!(root_children[0].resource_id, "root/my-drive");
+        assert_eq!(root_children[1].resource_id, "root/shared-with-me");
+
+        let my_drive_ref = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/my-drive".to_string(),
+        };
+        let my_drive_children = gdrive
+            .list_dir_refs(&my_drive_ref)
+            .expect("gdrive my-drive list dir refs");
+        assert_eq!(my_drive_children.len(), 3);
+        assert_eq!(my_drive_children[2].resource_id, "root/my-drive/readme.txt");
+
+        let leaf_ref = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/my-drive/projects".to_string(),
+        };
+        let leaf_children = gdrive
+            .list_dir_refs(&leaf_ref)
+            .expect("gdrive leaf list dir refs");
+        assert!(leaf_children.is_empty());
     }
 
     #[test]

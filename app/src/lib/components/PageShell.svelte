@@ -45,13 +45,14 @@
       <TreePanel bind:treeEl bind:treeBodyEl {...viewProps.treeProps} />
     {/if}
 
-    <FileList
-      bind:listEl
-      bind:listBodyEl
-      bind:focusedIndex
-      bind:anchorIndex
-      {...viewProps.fileListProps}
-    />
+  <FileList
+    bind:listEl
+    bind:listBodyEl
+    bind:focusedIndex
+    bind:anchorIndex
+    bind:dropdownOpen
+    {...viewProps.fileListProps}
+  />
   </div>
 
   <StatusBar {statusItems} />
