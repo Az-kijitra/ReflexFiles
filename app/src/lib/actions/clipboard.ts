@@ -128,6 +128,9 @@ export function createClipboardActions(ctx, helpers) {
     try {
       const base = cut ? ctx.t("status.moving") : ctx.t("status.copying");
       const pairs = ctx.buildPastePairs(filtered, currentPath);
+      const involvesGdrive =
+        String(currentPath || "").trim().toLowerCase().startsWith("gdrive://") ||
+        filtered.some((path) => String(path || "").trim().toLowerCase().startsWith("gdrive://"));
       if (cut) {
         const summary = await ctx.fsMove(filtered, currentPath);
         const okCount = typeof summary?.ok === "number" ? summary.ok : filtered.length;
@@ -157,14 +160,16 @@ export function createClipboardActions(ctx, helpers) {
         if (failCount > 0) {
           showFailures(`${base} failed`, summary?.failures || []);
         }
-        if (pairs.length && summary?.failures) {
-          const failed = new Set(summary.failures.map((item) => item.path));
-          const okPairs = pairs.filter((pair) => !failed.has(pair.from));
-          if (okPairs.length) {
-            pushUndoEntry({ kind: "copy", pairs: okPairs });
+        if (!involvesGdrive) {
+          if (pairs.length && summary?.failures) {
+            const failed = new Set(summary.failures.map((item) => item.path));
+            const okPairs = pairs.filter((pair) => !failed.has(pair.from));
+            if (okPairs.length) {
+              pushUndoEntry({ kind: "copy", pairs: okPairs });
+            }
+          } else if (pairs.length) {
+            pushUndoEntry({ kind: "copy", pairs });
           }
-        } else if (pairs.length) {
-          pushUndoEntry({ kind: "copy", pairs });
         }
         const suffix = failCount ? ` (failed ${failCount})` : "";
         setStatusMessage(`${base} ${okCount}/${totalCount} item(s)${suffix}`);

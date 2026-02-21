@@ -269,9 +269,15 @@
     backendMode: "stub",
     accountId: null,
     grantedScopes: [],
+    hasWriteScope: false,
     refreshTokenPersisted: false,
     pendingStartedAtMs: null,
+    accessTokenExpiresAtMs: null,
     lastError: "",
+    lastScopeInsufficientAtMs: null,
+    lastWriteConflictAtMs: null,
+    lastTokenRefreshError: "",
+    lastTokenRefreshErrorAtMs: null,
     tokenStoreBackend: "",
     tokenStoreAvailable: false,
   };
@@ -280,6 +286,11 @@
   let settingsGdriveAuthBusy = $state(false);
   let settingsGdriveAuthError = $state("");
   let settingsGdriveAuthMessage = $state("");
+  let settingsGdriveWorkcopyItems = $state([]);
+  let settingsGdriveWorkcopyLoading = $state(false);
+  let settingsGdriveWorkcopyBusy = $state(false);
+  let settingsGdriveWorkcopyError = $state("");
+  let settingsGdriveWorkcopyMessage = $state("");
   // Watch timers
   /** @type {ReturnType<typeof setTimeout> | null} */
   let watchTimer = null;
@@ -478,6 +489,27 @@
 
     return () => {
       cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    const path = String(state.currentPath || "").trim();
+    const entries = state.entries;
+    if (!path.startsWith("gdrive://")) return;
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    void actions.refreshGdriveWorkcopyBadges(entries);
+  });
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    const onFocus = () => {
+      const path = String(state.currentPath || "").trim();
+      if (!path.startsWith("gdrive://")) return;
+      void actions.refreshGdriveWorkcopyBadges(state.entries);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
     };
   });
 
@@ -790,6 +822,8 @@
     settingsReportIsError = false;
     settingsGdriveAuthError = "";
     settingsGdriveAuthMessage = "";
+    settingsGdriveWorkcopyError = "";
+    settingsGdriveWorkcopyMessage = "";
     try {
       const config = await invoke("config_get");
       settingsInitial = normalizeSettingsConfig(config || {});
@@ -816,6 +850,7 @@
     collectSettingsShortcutConflicts();
     settingsOpen = true;
     void refreshGdriveAuthStatus();
+    void refreshGdriveWorkcopies();
   }
 
   function closeSettingsModal() {
@@ -842,14 +877,34 @@
       : [];
     const pendingMsRaw = Number(status?.pendingStartedAtMs ?? Number.NaN);
     const pendingStartedAtMs = Number.isFinite(pendingMsRaw) ? Math.trunc(pendingMsRaw) : null;
+    const expiresMsRaw = Number(status?.accessTokenExpiresAtMs ?? Number.NaN);
+    const accessTokenExpiresAtMs = Number.isFinite(expiresMsRaw) ? Math.trunc(expiresMsRaw) : null;
+    const scopeInsufficientMsRaw = Number(status?.lastScopeInsufficientAtMs ?? Number.NaN);
+    const lastScopeInsufficientAtMs = Number.isFinite(scopeInsufficientMsRaw)
+      ? Math.trunc(scopeInsufficientMsRaw)
+      : null;
+    const writeConflictMsRaw = Number(status?.lastWriteConflictAtMs ?? Number.NaN);
+    const lastWriteConflictAtMs = Number.isFinite(writeConflictMsRaw)
+      ? Math.trunc(writeConflictMsRaw)
+      : null;
+    const tokenRefreshErrorMsRaw = Number(status?.lastTokenRefreshErrorAtMs ?? Number.NaN);
+    const lastTokenRefreshErrorAtMs = Number.isFinite(tokenRefreshErrorMsRaw)
+      ? Math.trunc(tokenRefreshErrorMsRaw)
+      : null;
     return {
       phase,
       backendMode,
       accountId,
       grantedScopes,
+      hasWriteScope: Boolean(status?.hasWriteScope),
       refreshTokenPersisted: Boolean(status?.refreshTokenPersisted),
       pendingStartedAtMs,
+      accessTokenExpiresAtMs,
       lastError: String(status?.lastError || ""),
+      lastScopeInsufficientAtMs,
+      lastWriteConflictAtMs,
+      lastTokenRefreshError: String(status?.lastTokenRefreshError || ""),
+      lastTokenRefreshErrorAtMs,
       tokenStoreBackend: String(status?.tokenStoreBackend || ""),
       tokenStoreAvailable: Boolean(status?.tokenStoreAvailable),
     };
@@ -1082,6 +1137,83 @@
       settingsGdriveAuthError = formatError(err, "failed to sign out gdrive", t);
     } finally {
       settingsGdriveAuthBusy = false;
+    }
+  }
+
+  function normalizeGdriveWorkcopyItems(items) {
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((item) => ({
+        resourceId: String(item?.resourceId || "").trim(),
+        exists: Boolean(item?.exists),
+        dirty: Boolean(item?.dirty),
+        fileName: String(item?.fileName || "").trim(),
+        localPath: String(item?.localPath || "").trim(),
+        updatedAtMs: Number.isFinite(Number(item?.updatedAtMs))
+          ? Math.trunc(Number(item.updatedAtMs))
+          : null,
+        sizeBytes: Math.max(0, Number(item?.sizeBytes || 0) || 0),
+      }))
+      .filter((item) => Boolean(item.resourceId));
+  }
+
+  async function refreshGdriveWorkcopies() {
+    settingsGdriveWorkcopyLoading = true;
+    settingsGdriveWorkcopyError = "";
+    try {
+      const items = await invoke("gdrive_list_edit_workcopies");
+      settingsGdriveWorkcopyItems = normalizeGdriveWorkcopyItems(items);
+    } catch (err) {
+      settingsGdriveWorkcopyError = formatError(err, "failed to list gdrive workcopies", t);
+      settingsGdriveWorkcopyItems = [];
+    } finally {
+      settingsGdriveWorkcopyLoading = false;
+    }
+  }
+
+  async function deleteGdriveWorkcopy(item) {
+    const resourceId = String(item?.resourceId || "").trim();
+    if (!resourceId) return;
+    settingsGdriveWorkcopyBusy = true;
+    settingsGdriveWorkcopyError = "";
+    settingsGdriveWorkcopyMessage = "";
+    try {
+      await invoke("gdrive_delete_edit_workcopy", {
+        resourceRef: {
+          provider: "gdrive",
+          resource_id: resourceId,
+        },
+      });
+      settingsGdriveWorkcopyMessage = t("settings.gdrive.workcopy.delete_done", {
+        name: String(item?.fileName || resourceId),
+      });
+      await refreshGdriveWorkcopies();
+      await actions.refreshGdriveWorkcopyBadges(state.entries);
+    } catch (err) {
+      settingsGdriveWorkcopyError = formatError(err, "failed to delete gdrive workcopy", t);
+    } finally {
+      settingsGdriveWorkcopyBusy = false;
+    }
+  }
+
+  async function cleanupGdriveWorkcopies(maxAgeDays) {
+    const daysRaw = Number(maxAgeDays);
+    const days = Number.isFinite(daysRaw) ? Math.min(365, Math.max(1, Math.trunc(daysRaw))) : 3;
+    settingsGdriveWorkcopyBusy = true;
+    settingsGdriveWorkcopyError = "";
+    settingsGdriveWorkcopyMessage = "";
+    try {
+      const result = await invoke("gdrive_cleanup_edit_workcopies", { maxAgeDays: days });
+      settingsGdriveWorkcopyMessage = t("settings.gdrive.workcopy.cleanup_done", {
+        files: Math.trunc(Number(result?.removedFiles || 0)),
+        bytes: Math.trunc(Number(result?.removedBytes || 0)),
+      });
+      await refreshGdriveWorkcopies();
+      await actions.refreshGdriveWorkcopyBadges(state.entries);
+    } catch (err) {
+      settingsGdriveWorkcopyError = formatError(err, "failed to cleanup gdrive workcopies", t);
+    } finally {
+      settingsGdriveWorkcopyBusy = false;
     }
   }
 
@@ -1515,6 +1647,11 @@
     gdriveAuthBusy={settingsGdriveAuthBusy}
     gdriveAuthError={settingsGdriveAuthError}
     gdriveAuthMessage={settingsGdriveAuthMessage}
+    gdriveWorkcopyItems={settingsGdriveWorkcopyItems}
+    gdriveWorkcopyLoading={settingsGdriveWorkcopyLoading}
+    gdriveWorkcopyBusy={settingsGdriveWorkcopyBusy}
+    gdriveWorkcopyError={settingsGdriveWorkcopyError}
+    gdriveWorkcopyMessage={settingsGdriveWorkcopyMessage}
     error={settingsError}
     onCancel={closeSettingsModal}
     onSave={saveSettings}
@@ -1527,6 +1664,9 @@
     onGdriveAuthStart={startGdriveAuth}
     onGdriveAuthComplete={completeGdriveAuth}
     onGdriveAuthSignOut={signOutGdrive}
+    onGdriveWorkcopyRefresh={refreshGdriveWorkcopies}
+    onGdriveWorkcopyDelete={deleteGdriveWorkcopy}
+    onGdriveWorkcopyCleanup={cleanupGdriveWorkcopies}
     {trapModalTab}
     {autofocus}
   />

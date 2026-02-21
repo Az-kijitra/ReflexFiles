@@ -160,10 +160,23 @@ npm run e2e:full
 - Editing-phase foundation APIs are available for Google Drive:
   - `gdrive_prepare_edit_workcopy` (download to local workcopy + return base revision snapshot)
   - `gdrive_check_edit_conflict` (optimistic-lock precheck against current Drive revision)
+  - `gdrive_get_edit_workcopy_state` / `gdrive_get_edit_workcopy_states` (resolve local workcopy existence + dirty state by local hash)
+  - `gdrive_list_edit_workcopies` / `gdrive_delete_edit_workcopy` / `gdrive_cleanup_edit_workcopies` (workcopy maintenance operations)
 - Current UI behavior:
   - Opening Google Drive files in associated external apps now uses local workcopies via `gdrive_prepare_edit_workcopy`.
   - Upload-back is explicit/manual via context menu action (`Write Back to Google Drive`).
   - Upload-back calls `gdrive_apply_edit_workcopy` and blocks on optimistic-lock conflict.
+  - Workcopy badge (`local` / `dirty`) is now refreshed from backend state, not only in-memory flag state.
+  - Settings > Google Drive includes workcopy maintenance UI (list / delete / age-based cleanup).
+- Runtime resilience / diagnostics:
+  - Google Drive API bridge retries transient failures (HTTP `429` / `5xx`, timeout, temporary network resolution issues) with bounded backoff.
+  - Upload-back scope-insufficient errors are normalized to `permission_denied` with actionable remediation text.
+  - Settings > Google Drive shows additional diagnostics:
+    - write-scope granted flag
+    - access-token expiry timestamp
+    - last scope-insufficient timestamp
+    - last write-conflict timestamp
+    - last token-refresh error + timestamp
 - Security behavior:
   - Google Drive viewer/read cache and edit workcopy cache are stored under local temp.
   - Sign-out clears persisted refresh token and viewer/read cache.

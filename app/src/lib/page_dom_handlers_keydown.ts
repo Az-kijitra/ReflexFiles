@@ -36,7 +36,19 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
 
     // WebView/IME differences occasionally break keymap matching for these basic shortcuts.
     // Keep a direct fallback at the top-level keydown entry.
+    // Ctrl+J must be captured here as well to avoid WebView2 default downloads popup.
     if (!hasBlockingOverlay) {
+      if (isCtrlLetter("J", 74)) {
+        event.preventDefault();
+        const jumpList = params.getJumpList();
+        if (!Array.isArray(jumpList) || jumpList.length === 0) {
+          params.setStatusMessage(params.t("no_items"));
+          return;
+        }
+        params.setDropdownMode("jump");
+        params.setDropdownOpen(true);
+        return;
+      }
       if (isCtrlLetter("N", 78)) {
         event.preventDefault();
         if (import.meta.env.DEV) {

@@ -71,6 +71,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     getExternalApps,
     getTargetEntry,
     resolveGdriveWorkcopyBadge,
+    refreshGdriveWorkcopyBadges,
     runExternalApp,
     openEntry,
     syncGdriveWorkcopyForEntry,
@@ -193,7 +194,12 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     currentPathSupports("can_copy") || currentPathSupports("can_move");
 
   const canCopyTargets = () => allEntriesSupport(getOperationEntries(), "can_copy");
-  const canDuplicateTargets = () => canCopyTargets();
+  const areOperationEntriesLocal = () =>
+    getOperationEntries().every((entry) => {
+      const provider = String(entry?.ref?.provider || "").toLowerCase();
+      return provider === "local" || !String(entry?.path || "").startsWith("gdrive://");
+    });
+  const canDuplicateTargets = () => canCopyTargets() && areOperationEntriesLocal();
   const canPrefixDateTargets = () => allEntriesSupport(getOperationEntries(), "can_rename");
   const canCutTargets = () => allEntriesSupport(getOperationEntries(), "can_move");
   const canRenameFocused = () => {
@@ -318,6 +324,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     onContextProperties,
     getExternalApps,
     resolveGdriveWorkcopyBadge,
+    refreshGdriveWorkcopyBadges,
     runExternalApp,
     getTargetEntry,
   };

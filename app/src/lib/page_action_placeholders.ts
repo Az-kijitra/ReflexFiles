@@ -78,6 +78,7 @@ export function createPageActionPlaceholders(
     handleContextMenuKey: noop,
     openConfigFile: noopAsync,
     openKeymapHelp: noopAsync,
+    refreshGdriveWorkcopyBadges: noopAsync,
     performUndo: noop,
     performRedo: noop,
     selectAll: noop,

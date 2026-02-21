@@ -157,6 +157,22 @@ npm run e2e:full
 - 選択項目ベースの操作（`copy/move/delete/rename/zip`）は引き続き `entry.capabilities` を使用。
 - capability で拒否された操作は実行せず、`capability.not_available` を表示する。
 - Google Drive read-only バックエンドの骨格は Rust feature flag `gdrive-readonly-stub` で制御する（既定: 無効）。
+- Google Drive 編集基盤API:
+  - `gdrive_prepare_edit_workcopy`（ローカル作業コピー生成 + ベースリビジョン返却）
+  - `gdrive_check_edit_conflict`（楽観ロックの事前競合判定）
+  - `gdrive_get_edit_workcopy_state` / `gdrive_get_edit_workcopy_states`（ローカル作業コピー有無 + dirty 判定）
+  - `gdrive_list_edit_workcopies` / `gdrive_delete_edit_workcopy` / `gdrive_cleanup_edit_workcopies`（作業コピー保守）
+- 実行時の堅牢性 / 診断:
+  - Google Drive API ブリッジは一時障害（HTTP `429` / `5xx`、timeout、名前解決の一時失敗）を上限付きバックオフで再試行する。
+  - 書き戻し時のスコープ不足は `permission_denied` に正規化し、再認証手順が分かるメッセージを返す。
+  - 設定 > Google Drive に追加診断を表示する:
+    - 書き込みスコープ許可フラグ
+    - アクセストークン有効期限
+    - 直近のスコープ不足時刻
+    - 直近の書き戻し競合時刻
+    - 直近のトークン更新エラーと時刻
+  - 作業コピーバッジ（`local` / `dirty`）はフロントの一時状態だけでなく、バックエンド照会結果で再計算する。
+  - 設定 > Google Drive で作業コピー管理（一覧 / 個別削除 / 日数指定クリーンアップ）を実行できる。
 - provider 境界を変更した場合は、通常構成と feature 有効構成の両方で確認する:
 ```bash
 cargo check --manifest-path app/src-tauri/Cargo.toml --locked

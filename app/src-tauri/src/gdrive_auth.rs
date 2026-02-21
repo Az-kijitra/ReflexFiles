@@ -50,9 +50,15 @@ pub struct GdriveAuthStatus {
     pub backend_mode: GdriveBackendMode,
     pub account_id: Option<String>,
     pub granted_scopes: Vec<String>,
+    pub has_write_scope: bool,
     pub refresh_token_persisted: bool,
     pub pending_started_at_ms: Option<u64>,
+    pub access_token_expires_at_ms: Option<u64>,
     pub last_error: String,
+    pub last_scope_insufficient_at_ms: Option<u64>,
+    pub last_write_conflict_at_ms: Option<u64>,
+    pub last_token_refresh_error: String,
+    pub last_token_refresh_error_at_ms: Option<u64>,
     pub token_store_backend: String,
     pub token_store_available: bool,
 }
@@ -110,6 +116,10 @@ struct GdriveAuthState {
     access_token: Option<String>,
     access_token_expires_at_ms: Option<u64>,
     last_error: String,
+    last_scope_insufficient_at_ms: Option<u64>,
+    last_write_conflict_at_ms: Option<u64>,
+    last_token_refresh_error: String,
+    last_token_refresh_error_at_ms: Option<u64>,
 }
 
 impl GdriveAuthState {
@@ -129,6 +139,10 @@ impl GdriveAuthState {
         self.refresh_token_persisted = false;
         self.access_token = None;
         self.access_token_expires_at_ms = None;
+        self.last_scope_insufficient_at_ms = None;
+        self.last_write_conflict_at_ms = None;
+        self.last_token_refresh_error.clear();
+        self.last_token_refresh_error_at_ms = None;
     }
 }
 
@@ -724,6 +738,10 @@ fn normalize_scope_text(scope_text: Option<String>) -> Vec<String> {
     }
 }
 
+fn has_write_scope(scopes: &[String]) -> bool {
+    scopes.iter().any(|scope| scope.trim() == GOOGLE_DRIVE_SCOPE)
+}
+
 fn refresh_access_token_with_refresh_token(
     client_id: &str,
     refresh_token: &str,
@@ -800,9 +818,15 @@ fn status_from_state(
         backend_mode: current_backend_mode(),
         account_id: state.account_id.clone(),
         granted_scopes: state.granted_scopes.clone(),
+        has_write_scope: has_write_scope(&state.granted_scopes),
         refresh_token_persisted: state.refresh_token_persisted,
         pending_started_at_ms: state.pending.as_ref().map(|pending| pending.issued_at_ms),
+        access_token_expires_at_ms: state.access_token_expires_at_ms,
         last_error: state.last_error.clone(),
+        last_scope_insufficient_at_ms: state.last_scope_insufficient_at_ms,
+        last_write_conflict_at_ms: state.last_write_conflict_at_ms,
+        last_token_refresh_error: state.last_token_refresh_error.clone(),
+        last_token_refresh_error_at_ms: state.last_token_refresh_error_at_ms,
         token_store_backend: token_store.backend_name().to_string(),
         token_store_available: token_store.is_available(),
     }
@@ -900,6 +924,19 @@ pub(crate) fn gdrive_auth_clear_client_secret_impl(client_id: String) -> AppResu
     token_store.clear_client_secret(&client_id)
 }
 
+pub(crate) fn gdrive_auth_report_scope_insufficient_impl() {
+    if let Ok(mut guard) = GDRIVE_AUTH_STATE.lock() {
+        guard.last_scope_insufficient_at_ms = Some(now_ms());
+        guard.last_error = "google drive write permission is not granted".to_string();
+    }
+}
+
+pub(crate) fn gdrive_auth_report_write_conflict_impl() {
+    if let Ok(mut guard) = GDRIVE_AUTH_STATE.lock() {
+        guard.last_write_conflict_at_ms = Some(now_ms());
+    }
+}
+
 pub(crate) fn gdrive_auth_access_token_impl() -> AppResult<String> {
     let token_store = default_gdrive_token_store();
     let (cached_access_token, cached_expiry_ms, mut account_id) = {
@@ -971,7 +1008,10 @@ pub(crate) fn gdrive_auth_access_token_impl() -> AppResult<String> {
         Ok(value) => value,
         Err(err) => {
             if let Ok(mut guard) = GDRIVE_AUTH_STATE.lock() {
-                guard.last_error = err.to_string();
+                let message = err.to_string();
+                guard.last_error = message.clone();
+                guard.last_token_refresh_error = message;
+                guard.last_token_refresh_error_at_ms = Some(now_ms());
             }
             return Err(err);
         }
@@ -985,6 +1025,8 @@ pub(crate) fn gdrive_auth_access_token_impl() -> AppResult<String> {
         guard.access_token = Some(access_token.clone());
         guard.access_token_expires_at_ms = Some(expires_at);
         guard.last_error.clear();
+        guard.last_token_refresh_error.clear();
+        guard.last_token_refresh_error_at_ms = None;
     }
     Ok(access_token)
 }

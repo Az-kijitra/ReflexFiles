@@ -24,9 +24,15 @@ export interface GdriveAuthStatus {
   backendMode: GdriveBackendMode;
   accountId: string | null;
   grantedScopes: string[];
+  hasWriteScope: boolean;
   refreshTokenPersisted: boolean;
   pendingStartedAtMs: number | null;
+  accessTokenExpiresAtMs: number | null;
   lastError: string;
+  lastScopeInsufficientAtMs: number | null;
+  lastWriteConflictAtMs: number | null;
+  lastTokenRefreshError: string;
+  lastTokenRefreshErrorAtMs: number | null;
   tokenStoreBackend: string;
   tokenStoreAvailable: boolean;
 }
@@ -72,6 +78,22 @@ export interface GdriveApplyEditResult {
   unchanged: boolean;
   conflict: boolean;
   revision: GdriveRevisionSnapshot;
+}
+
+export interface GdriveEditWorkcopyState {
+  resourceId: string;
+  exists: boolean;
+  dirty: boolean;
+  fileName: string;
+  localPath: string;
+  revision: GdriveRevisionSnapshot | null;
+  updatedAtMs: number | null;
+  sizeBytes: number;
+}
+
+export interface GdriveEditWorkcopyCleanupResult {
+  removedFiles: number;
+  removedBytes: number;
 }
 
 export type {

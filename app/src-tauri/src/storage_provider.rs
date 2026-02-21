@@ -204,7 +204,7 @@ impl StorageProviderBackend for GdriveStorageProvider {
 #[cfg(not(feature = "gdrive-readonly-stub"))]
 impl StorageProviderBackend for GdriveStorageProvider {
     fn supports(&self, capability: ProviderCapability) -> bool {
-        matches!(capability, ProviderCapability::Read)
+        matches!(capability, ProviderCapability::Read | ProviderCapability::Copy)
     }
 
     fn resolve_path(&self, resource_ref: &ResourceRef) -> AppResult<PathBuf> {
@@ -379,7 +379,9 @@ fn normalize_local_resource_id(path: &Path) -> AppResult<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{provider_capabilities, GdriveStorageProvider, StorageProviderBackend};
+    use super::provider_capabilities;
+    #[cfg(feature = "gdrive-readonly-stub")]
+    use super::{GdriveStorageProvider, StorageProviderBackend};
     use super::{
         resolve_legacy_path_for, LocalStorageProvider, ProviderCapability, ProviderRegistry,
     };
@@ -407,7 +409,10 @@ mod tests {
         assert!(capabilities.can_read);
         assert!(!capabilities.can_create);
         assert!(!capabilities.can_rename);
+        #[cfg(feature = "gdrive-readonly-stub")]
         assert!(!capabilities.can_copy);
+        #[cfg(not(feature = "gdrive-readonly-stub"))]
+        assert!(capabilities.can_copy);
         assert!(!capabilities.can_move);
         assert!(!capabilities.can_delete);
         assert!(!capabilities.can_archive_create);

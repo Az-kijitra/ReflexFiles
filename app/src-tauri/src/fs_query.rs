@@ -1670,7 +1670,7 @@ mod tests {
 
     #[test]
     #[cfg(not(feature = "gdrive-readonly-stub"))]
-    fn fs_get_capabilities_by_ref_reports_gdrive_readonly_when_stub_disabled() {
+    fn fs_get_capabilities_by_ref_reports_gdrive_copy_when_stub_disabled() {
         let capabilities = fs_get_capabilities_by_ref_impl(ResourceRef {
             provider: StorageProvider::Gdrive,
             resource_id: "root".to_string(),
@@ -1679,7 +1679,7 @@ mod tests {
         assert!(capabilities.can_read);
         assert!(!capabilities.can_create);
         assert!(!capabilities.can_rename);
-        assert!(!capabilities.can_copy);
+        assert!(capabilities.can_copy);
         assert!(!capabilities.can_move);
         assert!(!capabilities.can_delete);
         assert!(!capabilities.can_archive_create);

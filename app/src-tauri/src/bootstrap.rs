@@ -95,6 +95,11 @@ pub fn run() {
             crate::gdrive_edit_cmds::gdrive_prepare_edit_workcopy,
             crate::gdrive_edit_cmds::gdrive_check_edit_conflict,
             crate::gdrive_edit_cmds::gdrive_apply_edit_workcopy,
+            crate::gdrive_edit_cmds::gdrive_get_edit_workcopy_state,
+            crate::gdrive_edit_cmds::gdrive_get_edit_workcopy_states,
+            crate::gdrive_edit_cmds::gdrive_list_edit_workcopies,
+            crate::gdrive_edit_cmds::gdrive_delete_edit_workcopy,
+            crate::gdrive_edit_cmds::gdrive_cleanup_edit_workcopies,
             crate::watch::fs_watch_start,
             crate::watch::fs_watch_stop
         ])

@@ -21,6 +21,11 @@
   export let gdriveAuthBusy = false;
   export let gdriveAuthError = "";
   export let gdriveAuthMessage = "";
+  export let gdriveWorkcopyItems = [];
+  export let gdriveWorkcopyLoading = false;
+  export let gdriveWorkcopyBusy = false;
+  export let gdriveWorkcopyError = "";
+  export let gdriveWorkcopyMessage = "";
   export let error = "";
 
   export let onCancel = () => {};
@@ -34,6 +39,9 @@
   export let onGdriveAuthStart = () => {};
   export let onGdriveAuthComplete = () => {};
   export let onGdriveAuthSignOut = () => {};
+  export let onGdriveWorkcopyRefresh = () => {};
+  export let onGdriveWorkcopyDelete = () => {};
+  export let onGdriveWorkcopyCleanup = () => {};
 
   let activeSection = "general";
   let draft = {};
@@ -43,6 +51,7 @@
     copy_path_to_clipboard: true,
     open_after_write: true,
   };
+  let gdriveCleanupDays = 3;
   let gdriveDraft = {
     client_id: "",
     client_secret: "",
@@ -200,6 +209,45 @@
   function gdriveBackendModeLabel(mode) {
     if (mode === "real") return t("settings.gdrive.backend_mode_real");
     return t("settings.gdrive.backend_mode_stub");
+  }
+
+  function gdriveTimeText(value) {
+    const ms = Number(value ?? Number.NaN);
+    if (!Number.isFinite(ms) || ms <= 0) return "-";
+    try {
+      return new Date(ms).toLocaleString();
+    } catch {
+      return String(ms);
+    }
+  }
+
+  function gdriveWorkcopyStatusLabel(item) {
+    if (!item?.exists) return t("settings.gdrive.workcopy.status_missing");
+    if (item?.dirty) return t("settings.gdrive.workcopy.status_dirty");
+    return t("settings.gdrive.workcopy.status_local");
+  }
+
+  function gdriveWorkcopyUpdatedText(item) {
+    return gdriveTimeText(item?.updatedAtMs);
+  }
+
+  function gdriveWorkcopyNameText(item) {
+    const name = String(item?.fileName || "").trim();
+    if (name) return name;
+    return String(item?.resourceId || "").trim() || "-";
+  }
+
+  function gdriveWorkcopySizeText(item) {
+    const value = Number(item?.sizeBytes ?? Number.NaN);
+    if (!Number.isFinite(value) || value < 0) return "-";
+    return `${Math.trunc(value)} B`;
+  }
+
+  function runGdriveWorkcopyCleanup() {
+    const raw = Number(gdriveCleanupDays);
+    const days = Number.isFinite(raw) ? Math.max(1, Math.min(365, Math.trunc(raw))) : 3;
+    gdriveCleanupDays = days;
+    onGdriveWorkcopyCleanup?.(days);
   }
 
   $: {
@@ -458,8 +506,20 @@
             <div>{gdriveAuthStatus?.accountId || "-"}</div>
             <div class="settings-gdrive-key">{t("settings.gdrive.granted_scopes")}</div>
             <div>{gdriveScopesText(gdriveAuthStatus?.grantedScopes)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.write_scope")}</div>
+            <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.hasWriteScope))}</div>
             <div class="settings-gdrive-key">{t("settings.gdrive.refresh_persisted")}</div>
             <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.refreshTokenPersisted))}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.access_token_expires")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.accessTokenExpiresAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_scope_insufficient")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.lastScopeInsufficientAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_write_conflict")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.lastWriteConflictAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_refresh_error")}</div>
+            <div>{gdriveAuthStatus?.lastTokenRefreshError || "-"}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_refresh_error_at")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.lastTokenRefreshErrorAtMs)}</div>
             <div class="settings-gdrive-key">{t("settings.gdrive.token_store")}</div>
             <div>{gdriveAuthStatus?.tokenStoreBackend || "-"}</div>
             <div class="settings-gdrive-key">{t("settings.gdrive.token_store_available")}</div>
@@ -553,6 +613,72 @@
           {#if gdriveAuthError}
             <p class:test-error={true} class="settings-test-message">{gdriveAuthError}</p>
           {/if}
+
+          <div class="settings-gdrive-workcopy">
+            <div class="settings-profile-title">{t("settings.gdrive.workcopy.title")}</div>
+            <p class="settings-help settings-help-compact">{t("settings.gdrive.workcopy.help")}</p>
+
+            <div class="settings-gdrive-actions">
+              <button
+                type="button"
+                disabled={gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+                onclick={() => onGdriveWorkcopyRefresh?.()}
+              >
+                {t("settings.gdrive.workcopy.refresh")}
+              </button>
+              <input
+                type="number"
+                min="1"
+                max="365"
+                bind:value={gdriveCleanupDays}
+                class="settings-gdrive-days-input"
+              />
+              <button
+                type="button"
+                disabled={gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+                onclick={runGdriveWorkcopyCleanup}
+              >
+                {t("settings.gdrive.workcopy.cleanup")}
+              </button>
+            </div>
+
+            {#if gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+              <p class="settings-help settings-help-compact">{t("settings.gdrive.workcopy.busy")}</p>
+            {/if}
+            {#if gdriveWorkcopyMessage}
+              <p class="settings-test-message">{gdriveWorkcopyMessage}</p>
+            {/if}
+            {#if gdriveWorkcopyError}
+              <p class:test-error={true} class="settings-test-message">{gdriveWorkcopyError}</p>
+            {/if}
+
+            {#if Array.isArray(gdriveWorkcopyItems) && gdriveWorkcopyItems.length > 0}
+              <div class="settings-gdrive-workcopy-list">
+                {#each gdriveWorkcopyItems as item (item.resourceId)}
+                  <div class="settings-gdrive-workcopy-item">
+                    <div class="settings-gdrive-workcopy-main">
+                      <div class="settings-gdrive-workcopy-name">{gdriveWorkcopyNameText(item)}</div>
+                      <div class="settings-gdrive-workcopy-meta">
+                        <span>{gdriveWorkcopyStatusLabel(item)}</span>
+                        <span>{gdriveWorkcopySizeText(item)}</span>
+                        <span>{gdriveWorkcopyUpdatedText(item)}</span>
+                      </div>
+                      <div class="settings-gdrive-workcopy-path">{item.localPath || "-"}</div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+                      onclick={() => onGdriveWorkcopyDelete?.(item)}
+                    >
+                      {t("settings.gdrive.workcopy.delete")}
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {:else if !gdriveWorkcopyLoading}
+              <p class="settings-help settings-help-compact">{t("settings.gdrive.workcopy.empty")}</p>
+            {/if}
+          </div>
         </div>
       {/if}
 
@@ -827,6 +953,66 @@
     flex-wrap: wrap;
     gap: 8px;
     margin: 8px 0 10px;
+  }
+
+  .settings-gdrive-workcopy {
+    border-top: 1px solid var(--ui-border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .settings-gdrive-days-input {
+    width: 80px;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--ui-border-strong);
+    background: var(--ui-surface);
+    color: var(--ui-fg);
+    border-radius: 3px;
+  }
+
+  .settings-gdrive-workcopy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .settings-gdrive-workcopy-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid var(--ui-border);
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--ui-surface-2);
+  }
+
+  .settings-gdrive-workcopy-main {
+    min-width: 0;
+  }
+
+  .settings-gdrive-workcopy-name {
+    font-size: 12px;
+    color: var(--ui-fg);
+    overflow-wrap: anywhere;
+  }
+
+  .settings-gdrive-workcopy-meta {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ui-muted);
+    flex-wrap: wrap;
+  }
+
+  .settings-gdrive-workcopy-path {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ui-muted);
+    overflow-wrap: anywhere;
   }
 </style>
 
