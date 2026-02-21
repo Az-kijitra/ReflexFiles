@@ -1,5 +1,7 @@
 export type EntryType = "file" | "dir";
 export type StorageProvider = "local" | "gdrive";
+export type GdriveAuthPhase = "signed_out" | "pending" | "authorized";
+export type GdriveBackendMode = "stub" | "real";
 
 export interface ResourceRef {
   provider: StorageProvider;
@@ -15,6 +17,38 @@ export interface ProviderCapabilities {
   can_delete: boolean;
   can_archive_create: boolean;
   can_archive_extract: boolean;
+}
+
+export interface GdriveAuthStatus {
+  phase: GdriveAuthPhase;
+  backendMode: GdriveBackendMode;
+  accountId: string | null;
+  grantedScopes: string[];
+  refreshTokenPersisted: boolean;
+  pendingStartedAtMs: number | null;
+  lastError: string;
+  tokenStoreBackend: string;
+  tokenStoreAvailable: boolean;
+}
+
+export interface GdriveAuthStartPayload {
+  authorizationUrl: string;
+  issuedAtMs: number;
+  pendingExpiresInSec: number;
+}
+
+export interface GdriveAuthCallbackValidated {
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+  clientId: string;
+  scopes: string[];
+}
+
+export interface GdriveAuthCallbackCaptured {
+  callbackUrl: string;
+  state: string;
+  code: string;
 }
 
 export type {

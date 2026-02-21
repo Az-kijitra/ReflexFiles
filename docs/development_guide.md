@@ -1,5 +1,5 @@
 # Development Guide
-Updated: 2026-02-20
+Updated: 2026-02-21
 
 ## Scope
 This guide is for day-to-day development contributors.
@@ -69,6 +69,14 @@ cargo check --manifest-path src-tauri/Cargo.toml --locked --features gdrive-read
 cargo test --manifest-path src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
 ```
 
+## Google Cloud Ownership Policy (Google Drive)
+- Development is based on maintainer personal Google Cloud usage.
+- Public GitHub content must never expose real Google API credentials.
+- The repository must keep credential-empty defaults and placeholder examples only.
+- End users configure their own Google Cloud OAuth client (`client_id`) following:
+  - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+  - `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+
 ## Google Drive Gate 0 DoD (Definition of Done)
 Use this checklist before starting Google Drive implementation work.
 References:
@@ -88,6 +96,7 @@ Mandatory:
 - `e2e:capability` passes.
 5. Secret handling rules are documented and enforceable.
 - OAuth/token handling policy is documented (no token/plain secret logging, protected storage target defined).
+ - Public repository contains no real credential values.
 6. Public docs are synchronized.
 - Related EN docs in `docs/` and JA docs in `docs/ja/` are updated together.
 
@@ -113,12 +122,15 @@ Recommended:
 - ADR-0001 (Storage Provider boundary, JA): `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
 - Google Drive Gate 0 threat model (EN): `docs/THREAT_MODEL_GDRIVE_GATE0.md`
 - Google Drive Gate 0 threat model (JA): `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Google Drive self-setup (EN): `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+- Google Drive self-setup (JA): `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 
 ## EN/JA Mapping
 - User manual: `user_manual.md` <-> `docs/ja/user_manual.ja.md`
 - Maintenance guide: `docs/maintenance_guide.md` <-> `docs/ja/maintenance_guide.ja.md`
 - Security policy: `docs/SECURITY.md` <-> `docs/ja/SECURITY.ja.md`
 - Google Drive Gate 0 threat model: `docs/THREAT_MODEL_GDRIVE_GATE0.md` <-> `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Google Drive self-setup: `docs/GOOGLE_DRIVE_SELF_SETUP.md` <-> `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - Contributing guide: `docs/CONTRIBUTING.md` <-> `docs/ja/CONTRIBUTING.ja.md`
 - Release notes 0.2.0: `docs/RELEASE_NOTES_0.2.0.md` <-> `docs/ja/RELEASE_NOTES_0.2.0.ja.md`
 

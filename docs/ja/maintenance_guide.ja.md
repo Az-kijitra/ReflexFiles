@@ -1,5 +1,5 @@
 # メンテナンスガイド
-更新日: 2026-02-20
+更新日: 2026-02-21
 
 ## 対象と目的
 このドキュメントは ReflexFiles の**保守担当者向け**です（エンドユーザー向けではありません）。
@@ -165,6 +165,24 @@ cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-
 cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
 ```
 
+## Google Cloud 資格情報運用（Google Drive）
+- 開発時はメンテナ個人の Google Cloud プロジェクト利用を許可する。
+- 公開リポジトリと配布成果物には、実際の Google API 資格情報を含めない。
+- リポジトリに保存しないもの:
+  - API key
+  - OAuth client secret
+  - access/refresh token
+  - 資格情報を含む `.env` ファイル
+- アプリ既定値は資格情報なしを維持する。
+- ユーザー向け公式手順は次を参照する:
+  - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+  - `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- 資格情報漏えいを検知した場合:
+  1. マージ/リリースを即時停止。
+  2. 必要に応じて履歴・成果物から漏えい値を除去。
+  3. 該当資格情報をローテーション。
+  4. 事象と再発防止策を保守記録へ残す。
+
 ### スイートサマリーと失敗分類
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` は以下を出力:
 - スイート `summary.json`
@@ -317,6 +335,8 @@ npm run check
 - `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
 - `docs/THREAT_MODEL_GDRIVE_GATE0.md`
 - `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+- `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`

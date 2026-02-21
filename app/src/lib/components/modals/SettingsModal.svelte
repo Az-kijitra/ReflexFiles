@@ -16,6 +16,11 @@
   export let reportMessage = "";
   export let reportIsError = false;
   export let shortcutConflicts = [];
+  export let gdriveAuthStatus = null;
+  export let gdriveAuthLoading = false;
+  export let gdriveAuthBusy = false;
+  export let gdriveAuthError = "";
+  export let gdriveAuthMessage = "";
   export let error = "";
 
   export let onCancel = () => {};
@@ -25,6 +30,10 @@
   export let onRestoreConfig = () => {};
   export let onExportReport = () => {};
   export let onRunDiagnostic = () => {};
+  export let onGdriveAuthRefresh = () => {};
+  export let onGdriveAuthStart = () => {};
+  export let onGdriveAuthComplete = () => {};
+  export let onGdriveAuthSignOut = () => {};
 
   let activeSection = "general";
   let draft = {};
@@ -33,6 +42,14 @@
     as_zip: false,
     copy_path_to_clipboard: true,
     open_after_write: true,
+  };
+  let gdriveDraft = {
+    client_id: "",
+    client_secret: "",
+    redirect_uri: "http://127.0.0.1:45123/oauth2/callback",
+    callback_url: "",
+    account_id: "",
+    refresh_token: "",
   };
 
   $: draft = {
@@ -49,6 +66,17 @@
     external_terminal_profile_cmd: initial.external_terminal_profile_cmd ?? "",
     external_terminal_profile_powershell: initial.external_terminal_profile_powershell ?? "",
     external_terminal_profile_wsl: initial.external_terminal_profile_wsl ?? "",
+  };
+
+  $: gdriveDraft = {
+    client_id: String(initial?.gdrive_oauth_client_id || ""),
+    client_secret: "",
+    redirect_uri:
+      String(initial?.gdrive_oauth_redirect_uri || "").trim() ||
+      "http://127.0.0.1:45123/oauth2/callback",
+    callback_url: "",
+    account_id: String(initial?.gdrive_account_id || ""),
+    refresh_token: "",
   };
 
   function clampTimeoutMs(value) {
@@ -77,9 +105,27 @@
     };
   }
 
+  function normalizeGdriveForSubmit(values) {
+    const redirectUriRaw = String(
+      values?.gdrive_oauth_redirect_uri ?? values?.redirect_uri ?? ""
+    ).trim();
+    return {
+      gdrive_oauth_client_id: String(
+        values?.gdrive_oauth_client_id ?? values?.client_id ?? ""
+      ).trim(),
+      gdrive_oauth_redirect_uri:
+        redirectUriRaw || "http://127.0.0.1:45123/oauth2/callback",
+      gdrive_account_id: String(values?.gdrive_account_id ?? values?.account_id ?? "").trim(),
+    };
+  }
+
   $: normalizedInitial = normalizeForSubmit(initial || {});
   $: normalizedDraft = normalizeForSubmit(draft || {});
-  $: hasUnsavedChanges = JSON.stringify(normalizedInitial) !== JSON.stringify(normalizedDraft);
+  $: normalizedGdriveInitial = normalizeGdriveForSubmit(initial || {});
+  $: normalizedGdriveDraft = normalizeGdriveForSubmit(gdriveDraft || {});
+  $: hasUnsavedChanges =
+    JSON.stringify(normalizedInitial) !== JSON.stringify(normalizedDraft) ||
+    JSON.stringify(normalizedGdriveInitial) !== JSON.stringify(normalizedGdriveDraft);
 
   function getUnsavedChangesLabel() {
     return normalizedDraft.ui_language === "ja"
@@ -106,7 +152,10 @@
   }
 
   function submit() {
-    onSave?.(normalizedDraft);
+    onSave?.({
+      ...normalizedDraft,
+      ...normalizedGdriveDraft,
+    });
   }
 
   function runExportReport() {
@@ -132,6 +181,36 @@
     { id: "external", label: "settings.section.external" },
     { id: "advanced", label: "settings.section.advanced" },
   ];
+
+  function gdrivePhaseLabel(phase) {
+    if (phase === "pending") return t("settings.gdrive.phase_pending");
+    if (phase === "authorized") return t("settings.gdrive.phase_authorized");
+    return t("settings.gdrive.phase_signed_out");
+  }
+
+  function gdriveScopesText(scopes) {
+    if (!Array.isArray(scopes) || !scopes.length) return "-";
+    return scopes.join(", ");
+  }
+
+  function gdriveBooleanLabel(value) {
+    return value ? t("state.on") : t("state.off");
+  }
+
+  function gdriveBackendModeLabel(mode) {
+    if (mode === "real") return t("settings.gdrive.backend_mode_real");
+    return t("settings.gdrive.backend_mode_stub");
+  }
+
+  $: {
+    if (
+      gdriveAuthStatus?.accountId &&
+      !String(gdriveDraft.account_id || "").trim() &&
+      typeof gdriveAuthStatus.accountId === "string"
+    ) {
+      gdriveDraft.account_id = gdriveAuthStatus.accountId;
+    }
+  }
 </script>
 
 <ModalShell
@@ -362,6 +441,117 @@
             </ul>
           {:else}
             <p>{t("settings.no_shortcut_conflicts")}</p>
+          {/if}
+        </div>
+
+        <div class="settings-gdrive-auth">
+          <div class="settings-profile-title">{t("settings.gdrive.title")}</div>
+          <p class="settings-help settings-help-compact">{t("settings.gdrive.help")}</p>
+          <p class="settings-help settings-help-compact">{t("settings.gdrive.persist_notice")}</p>
+
+          <div class="settings-gdrive-grid">
+            <div class="settings-gdrive-key">{t("settings.gdrive.phase")}</div>
+            <div>{gdrivePhaseLabel(gdriveAuthStatus?.phase)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.backend_mode")}</div>
+            <div>{gdriveBackendModeLabel(gdriveAuthStatus?.backendMode)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.account_id_current")}</div>
+            <div>{gdriveAuthStatus?.accountId || "-"}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.granted_scopes")}</div>
+            <div>{gdriveScopesText(gdriveAuthStatus?.grantedScopes)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.refresh_persisted")}</div>
+            <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.refreshTokenPersisted))}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.token_store")}</div>
+            <div>{gdriveAuthStatus?.tokenStoreBackend || "-"}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.token_store_available")}</div>
+            <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.tokenStoreAvailable))}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_error")}</div>
+            <div>{gdriveAuthStatus?.lastError || "-"}</div>
+          </div>
+
+          <div class="settings-gdrive-actions">
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthRefresh?.()}>
+              {t("settings.gdrive.refresh_status")}
+            </button>
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthSignOut?.(gdriveDraft)}>
+              {t("settings.gdrive.sign_out")}
+            </button>
+          </div>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.client_id")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.client_id}
+              placeholder={t("settings.gdrive.placeholder_client_id")}
+            />
+            <small>{t("settings.gdrive.client_id_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.client_secret_optional")}</span>
+            <input type="password" bind:value={gdriveDraft.client_secret} />
+            <small>{t("settings.gdrive.client_secret_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.redirect_uri")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.redirect_uri}
+              placeholder={t("settings.gdrive.placeholder_redirect_uri")}
+            />
+            <small>{t("settings.gdrive.redirect_uri_help")}</small>
+          </label>
+
+          <div class="settings-gdrive-actions">
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthStart?.(gdriveDraft)}>
+              {t("settings.gdrive.start_sign_in")}
+            </button>
+          </div>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.callback_url")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.callback_url}
+              placeholder={t("settings.gdrive.placeholder_callback_url")}
+            />
+            <small>{t("settings.gdrive.callback_url_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.account_id")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.account_id}
+              placeholder={t("settings.gdrive.placeholder_account_id")}
+            />
+            <small>{t("settings.gdrive.account_id_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.refresh_token_optional")}</span>
+            <input type="password" bind:value={gdriveDraft.refresh_token} />
+            <small>{t("settings.gdrive.refresh_token_help")}</small>
+          </label>
+
+          <div class="settings-gdrive-actions">
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthComplete?.(gdriveDraft)}>
+              {t("settings.gdrive.complete_sign_in")}
+            </button>
+          </div>
+
+          {#if gdriveAuthLoading || gdriveAuthBusy}
+            <p class="settings-help settings-help-compact">{t("settings.gdrive.busy")}</p>
+          {/if}
+          {#if gdriveAuthMessage}
+            <p class="settings-test-message">{gdriveAuthMessage}</p>
+          {/if}
+          {#if gdriveAuthStatus?.backendMode === "stub"}
+            <p class="settings-help settings-help-compact">{t("settings.gdrive.stub_notice")}</p>
+          {/if}
+          {#if gdriveAuthError}
+            <p class:test-error={true} class="settings-test-message">{gdriveAuthError}</p>
           {/if}
         </div>
       {/if}
@@ -612,6 +802,31 @@
   .settings-shortcut-conflicts li {
     margin-bottom: 4px;
     font-size: 12px;
+  }
+
+  .settings-gdrive-auth {
+    border-top: 1px solid var(--ui-border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .settings-gdrive-grid {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 4px 10px;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .settings-gdrive-key {
+    color: var(--ui-muted);
+  }
+
+  .settings-gdrive-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 10px;
   }
 </style>
 

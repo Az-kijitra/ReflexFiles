@@ -83,6 +83,15 @@ pub fn run() {
             crate::viewer_cmds::close_viewer,
             crate::viewer_cmds::viewer_take_pending_path,
             crate::viewer_cmds::viewer_take_pending_open,
+            crate::gdrive_auth_cmds::gdrive_auth_get_status,
+            crate::gdrive_auth_cmds::gdrive_auth_start_session,
+            crate::gdrive_auth_cmds::gdrive_auth_validate_callback,
+            crate::gdrive_auth_cmds::gdrive_auth_wait_for_callback,
+            crate::gdrive_auth_cmds::gdrive_auth_complete_exchange,
+            crate::gdrive_auth_cmds::gdrive_auth_sign_out,
+            crate::gdrive_auth_cmds::gdrive_auth_store_client_secret,
+            crate::gdrive_auth_cmds::gdrive_auth_load_client_secret,
+            crate::gdrive_auth_cmds::gdrive_auth_clear_client_secret,
             crate::watch::fs_watch_start,
             crate::watch::fs_watch_stop
         ])

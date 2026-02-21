@@ -232,6 +232,15 @@ Windows Terminal のプロファイル名を固定で指定できます。
 診断レポート保存先:
 - %APPDATA%\\ReflexFIles\\diagnostics\\
 
+### Google Drive 設定ガイド（個人利用）
+Google Drive 連携の設定手順は、次の専用ガイドを参照してください。
+- `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+
+このガイドには以下を記載しています。
+- Google Cloud の画面入力例
+- 認証で詰まりやすいポイント（`ERR_CONNECTION_REFUSED` / `client_secret is missing` など）
+- 無課金運用の方法（課金回避ルール、毎月の確認手順）
+
 ### ショートカット競合警告（設定画面）
 **設定 > 詳細** に、ショートカット競合の警告一覧を表示します。
 - 既知のグローバルショートカット競合（例: `Ctrl+Alt+G` と Google Drive）

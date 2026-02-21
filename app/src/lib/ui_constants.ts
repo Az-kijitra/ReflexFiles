@@ -402,6 +402,73 @@
       "settings.restore_failed": "Restore failed: {error}",
       "settings.restore_ready": "Config restored from backup",
       "settings.restore_confirm": "Restore latest config backup? Current config will be overwritten.",
+      "settings.gdrive.title": "Google Drive (Phased Preview)",
+      "settings.gdrive.help":
+        "Personal-use setup only. Keep real credentials out of the public repository.",
+      "settings.gdrive.persist_notice":
+        "Saved locally: client_id, redirect_uri, account ID. client_secret is stored only in OS secure credential storage (not in config.toml). callback URL is not saved.",
+      "settings.gdrive.phase": "Auth phase",
+      "settings.gdrive.phase_signed_out": "Signed out",
+      "settings.gdrive.phase_pending": "Pending callback",
+      "settings.gdrive.phase_authorized": "Authorized",
+      "settings.gdrive.backend_mode": "Backend mode",
+      "settings.gdrive.backend_mode_stub": "Stub (virtual test data)",
+      "settings.gdrive.backend_mode_real": "Real Google Drive API",
+      "settings.gdrive.account_id_current": "Current account",
+      "settings.gdrive.granted_scopes": "Granted scopes",
+      "settings.gdrive.refresh_persisted": "Refresh token persisted",
+      "settings.gdrive.token_store": "Token store backend",
+      "settings.gdrive.token_store_available": "Token store available",
+      "settings.gdrive.last_error": "Last auth error",
+      "settings.gdrive.refresh_status": "Refresh Auth Status",
+      "settings.gdrive.sign_out": "Sign Out",
+      "settings.gdrive.client_id": "OAuth client_id",
+      "settings.gdrive.client_id_help": "Paste your own Google OAuth desktop client ID.",
+      "settings.gdrive.client_secret_optional": "OAuth client_secret (optional)",
+      "settings.gdrive.client_secret_help":
+        "Only needed if Google requires it during token exchange. If entered and sign-in succeeds, it is stored in OS secure credential storage. Never commit real secrets.",
+      "settings.gdrive.redirect_uri": "OAuth redirect_uri",
+      "settings.gdrive.redirect_uri_help": "Must match redirect URI configured in your Google Cloud client.",
+      "settings.gdrive.start_sign_in": "Start Sign-In",
+      "settings.gdrive.callback_url": "Callback URL",
+      "settings.gdrive.callback_url_help":
+        "Paste the full callback URL after browser sign-in (contains state and code).",
+      "settings.gdrive.account_id": "Account ID (email)",
+      "settings.gdrive.account_id_help": "Google account email used for this authorization.",
+      "settings.gdrive.refresh_token_optional": "Refresh token (optional)",
+      "settings.gdrive.refresh_token_help":
+        "Optional manual mode. Leave empty for automatic token exchange.",
+      "settings.gdrive.complete_sign_in": "Complete Sign-In",
+      "settings.gdrive.placeholder_client_id":
+        "1234567890-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+      "settings.gdrive.placeholder_redirect_uri": "http://127.0.0.1:45123/oauth2/callback",
+      "settings.gdrive.placeholder_callback_url":
+        "http://127.0.0.1:45123/oauth2/callback?state=...&code=...",
+      "settings.gdrive.placeholder_account_id": "user@example.com",
+      "settings.gdrive.busy": "Google Drive auth operation in progress...",
+      "settings.gdrive.callback_missing": "Callback URL is required.",
+      "settings.gdrive.callback_parse_error":
+        "Callback URL must contain both state and code query parameters.",
+      "settings.gdrive.token_exchange_network_error":
+        "Network error while contacting Google token endpoint.",
+      "settings.gdrive.token_exchange_failed": "Google token exchange failed.",
+      "settings.gdrive.token_exchange_failed_with_detail":
+        "Google token exchange failed: {detail}",
+      "settings.gdrive.token_exchange_requires_client_secret":
+        'Google requested client_secret. Set "OAuth client_secret (optional)" then retry Complete Sign-In.',
+      "settings.gdrive.token_exchange_no_access_token":
+        "Google token response did not include access_token.",
+      "settings.gdrive.client_or_redirect_required": "client_id and redirect_uri are required.",
+      "settings.gdrive.account_required": "Account ID is required.",
+      "settings.gdrive.started_opened": "OAuth session started. Browser opened for sign-in.",
+      "settings.gdrive.callback_auto_captured":
+        "Callback URL captured automatically. Review account/secret fields and run Complete Sign-In.",
+      "settings.gdrive.complete_done": "Google Drive auth session updated.",
+      "settings.gdrive.complete_done_manual":
+        "Google Drive auth session updated (manual token mode).",
+      "settings.gdrive.sign_out_done": "Google Drive auth session cleared.",
+      "settings.gdrive.stub_notice":
+        "This build uses stub data for gdrive:// paths. Real Google Drive file listing is not active yet.",
       "settings.shortcut_conflicts": "Shortcut conflicts",
       "settings.no_shortcut_conflicts": "No known global shortcut conflicts detected.",
       "settings.shortcut_conflict_google_drive": "May trigger Google Drive global shortcut.",
@@ -783,6 +850,77 @@
       "settings.restore_failed": "復元に失敗しました: {error}",
       "settings.restore_ready": "バックアップから設定を復元しました",
       "settings.restore_confirm": "最新の設定バックアップを復元しますか？現在の config.toml は上書きされます。",
+      "settings.gdrive.title": "Google Drive（段階プレビュー）",
+      "settings.gdrive.help":
+        "個人利用前提の設定です。公開リポジトリに実資格情報を含めないでください。",
+      "settings.gdrive.persist_notice":
+        "ローカル保存: client_id / redirect_uri / アカウントID。client_secret は config.toml には保存せず、OSの安全な資格情報ストアのみに保存します。コールバックURLは保存しません。",
+      "settings.gdrive.phase": "認証フェーズ",
+      "settings.gdrive.phase_signed_out": "未サインイン",
+      "settings.gdrive.phase_pending": "コールバック待ち",
+      "settings.gdrive.phase_authorized": "認証済み",
+      "settings.gdrive.backend_mode": "バックエンド種別",
+      "settings.gdrive.backend_mode_stub": "スタブ（テスト用仮想データ）",
+      "settings.gdrive.backend_mode_real": "実 Google Drive API",
+      "settings.gdrive.account_id_current": "現在のアカウント",
+      "settings.gdrive.granted_scopes": "許可スコープ",
+      "settings.gdrive.refresh_persisted": "refresh token 保存済み",
+      "settings.gdrive.token_store": "トークン保存バックエンド",
+      "settings.gdrive.token_store_available": "トークン保存の利用可否",
+      "settings.gdrive.last_error": "直近の認証エラー",
+      "settings.gdrive.refresh_status": "認証状態を更新",
+      "settings.gdrive.sign_out": "サインアウト",
+      "settings.gdrive.client_id": "OAuth クライアント ID",
+      "settings.gdrive.client_id_help":
+        "ご自身の Google OAuth デスクトップ クライアント ID を入力します。",
+      "settings.gdrive.client_secret_optional": "OAuth クライアント シークレット（任意）",
+      "settings.gdrive.client_secret_help":
+        "Google 側が token 交換時に要求した場合のみ使います。入力して認証が成功すると、OSの安全な資格情報ストアへ保存します。実シークレットは絶対にコミットしないでください。",
+      "settings.gdrive.redirect_uri": "OAuth リダイレクト URI",
+      "settings.gdrive.redirect_uri_help":
+        "Google Cloud のOAuthクライアント設定と完全一致させてください。",
+      "settings.gdrive.start_sign_in": "サインイン開始",
+      "settings.gdrive.callback_url": "コールバック URL",
+      "settings.gdrive.callback_url_help":
+        "ブラウザ認証後に取得したURL（state/code付き）を貼り付けます。",
+      "settings.gdrive.account_id": "アカウント ID（メールアドレス）",
+      "settings.gdrive.account_id_help": "この認証で使うGoogleアカウントのメールアドレス。",
+      "settings.gdrive.refresh_token_optional": "リフレッシュ トークン（任意）",
+      "settings.gdrive.refresh_token_help":
+        "手動モード用です。空欄なら自動token交換を試行します。",
+      "settings.gdrive.complete_sign_in": "サインイン完了",
+      "settings.gdrive.placeholder_client_id":
+        "1234567890-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
+      "settings.gdrive.placeholder_redirect_uri": "http://127.0.0.1:45123/oauth2/callback",
+      "settings.gdrive.placeholder_callback_url":
+        "http://127.0.0.1:45123/oauth2/callback?state=...&code=...",
+      "settings.gdrive.placeholder_account_id": "user@example.com",
+      "settings.gdrive.busy": "Google Drive 認証処理を実行中です...",
+      "settings.gdrive.callback_missing": "コールバックURLを入力してください。",
+      "settings.gdrive.callback_parse_error":
+        "コールバックURLには state と code の両方が必要です。",
+      "settings.gdrive.token_exchange_network_error":
+        "Google token endpoint への通信に失敗しました。",
+      "settings.gdrive.token_exchange_failed": "Google token 交換に失敗しました。",
+      "settings.gdrive.token_exchange_failed_with_detail":
+        "Google token 交換に失敗しました: {detail}",
+      "settings.gdrive.token_exchange_requires_client_secret":
+        "Google 側が client_secret を要求しました。OAuth client_secret（任意）を入力して再実行してください。",
+      "settings.gdrive.token_exchange_no_access_token":
+        "Google token 応答に access_token が含まれていません。",
+      "settings.gdrive.client_or_redirect_required":
+        "client_id と redirect_uri を入力してください。",
+      "settings.gdrive.account_required": "アカウントIDを入力してください。",
+      "settings.gdrive.started_opened":
+        "OAuth セッションを開始し、サインイン用ブラウザを開きました。",
+      "settings.gdrive.callback_auto_captured":
+        "コールバックURLを自動取得しました。アカウント/シークレットを確認して「サインイン完了」を実行してください。",
+      "settings.gdrive.complete_done": "Google Drive 認証セッションを更新しました。",
+      "settings.gdrive.complete_done_manual":
+        "Google Drive 認証セッションを更新しました（手動トークンモード）。",
+      "settings.gdrive.sign_out_done": "Google Drive 認証セッションを解除しました。",
+      "settings.gdrive.stub_notice":
+        "このビルドの gdrive:// はスタブ表示です。実 Google Drive ファイル一覧はまだ有効化されていません。",
       "settings.shortcut_conflicts": "ショートカット競合",
       "settings.no_shortcut_conflicts": "既知のグローバルショートカット競合はありません。",
       "settings.shortcut_conflict_google_drive": "Google Drive のグローバルショートカットと競合する可能性があります。",

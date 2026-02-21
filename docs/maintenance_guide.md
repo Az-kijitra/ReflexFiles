@@ -1,5 +1,5 @@
 # Maintenance Guide
-Updated: 2026-02-20
+Updated: 2026-02-21
 
 ## Scope
 This document is for maintainers of ReflexFiles (not end users).
@@ -163,6 +163,24 @@ cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-
 cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
 ```
 
+## Google Cloud Credential Operations (Google Drive)
+- Development may use maintainer personal Google Cloud projects.
+- Public repository and release artifacts must not contain real Google API credentials.
+- Never store in repo:
+  - API key
+  - OAuth client secret
+  - access/refresh token
+  - credential-bearing `.env` files
+- Keep app defaults credential-empty.
+- Official user-facing setup must follow:
+  - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+  - `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- If credential exposure is detected:
+  1. Stop merge/release immediately.
+  2. Remove leaked value from history/archives as needed.
+  3. Rotate compromised credentials.
+  4. Record incident and preventive action in maintenance notes.
+
 ### Suite summary and failure classification
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` now writes:
 - suite-level `summary.json`
@@ -312,6 +330,8 @@ Actions:
 - `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
 - `docs/THREAT_MODEL_GDRIVE_GATE0.md`
 - `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+- `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`

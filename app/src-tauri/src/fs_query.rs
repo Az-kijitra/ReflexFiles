@@ -13,9 +13,12 @@ use crate::error::{AppError, AppErrorKind, AppResult};
 use crate::storage_provider::{provider_capabilities, provider_registry, resolve_legacy_path};
 use crate::types::{
     DirStats, Entry, EntryType, Properties, PropertyKind, ProviderCapabilities, ResourceRef,
-    SortKey, SortOrder,
+    SortKey, SortOrder, StorageProvider,
 };
 use crate::utils::{is_hidden, system_time_to_rfc3339};
+
+#[cfg(not(feature = "gdrive-readonly-stub"))]
+use crate::gdrive_real::gdrive_entry_info_for_ref_impl;
 
 #[cfg(feature = "gdrive-readonly-stub")]
 use crate::gdrive_stub::{
@@ -23,9 +26,6 @@ use crate::gdrive_stub::{
     gdrive_stub_resource_ext, gdrive_stub_resource_kind, gdrive_stub_resource_name,
     gdrive_stub_text_content_for_resource_ref, GdriveStubNodeKind,
 };
-
-#[cfg(feature = "gdrive-readonly-stub")]
-use crate::types::StorageProvider;
 
 const IMAGE_CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
 const IMAGE_CACHE_MAX_FILES: usize = 400;
@@ -162,6 +162,29 @@ fn entry_from_resource_ref(resource_ref: ResourceRef) -> AppResult<Entry> {
             modified: String::new(),
             hidden: false,
             ext,
+        });
+    }
+
+    #[cfg(not(feature = "gdrive-readonly-stub"))]
+    if matches!(resource_ref.provider, StorageProvider::Gdrive) {
+        let info = gdrive_entry_info_for_ref_impl(&resource_ref)?;
+        let display_path = provider.display_path(&resource_ref);
+        return Ok(Entry {
+            name: info.name,
+            path: display_path.clone(),
+            display_path,
+            provider: resource_ref.provider,
+            resource_ref,
+            capabilities,
+            entry_type: if info.is_dir {
+                EntryType::Dir
+            } else {
+                EntryType::File
+            },
+            size: info.size,
+            modified: info.modified,
+            hidden: false,
+            ext: info.ext,
         });
     }
 
@@ -859,6 +882,36 @@ pub(crate) fn fs_get_properties_by_ref_impl(resource_ref: ResourceRef) -> AppRes
             readonly: true,
             system: false,
             ext,
+            files: 0,
+            dirs: 0,
+            dir_stats_pending: false,
+            dir_stats_timeout: false,
+        });
+    }
+
+    #[cfg(not(feature = "gdrive-readonly-stub"))]
+    if matches!(resource_ref.provider, StorageProvider::Gdrive) {
+        let info = gdrive_entry_info_for_ref_impl(&resource_ref)?;
+        return Ok(Properties {
+            name: info.name,
+            path: display_path.clone(),
+            display_path,
+            provider: resource_ref.provider,
+            resource_ref,
+            capabilities,
+            kind: if info.is_dir {
+                PropertyKind::Dir
+            } else {
+                PropertyKind::File
+            },
+            size: info.size,
+            created: String::new(),
+            modified: info.modified,
+            accessed: String::new(),
+            hidden: false,
+            readonly: true,
+            system: false,
+            ext: info.ext,
             files: 0,
             dirs: 0,
             dir_stats_pending: false,
