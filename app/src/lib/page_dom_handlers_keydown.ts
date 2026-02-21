@@ -21,6 +21,14 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         event.which === code);
     const hasOperationTargets =
       params.getSelectedPaths().length > 0 || Boolean(params.getEntries()[params.getFocusedIndex()]);
+    const isPathInputActive =
+      Boolean(pathInputEl && activeElement === pathInputEl) ||
+      Boolean(
+        pathInputEl &&
+          activeElement &&
+          typeof (pathInputEl as any).contains === "function" &&
+          (pathInputEl as any).contains(activeElement)
+      );
     const hasBlockingOverlay =
       params.getPasteConfirmOpen() ||
       params.getDeleteConfirmOpen() ||
@@ -58,6 +66,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("C", 67)) {
+        if (isPathInputActive) return;
         event.preventDefault();
         if (!hasOperationTargets) {
           params.setStatusMessage(params.t("status.no_selection"));
@@ -70,6 +79,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("X", 88)) {
+        if (isPathInputActive) return;
         event.preventDefault();
         if (!hasOperationTargets) {
           params.setStatusMessage(params.t("status.no_selection"));
@@ -82,6 +92,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("V", 86)) {
+        if (isPathInputActive) return;
         event.preventDefault();
         if (import.meta.env.DEV) {
           params.setStatusMessage("DBG Ctrl+V");

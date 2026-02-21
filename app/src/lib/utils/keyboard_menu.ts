@@ -17,14 +17,7 @@ export function handleMenuKey(event, ctx) {
       event.keyCode === code ||
       event.which === code);
   const shouldPassThroughListShortcut = () =>
-    isCtrlLetter("N", 78) ||
-    isCtrlLetter("C", 67) ||
-    isCtrlLetter("X", 88) ||
-    isCtrlLetter("V", 86) ||
-    ctx.matchesAction(event, "new_file") ||
-    ctx.matchesAction(event, "copy") ||
-    ctx.matchesAction(event, "cut") ||
-    ctx.matchesAction(event, "paste");
+    isCtrlLetter("N", 78) || ctx.matchesAction(event, "new_file");
 
   if (event.key === "Escape" && ctx.menuOpen) {
     event.preventDefault();

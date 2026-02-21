@@ -636,6 +636,45 @@ try {
     );
   };
 
+  const assertPathInputCopyPaste = async ({ basePath, suffix }) => {
+    await setPath(basePath);
+    const input = await getPathInput();
+    await input.click();
+    await input.sendKeys(Key.chord(Key.CONTROL, 'a'));
+    await input.sendKeys(Key.DELETE);
+    await input.sendKeys(`${basePath}\\${suffix}`);
+    const result = await driver.executeScript((el) => {
+      if (!el) {
+        return { c: { prevented: true, accepted: false }, v: { prevented: true, accepted: false } };
+      }
+      el.focus();
+      const fire = (key, code) => {
+        const event = new KeyboardEvent('keydown', {
+          key,
+          code,
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        const accepted = el.dispatchEvent(event);
+        return {
+          prevented: event.defaultPrevented,
+          accepted,
+        };
+      };
+      return {
+        c: fire('c', 'KeyC'),
+        v: fire('v', 'KeyV'),
+      };
+    }, input);
+
+    if (result?.c?.prevented || result?.v?.prevented || result?.c?.accepted === false || result?.v?.accepted === false) {
+      throw new Error(
+        `path copy/paste keydown was captured by app: c=${JSON.stringify(result?.c)} v=${JSON.stringify(result?.v)}`
+      );
+    }
+  };
+
   const readCreateError = async () => {
     const errors = await driver.findElements(By.css('.modal .error'));
     if (!errors.length) return '';
@@ -759,9 +798,14 @@ try {
     throw new Error(`${label} was not created: ${path}`);
   };
 
-  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH Tab completion)...');
+  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH copy/paste / PATH Tab completion)...');
   const shortcutProbeFile = `e2e_${testId}_shortcut_probe.txt`;
   await confirmCreateViaShortcutOnly(shortcutProbeFile);
+  await assertPathInputCopyPaste({
+    basePath: targetPath,
+    suffix: `clip_probe_${testId}`,
+  });
+  await setPath(targetPath);
 
   console.log('[smoke] creating files...');
   await confirmCreate(fileA);
