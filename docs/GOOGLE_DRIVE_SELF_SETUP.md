@@ -9,7 +9,12 @@ Each user configures and owns their own Google Cloud project and OAuth client.
 1. ReflexFiles Google Drive integration is being delivered in phases.
 2. If backend mode is `Real Google Drive API`, `gdrive://root/my-drive` lists real Drive data.
 3. If backend mode is `Stub (virtual test data)`, `gdrive://` paths still show virtual test data.
-4. File-content read/edit paths are still being implemented in later phases (listing is delivered first).
+4. In `Real Google Drive API` mode, file content viewing is available for viewer-supported types (text/markdown/image).
+5. Editing/write-back to Google Drive is manual (context menu: `Write Back to Google Drive`).
+6. Google Drive read files are cached in local temp for viewing and are cleared on Google Drive sign-out.
+7. Opening a Google Drive file in an external app uses a local workcopy; automatic upload-back is not performed.
+8. Upload-back is manual: use context menu `Write Back to Google Drive` on the same Google Drive file.
+9. Write-back requires OAuth scope `https://www.googleapis.com/auth/drive`.
 
 ## Security Rules (Mandatory)
 - Do not publish API keys, OAuth client secrets, or tokens in GitHub.
@@ -103,6 +108,7 @@ Each user configures and owns their own Google Cloud project and OAuth client.
 5. Confirm auth phase is Authorized.
 6. If backend mode is `Stub (virtual test data)`, `gdrive://` paths are still test data, not real Drive files.
 7. After one successful sign-in, ReflexFiles reuses saved credentials on next launch and reconnects automatically when `gdrive://` is accessed.
+8. On sign-out, saved refresh token is cleared and downloaded Google Drive read-cache files are removed from local temp.
 
 ## Publish-Safe Checklist
 1. Client secret is not committed.
@@ -119,7 +125,13 @@ Each user configures and owns their own Google Cloud project and OAuth client.
 4. `redirect_uri_mismatch`
    - ensure exact URI match between app and Google config.
 5. Auth succeeds but only mock files appear
-   - current Gate 1 is stub-data listing by design.
+   - check `Backend mode`; if it is `Stub`, your build is stub mode and real Drive data is unavailable.
+6. Write-back says no local workcopy
+   - open the file once in an external app first (this creates local workcopy).
+7. Write-back conflict
+   - Google Drive file changed since your workcopy was created. Re-open external app flow to refresh workcopy and retry.
+8. `Request had insufficient authentication scopes` on write-back
+   - Your token was authorized with read-only scope. Run `Sign Out`, then `Start Sign-In` and `Complete Sign-In` again so ReflexFiles obtains `https://www.googleapis.com/auth/drive`.
 
 ## References (Official)
 - Google Drive API Usage limits / Pricing:

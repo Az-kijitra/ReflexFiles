@@ -70,8 +70,10 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const {
     getExternalApps,
     getTargetEntry,
+    resolveGdriveWorkcopyBadge,
     runExternalApp,
     openEntry,
+    syncGdriveWorkcopyForEntry,
     openFocusedOrSelected,
     openParentForSelection,
     openInExplorer,
@@ -130,6 +132,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     showError,
     runExternalApp,
     getExternalApps,
+    syncGdriveWorkcopyForEntry,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {
@@ -314,6 +317,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     onContextDelete,
     onContextProperties,
     getExternalApps,
+    resolveGdriveWorkcopyBadge,
     runExternalApp,
     getTargetEntry,
   };

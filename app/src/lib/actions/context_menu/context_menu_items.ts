@@ -38,6 +38,7 @@ import { getParentPath } from "$lib/utils/path";
  * @param {(err: unknown) => void} actions.showError
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
+ * @param {(entry: import("$lib/types").Entry | null) => void} [actions.syncGdriveWorkcopyForEntry]
  * @param {() => void} closeContextMenu
  */
 export function createContextMenuItems(ctx, actions, closeContextMenu) {
@@ -60,6 +61,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     showError,
     runExternalApp,
     getExternalApps,
+    syncGdriveWorkcopyForEntry,
   } = actions;
 
   function onContextOpen() {
@@ -88,6 +90,18 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
 
   function onContextOpenGitClient() {
     openInGitClient();
+    closeContextMenu();
+  }
+
+  function onContextGdriveWriteBack() {
+    const selected = ctx.getSelectedPaths();
+    if (selected.length !== 1) return;
+    const target = ctx.getEntries().find((e) => e.path === selected[0]);
+    if (!target || target.type === "dir") {
+      closeContextMenu();
+      return;
+    }
+    syncGdriveWorkcopyForEntry?.(target);
     closeContextMenu();
   }
 
@@ -265,6 +279,12 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         ? !!getParentPath(selected[0])
         : !!getParentPath(ctx.getCurrentPath()));
     const selectedEntry = isSingle ? entries.find((e) => e.path === selected[0]) : null;
+    const isGdriveFile =
+      isSingle &&
+      !!selectedEntry &&
+      selectedEntry.type === "file" &&
+      (selectedEntry?.ref?.provider === "gdrive" ||
+        String(selectedEntry?.path || "").startsWith("gdrive://"));
     const isZip = !!selectedEntry && selectedEntry.ext?.toLowerCase() === ".zip";
     const canCopySelection = allSelectedSupport("can_copy");
     const canMoveSelection = allSelectedSupport("can_move");
@@ -310,6 +330,12 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         visible: isSingle && !!selectedEntry && selectedEntry.type !== "dir",
         action: () => onContextOpenExternalApp(app),
       })),
+      {
+        label: ctx.t("context.gdrive_write_back"),
+        enabled: isGdriveFile,
+        visible: isGdriveFile,
+        action: onContextGdriveWriteBack,
+      },
       {
         label: ctx.t("context.open_parent"),
         enabled: openParentEnabled,

@@ -51,6 +51,29 @@ export interface GdriveAuthCallbackCaptured {
   code: string;
 }
 
+export interface GdriveRevisionSnapshot {
+  resourceId: string;
+  fileId: string;
+  modified: string;
+  size: number;
+  md5Checksum: string | null;
+  version: string | null;
+  localSha256: string;
+}
+
+export interface GdriveEditWorkcopy {
+  localPath: string;
+  fileName: string;
+  revision: GdriveRevisionSnapshot;
+}
+
+export interface GdriveApplyEditResult {
+  uploaded: boolean;
+  unchanged: boolean;
+  conflict: boolean;
+  revision: GdriveRevisionSnapshot;
+}
+
 export type {
   AppConfig,
   ExternalAppConfig,

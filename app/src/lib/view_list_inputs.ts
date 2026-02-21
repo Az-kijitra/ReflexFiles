@@ -7,6 +7,7 @@
  */
 export function buildListViewInputs({ state, actions, formatters, helpers }) {
   return {
+    currentPath: state.currentPath,
     showSize: state.showSize,
     showTime: state.showTime,
     uiFileIconMode: state.uiFileIconMode,
@@ -25,6 +26,7 @@ export function buildListViewInputs({ state, actions, formatters, helpers }) {
     toggleSelection: actions.toggleSelection,
     setSelected: actions.setSelected,
     openEntry: actions.openEntry,
+    resolveGdriveWorkcopyBadge: actions.resolveGdriveWorkcopyBadge,
     formatName: formatters.formatName,
     formatSize: formatters.formatSize,
     formatModified: formatters.formatModified,

@@ -3,6 +3,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Mutex;
 #[cfg(target_os = "windows")]
 use std::process::Command;
@@ -42,6 +43,9 @@ struct DriveFileDto {
     #[serde(rename = "modifiedTime")]
     modified_time: Option<String>,
     size: Option<String>,
+    #[serde(rename = "md5Checksum")]
+    md5_checksum: Option<String>,
+    version: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -79,8 +83,52 @@ fn parse_resource_kind(resource_ref: &ResourceRef) -> AppResult<GdriveResourceKi
     if id == "root/shared-with-me" {
         return Ok(GdriveResourceKind::RootSharedWithMe);
     }
+    if id == "my-drive" {
+        return Ok(GdriveResourceKind::RootMyDrive);
+    }
+    if id == "shared-with-me" {
+        return Ok(GdriveResourceKind::RootSharedWithMe);
+    }
+    if let Some(rest) = id.strip_prefix("root/my-drive/") {
+        let file_id = rest
+            .split('/')
+            .filter(|segment| !segment.trim().is_empty())
+            .next_back()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if file_id.is_empty() {
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                "gdrive my-drive file id is empty",
+            ));
+        }
+        return Ok(GdriveResourceKind::MyDrive { file_id });
+    }
+    if let Some(rest) = id.strip_prefix("root/shared-with-me/") {
+        let file_id = rest
+            .split('/')
+            .filter(|segment| !segment.trim().is_empty())
+            .next_back()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if file_id.is_empty() {
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                "gdrive shared-with-me file id is empty",
+            ));
+        }
+        return Ok(GdriveResourceKind::SharedWithMe { file_id });
+    }
     if let Some(rest) = id.strip_prefix("my-drive/") {
-        let file_id = rest.trim().to_string();
+        let file_id = rest
+            .split('/')
+            .filter(|segment| !segment.trim().is_empty())
+            .next_back()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
         if file_id.is_empty() {
             return Err(AppError::with_kind(
                 AppErrorKind::InvalidPath,
@@ -90,7 +138,13 @@ fn parse_resource_kind(resource_ref: &ResourceRef) -> AppResult<GdriveResourceKi
         return Ok(GdriveResourceKind::MyDrive { file_id });
     }
     if let Some(rest) = id.strip_prefix("shared-with-me/") {
-        let file_id = rest.trim().to_string();
+        let file_id = rest
+            .split('/')
+            .filter(|segment| !segment.trim().is_empty())
+            .next_back()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
         if file_id.is_empty() {
             return Err(AppError::with_kind(
                 AppErrorKind::InvalidPath,
@@ -254,6 +308,62 @@ fn run_powershell_json(_script: &str) -> AppResult<Value> {
     ))
 }
 
+#[cfg(target_os = "windows")]
+fn run_powershell_bytes(script: &str) -> AppResult<Vec<u8>> {
+    for shell in ["pwsh", "powershell"] {
+        let output = Command::new(shell)
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ])
+            .output();
+
+        match output {
+            Ok(output) if output.status.success() => {
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if stdout.is_empty() {
+                    return Ok(Vec::new());
+                }
+                let decoded = base64::engine::general_purpose::STANDARD
+                    .decode(stdout.as_bytes())
+                    .map_err(|err| {
+                        AppError::with_kind(
+                            AppErrorKind::Io,
+                            format!("failed to decode powershell base64 output: {err}"),
+                        )
+                    })?;
+                return Ok(decoded);
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                let detail = if stderr.is_empty() {
+                    format!("powershell exited with status {}", output.status)
+                } else {
+                    stderr
+                };
+                return Err(AppError::with_kind(AppErrorKind::Io, detail));
+            }
+            Err(_) => continue,
+        }
+    }
+    Err(AppError::with_kind(
+        AppErrorKind::Io,
+        "failed to execute powershell",
+    ))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn run_powershell_bytes(_script: &str) -> AppResult<Vec<u8>> {
+    Err(AppError::with_kind(
+        AppErrorKind::Permission,
+        "google drive API bridge is supported on windows only",
+    ))
+}
+
 fn drive_files_get(access_token: &str, file_id: &str) -> AppResult<DriveFileDto> {
     if file_id.contains('/') {
         return Err(AppError::with_kind(
@@ -264,7 +374,10 @@ fn drive_files_get(access_token: &str, file_id: &str) -> AppResult<DriveFileDto>
     let endpoint = format!("{DRIVE_FILES_ENDPOINT}/{file_id}");
     let query = build_query_string(&[
         ("supportsAllDrives", "true".to_string()),
-        ("fields", "id,name,mimeType,modifiedTime,size".to_string()),
+        (
+            "fields",
+            "id,name,mimeType,modifiedTime,size,md5Checksum,version".to_string(),
+        ),
     ]);
     let uri = format!("{endpoint}?{query}");
     let script = format!(
@@ -275,6 +388,72 @@ fn drive_files_get(access_token: &str, file_id: &str) -> AppResult<DriveFileDto>
     let value = run_powershell_json(&script)?;
     serde_json::from_value::<DriveFileDto>(value).map_err(|err| {
         AppError::with_kind(AppErrorKind::Io, format!("invalid files.get JSON: {err}"))
+    })
+}
+
+fn drive_files_get_media(access_token: &str, file_id: &str) -> AppResult<Vec<u8>> {
+    if file_id.contains('/') {
+        return Err(AppError::with_kind(
+            AppErrorKind::InvalidPath,
+            "invalid gdrive file id",
+        ));
+    }
+    let endpoint = format!("{DRIVE_FILES_ENDPOINT}/{file_id}");
+    let query = build_query_string(&[("supportsAllDrives", "true".to_string())]);
+    let uri = format!("{endpoint}?{query}&alt=media");
+    let script = format!(
+        "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$client=[System.Net.Http.HttpClient]::new();try{{$client.DefaultRequestHeaders.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer','{}');$bytes=$client.GetByteArrayAsync('{}').GetAwaiter().GetResult();[Convert]::ToBase64String($bytes)}}finally{{$client.Dispose()}}",
+        ps_escape_single_quote(access_token),
+        ps_escape_single_quote(&uri),
+    );
+    run_powershell_bytes(&script)
+}
+
+fn drive_files_patch_media_from_path(
+    access_token: &str,
+    file_id: &str,
+    local_path: &Path,
+) -> AppResult<DriveFileDto> {
+    if file_id.contains('/') {
+        return Err(AppError::with_kind(
+            AppErrorKind::InvalidPath,
+            "invalid gdrive file id",
+        ));
+    }
+    if !local_path.exists() {
+        return Err(AppError::with_kind(
+            AppErrorKind::NotFound,
+            format!("local file not found: {}", local_path.display()),
+        ));
+    }
+    if !local_path.is_file() {
+        return Err(AppError::with_kind(
+            AppErrorKind::InvalidPath,
+            format!("local path is not a file: {}", local_path.display()),
+        ));
+    }
+    let endpoint = format!("https://www.googleapis.com/upload/drive/v3/files/{file_id}");
+    let query = build_query_string(&[
+        ("supportsAllDrives", "true".to_string()),
+        ("uploadType", "media".to_string()),
+        (
+            "fields",
+            "id,name,mimeType,modifiedTime,size,md5Checksum,version".to_string(),
+        ),
+    ]);
+    let uri = format!("{endpoint}?{query}");
+    let script = format!(
+        "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$client=[System.Net.Http.HttpClient]::new();$content=$null;$request=$null;try{{$client.DefaultRequestHeaders.Authorization=[System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer','{}');$bytes=[System.IO.File]::ReadAllBytes('{}');$content=[System.Net.Http.ByteArrayContent]::new($bytes);$content.Headers.ContentType=[System.Net.Http.Headers.MediaTypeHeaderValue]::Parse('application/octet-stream');$request=[System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new('PATCH'),'{}');$request.Content=$content;$resp=$client.SendAsync($request).GetAwaiter().GetResult();if(-not $resp.IsSuccessStatusCode){{$body=$resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();throw ('drive upload failed: ' + [int]$resp.StatusCode + ' ' + $body)}}$json=$resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();[Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($json))}}finally{{if($request -ne $null){{$request.Dispose()}}if($content -ne $null){{$content.Dispose()}}$client.Dispose()}}",
+        ps_escape_single_quote(access_token),
+        ps_escape_single_quote(&local_path.to_string_lossy()),
+        ps_escape_single_quote(&uri),
+    );
+    let value = run_powershell_json(&script)?;
+    serde_json::from_value::<DriveFileDto>(value).map_err(|err| {
+        AppError::with_kind(
+            AppErrorKind::Io,
+            format!("invalid files.patch media JSON: {err}"),
+        )
     })
 }
 
@@ -381,9 +560,19 @@ pub(crate) fn gdrive_list_dir_refs_impl(dir_ref: &ResourceRef) -> AppResult<Vec<
         ]),
         GdriveResourceKind::RootMyDrive => list_children_for_prefix("my-drive", "root"),
         GdriveResourceKind::RootSharedWithMe => list_shared_root(),
-        GdriveResourceKind::MyDrive { file_id } => list_children_for_prefix("my-drive", &file_id),
+        GdriveResourceKind::MyDrive { file_id } => {
+            let prefix = dir_ref.resource_id.trim();
+            let prefix = if prefix.is_empty() { "my-drive" } else { prefix };
+            list_children_for_prefix(prefix, &file_id)
+        }
         GdriveResourceKind::SharedWithMe { file_id } => {
-            list_children_for_prefix("shared-with-me", &file_id)
+            let prefix = dir_ref.resource_id.trim();
+            let prefix = if prefix.is_empty() {
+                "shared-with-me"
+            } else {
+                prefix
+            };
+            list_children_for_prefix(prefix, &file_id)
         }
     }
 }
@@ -415,6 +604,109 @@ pub(crate) fn gdrive_entry_info_for_ref_impl(resource_ref: &ResourceRef) -> AppR
     Ok(entry)
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct GdriveRevisionInfo {
+    pub file_id: String,
+    pub modified: String,
+    pub size: u64,
+    pub md5_checksum: Option<String>,
+    pub version: Option<String>,
+}
+
+fn revision_info_from_file(file: &DriveFileDto, fallback_file_id: &str) -> GdriveRevisionInfo {
+    let size = file
+        .size
+        .as_deref()
+        .and_then(|raw| raw.trim().parse::<u64>().ok())
+        .unwrap_or(0);
+    GdriveRevisionInfo {
+        file_id: if file.id.trim().is_empty() {
+            fallback_file_id.to_string()
+        } else {
+            file.id.trim().to_string()
+        },
+        modified: file.modified_time.clone().unwrap_or_default(),
+        size,
+        md5_checksum: file
+            .md5_checksum
+            .as_deref()
+            .map(str::trim)
+            .map(ToOwned::to_owned)
+            .filter(|v| !v.is_empty()),
+        version: file
+            .version
+            .as_deref()
+            .map(str::trim)
+            .map(ToOwned::to_owned)
+            .filter(|v| !v.is_empty()),
+    }
+}
+
+pub(crate) fn gdrive_revision_for_ref_impl(resource_ref: &ResourceRef) -> AppResult<GdriveRevisionInfo> {
+    let resource_id = resource_ref.resource_id.trim();
+    let file_id = match parse_resource_kind(resource_ref)? {
+        GdriveResourceKind::MyDrive { file_id } => file_id,
+        GdriveResourceKind::SharedWithMe { file_id } => file_id,
+        _ => {
+            return Err(AppError::with_kind(
+                AppErrorKind::InvalidPath,
+                format!("gdrive resource is not a file: {resource_id}"),
+            ))
+        }
+    };
+    let access_token = gdrive_auth_access_token_impl()?;
+    let file = drive_files_get(&access_token, &file_id)?;
+    if file.mime_type == MIME_GOOGLE_FOLDER {
+        return Err(AppError::with_kind(
+            AppErrorKind::InvalidPath,
+            format!("gdrive resource is a directory: {resource_id}"),
+        ));
+    }
+    Ok(revision_info_from_file(&file, &file_id))
+}
+
+pub(crate) fn gdrive_download_file_bytes_for_ref_impl(resource_ref: &ResourceRef) -> AppResult<Vec<u8>> {
+    let resource_id = resource_ref.resource_id.trim();
+    let revision = gdrive_revision_for_ref_impl(resource_ref)?;
+    let access_token = gdrive_auth_access_token_impl()?;
+    drive_files_get_media(&access_token, &revision.file_id).map_err(|err| {
+        AppError::with_kind(
+            err.kind(),
+            format!("failed to download gdrive file bytes for {resource_id}: {err}"),
+        )
+    })
+}
+
+pub(crate) fn gdrive_upload_file_from_path_for_ref_impl(
+    resource_ref: &ResourceRef,
+    local_path: &Path,
+) -> AppResult<GdriveRevisionInfo> {
+    let resource_id = resource_ref.resource_id.trim();
+    let revision = gdrive_revision_for_ref_impl(resource_ref)?;
+    let access_token = gdrive_auth_access_token_impl()?;
+    let file = drive_files_patch_media_from_path(&access_token, &revision.file_id, local_path)
+        .map_err(|err| {
+            let detail = err.to_string();
+            let lowered = detail.to_ascii_lowercase();
+            if lowered.contains("insufficient authentication scopes")
+                || lowered.contains("access_token_scope_insufficient")
+                || lowered.contains("insufficientpermissions")
+            {
+                return AppError::with_kind(
+                    AppErrorKind::Permission,
+                    "google drive write permission is not granted. Sign out and authorize again.",
+                );
+            }
+            AppError::with_kind(
+                err.kind(),
+                format!("failed to upload gdrive file for {resource_id}: {detail}"),
+            )
+        })?;
+    let uploaded_entry = to_entry_info(&file);
+    let _ = save_cached_entry(resource_ref.resource_id.clone(), uploaded_entry);
+    Ok(revision_info_from_file(&file, &revision.file_id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{parse_resource_kind, GdriveResourceKind};
@@ -440,5 +732,29 @@ mod tests {
         };
         let err = parse_resource_kind(&input).expect_err("must reject empty id");
         assert_eq!(err.code(), "invalid_path");
+    }
+
+    #[test]
+    fn parse_resource_kind_accepts_nested_my_drive_path() {
+        let input = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "my-drive/folder1/file789".to_string(),
+        };
+        match parse_resource_kind(&input).expect("parse resource kind nested") {
+            GdriveResourceKind::MyDrive { file_id } => assert_eq!(file_id, "file789"),
+            _ => panic!("unexpected resource kind"),
+        }
+    }
+
+    #[test]
+    fn parse_resource_kind_accepts_my_drive_alias_root() {
+        let input = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "my-drive".to_string(),
+        };
+        match parse_resource_kind(&input).expect("parse root alias") {
+            GdriveResourceKind::RootMyDrive => {}
+            _ => panic!("unexpected resource kind"),
+        }
     }
 }

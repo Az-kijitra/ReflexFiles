@@ -9,6 +9,9 @@
   export let formatName;
   export let formatSize;
   export let formatModified;
+  export let gdriveWorkcopyBadge = "";
+  export let gdriveWorkcopyLocalTitle = "";
+  export let gdriveWorkcopyDirtyTitle = "";
   export let overflowLeft = false;
   export let overflowRight = false;
   export let visualIndex = 0;
@@ -44,6 +47,15 @@
       <span class="icon">{entryIcon}</span>
     {/if}
     <span class="text">{formatName(entry.name, entry.ext)}</span>
+    {#if gdriveWorkcopyBadge === "local" || gdriveWorkcopyBadge === "dirty"}
+      <span
+        class="gdrive-workcopy-badge {gdriveWorkcopyBadge === 'dirty' ? 'dirty' : 'local'}"
+        title={gdriveWorkcopyBadge === "dirty" ? gdriveWorkcopyDirtyTitle : gdriveWorkcopyLocalTitle}
+        aria-label={gdriveWorkcopyBadge === "dirty" ? gdriveWorkcopyDirtyTitle : gdriveWorkcopyLocalTitle}
+      >
+        {gdriveWorkcopyBadge === "dirty" ? "!" : "W"}
+      </span>
+    {/if}
     {#if overflowLeft && visualIndex === visibleColStart * listRows}
       <span class="edge-marker left">◀</span>
     {/if}
@@ -140,6 +152,29 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .gdrive-workcopy-badge {
+    margin-left: 4px;
+    min-width: 1.2em;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1.4;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 3px;
+    padding: 0 2px;
+    flex: 0 0 auto;
+    color: var(--ui-fg);
+    background: var(--ui-surface-2);
+  }
+
+  .gdrive-workcopy-badge.local {
+    color: var(--ui-muted);
+  }
+
+  .gdrive-workcopy-badge.dirty {
+    color: var(--ui-error);
+    border-color: var(--ui-error);
   }
 
 </style>

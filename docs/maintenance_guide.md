@@ -154,7 +154,19 @@ npm run e2e:full
   - keyboard actions (`new_file`, `paste`)
 - Entry-level capabilities (`entry.capabilities`) remain the source for selection-based actions (`copy/move/delete/rename/zip`).
 - If an action is denied by capability, UI shows `capability.not_available` instead of executing the operation.
-- Google Drive read-only backend skeleton is available behind Rust feature flag `gdrive-readonly-stub` (default: disabled).
+- Google Drive read-only implementation has two backend modes:
+  - default: `Real Google Drive API` (real listing + viewer read via local temp cache)
+  - optional feature: `gdrive-readonly-stub` (virtual test data backend)
+- Editing-phase foundation APIs are available for Google Drive:
+  - `gdrive_prepare_edit_workcopy` (download to local workcopy + return base revision snapshot)
+  - `gdrive_check_edit_conflict` (optimistic-lock precheck against current Drive revision)
+- Current UI behavior:
+  - Opening Google Drive files in associated external apps now uses local workcopies via `gdrive_prepare_edit_workcopy`.
+  - Upload-back is explicit/manual via context menu action (`Write Back to Google Drive`).
+  - Upload-back calls `gdrive_apply_edit_workcopy` and blocks on optimistic-lock conflict.
+- Security behavior:
+  - Google Drive viewer/read cache and edit workcopy cache are stored under local temp.
+  - Sign-out clears persisted refresh token and viewer/read cache.
 - Validate both variants when touching provider-boundary logic:
 ```bash
 cargo check --manifest-path app/src-tauri/Cargo.toml --locked

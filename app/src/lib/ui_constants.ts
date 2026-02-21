@@ -526,6 +526,7 @@
       "context.open_cmd": "Open in Terminal",
       "context.open_vscode": "Open in VS Code",
       "context.open_git_client": "Open in Git Client",
+      "context.gdrive_write_back": "Write Back to Google Drive",
       "context.open_parent": "Open Parent",
       "context.copy": "Copy",
       "context.duplicate": "Duplicate",
@@ -565,6 +566,17 @@
       "status.no_parent": "No parent",
       "status.same_path": "Skipped: source and destination are the same",
       "status.jump_added": "Added to jump list",
+      "status.gdrive_workcopy_opened":
+        "Opened local workcopy for Google Drive file: {name} (not uploaded automatically)",
+      "status.gdrive_writeback_only": "Write-back is available only for Google Drive files.",
+      "status.gdrive_workcopy_missing":
+        "No local workcopy found for {name}. Open it in an external app first.",
+      "status.gdrive_writeback_done": "Uploaded local workcopy to Google Drive: {name}",
+      "status.gdrive_writeback_no_change": "No local changes to upload: {name}",
+      "status.gdrive_writeback_conflict":
+        "Upload blocked by conflict on Google Drive: {name}",
+      "status.gdrive_writeback_unknown":
+        "Write-back finished with unknown result: {name}",
       "focus.list": "List",
       "focus.tree": "Tree",
       "focus.path": "Path",
@@ -594,6 +606,8 @@
       "history.delete": "Del",
       "label.path": "PATH",
       "label.list": "File List",
+      "list.gdrive_workcopy_local": "Local Google Drive workcopy exists",
+      "list.gdrive_workcopy_dirty": "Local changes pending upload to Google Drive",
       "label.tree": "Tree View",
       "keymap.windows_like": "Windows-like",
       "keymap.vim_like": "Vim-like",
@@ -978,6 +992,7 @@
       "context.open_cmd": "ターミナルを開く",
       "context.open_vscode": "VS Codeで開く",
       "context.open_git_client": "Gitクライアントで開く",
+      "context.gdrive_write_back": "Google Driveへ書き戻し",
       "context.open_parent": "親フォルダを開く",
       "context.copy": "コピー",
       "context.duplicate": "複製",
@@ -1017,6 +1032,20 @@
       "status.no_parent": "親フォルダなし",
       "status.same_path": "同じ場所のためスキップしました",
       "status.jump_added": "ジャンプリストに追加しました",
+      "status.gdrive_workcopy_opened":
+        "Google Drive ファイルをローカル作業コピーで開きました: {name}（自動アップロードはされません）",
+      "status.gdrive_writeback_only":
+        "書き戻しは Google Drive ファイルでのみ実行できます。",
+      "status.gdrive_workcopy_missing":
+        "{name} のローカル作業コピーがありません。先に外部アプリで開いてください。",
+      "status.gdrive_writeback_done":
+        "ローカル作業コピーを Google Drive に書き戻しました: {name}",
+      "status.gdrive_writeback_no_change":
+        "書き戻すローカル変更がありません: {name}",
+      "status.gdrive_writeback_conflict":
+        "Google Drive 側の競合により書き戻しを中止しました: {name}",
+      "status.gdrive_writeback_unknown":
+        "書き戻し結果を確認できませんでした: {name}",
       "focus.list": "リスト",
       "focus.tree": "ツリー",
       "focus.path": "パス",
@@ -1047,6 +1076,8 @@
       "history.delete": "削除",
       "label.path": "PATH",
       "label.list": "ファイル一覧",
+      "list.gdrive_workcopy_local": "Google Drive のローカル作業コピーがあります",
+      "list.gdrive_workcopy_dirty": "Google Drive へ未反映のローカル変更があります",
       "label.tree": "ツリー表示",
       "keymap.windows_like": "Windows風",
       "keymap.vim_like": "Vim風",

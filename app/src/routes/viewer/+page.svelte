@@ -786,13 +786,38 @@
     moveSiblingFile(1);
   }
 
-  function syncTitle(path) {
+  function syncTitle(path, displayName = "") {
     const base = "ReflexViewer";
     if (!path) {
       document.title = base;
       return;
     }
-    document.title = `${base} - ${fileTail(path)}`;
+    const tail = String(displayName || "").trim() || fileTail(path);
+    document.title = `${base} - ${tail}`;
+  }
+
+  /**
+   * @param {string} path
+   * @param {{ provider: "local" | "gdrive", resource_id: string } | null} resourceRef
+   */
+  async function resolveViewerKind(path, resourceRef = null) {
+    const byPath = detectKind(path);
+    if (!resourceRef || resourceRef.provider !== "gdrive" || byPath !== "text") {
+      return { kind: byPath, nameHint: "" };
+    }
+    try {
+      const props = await invoke("fs_get_properties_by_ref", { resourceRef });
+      const name = String(props?.name || "").trim();
+      const ext = String(props?.ext || "").trim();
+      const lowerName = name.toLowerCase();
+      const lowerExt = ext.toLowerCase();
+      const kindProbe =
+        name && ext && lowerExt && !lowerName.endsWith(lowerExt) ? `${name}${ext}` : name;
+      const resolvedKind = detectKind(kindProbe || path);
+      return { kind: resolvedKind, nameHint: name };
+    } catch {
+      return { kind: byPath, nameHint: "" };
+    }
   }
 
   function resetView() {
@@ -1756,6 +1781,13 @@
     pendingMarkdownJumpHeading = "";
 
     try {
+      const currentRef = toGdriveResourceRef(currentPath);
+      const kindResolved = await resolveViewerKind(currentPath, currentRef);
+      currentKind = kindResolved.kind;
+      if (kindResolved.nameHint) {
+        syncTitle(currentPath, kindResolved.nameHint);
+      }
+
       if (currentKind === "image") {
         const cached = getCachedImageSource(currentPath);
         if (cached) {
@@ -1774,7 +1806,6 @@
         void prefetchNeighborImages();
         return;
       }
-      const currentRef = toGdriveResourceRef(currentPath);
       const viewportInfoRaw = currentRef
         ? await invoke("fs_text_viewport_info_by_ref", {
             resourceRef: currentRef,
@@ -1787,7 +1818,8 @@
       const useVirtualText =
         viewportFileSize >= LARGE_TEXT_THRESHOLD_BYTES || viewportTotalLines >= LARGE_TEXT_LINE_THRESHOLD;
 
-      textLanguage = currentKind === "markdown" ? "markdown" : detectTextLanguage(currentPath);
+      const languagePathHint = kindResolved.nameHint || currentPath;
+      textLanguage = currentKind === "markdown" ? "markdown" : detectTextLanguage(languagePathHint);
 
       if (useVirtualText) {
         virtualTextMode = true;

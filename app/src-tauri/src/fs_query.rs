@@ -18,7 +18,7 @@ use crate::types::{
 use crate::utils::{is_hidden, system_time_to_rfc3339};
 
 #[cfg(not(feature = "gdrive-readonly-stub"))]
-use crate::gdrive_real::gdrive_entry_info_for_ref_impl;
+use crate::gdrive_real::{gdrive_download_file_bytes_for_ref_impl, gdrive_entry_info_for_ref_impl};
 
 #[cfg(feature = "gdrive-readonly-stub")]
 use crate::gdrive_stub::{
@@ -30,6 +30,10 @@ use crate::gdrive_stub::{
 const IMAGE_CACHE_MAX_AGE_SECS: u64 = 7 * 24 * 60 * 60;
 const IMAGE_CACHE_MAX_FILES: usize = 400;
 const IMAGE_CACHE_MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+const GDRIVE_READ_CACHE_DIR_NAME: &str = "reflexfiles-gdrive-read-cache";
+const GDRIVE_READ_CACHE_MAX_AGE_SECS: u64 = 24 * 60 * 60;
+const GDRIVE_READ_CACHE_MAX_FILES: usize = 400;
+const GDRIVE_READ_CACHE_MAX_TOTAL_BYTES: u64 = 1024 * 1024 * 1024;
 const TEXT_INDEX_LINE_STEP: usize = 1024;
 const TEXT_VIEWPORT_MAX_LINES: usize = 4000;
 const TEXT_INDEX_CACHE_MAX_ENTRIES: usize = 16;
@@ -67,6 +71,56 @@ struct CacheEntryMeta {
     path: PathBuf,
     modified: SystemTime,
     size: u64,
+}
+
+fn cleanup_cache_dir_with_limits(
+    dir: &Path,
+    max_age_secs: u64,
+    max_files: usize,
+    max_total_bytes: u64,
+) {
+    let now = SystemTime::now();
+    let mut entries: Vec<CacheEntryMeta> = Vec::new();
+
+    let Ok(iter) = fs::read_dir(dir) else {
+        return;
+    };
+
+    for item in iter.flatten() {
+        let path = item.path();
+        let Ok(meta) = item.metadata() else {
+            continue;
+        };
+        if !meta.is_file() {
+            continue;
+        }
+        let modified = meta.modified().unwrap_or(UNIX_EPOCH);
+        if now
+            .duration_since(modified)
+            .map(|d| d.as_secs() > max_age_secs)
+            .unwrap_or(false)
+        {
+            let _ = fs::remove_file(&path);
+            continue;
+        }
+        entries.push(CacheEntryMeta {
+            path,
+            modified,
+            size: meta.len(),
+        });
+    }
+
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.modified));
+    let mut total_size = 0u64;
+    for (idx, entry) in entries.into_iter().enumerate() {
+        let over_count = idx >= max_files;
+        let over_size = total_size.saturating_add(entry.size) > max_total_bytes;
+        if over_count || over_size {
+            let _ = fs::remove_file(&entry.path);
+            continue;
+        }
+        total_size = total_size.saturating_add(entry.size);
+    }
 }
 
 fn cleanup_viewer_image_cache_dir(dir: &Path) {
@@ -228,6 +282,11 @@ fn entry_from_resource_ref(resource_ref: ResourceRef) -> AppResult<Entry> {
 }
 
 fn resolve_existing_file_path(path: &str) -> AppResult<PathBuf> {
+    #[cfg(not(feature = "gdrive-readonly-stub"))]
+    if let Some(resource_ref) = gdrive_resource_ref_from_legacy_path(path)? {
+        return gdrive_cached_file_path_for_resource_ref(&resource_ref);
+    }
+
     let path_buf = resolve_legacy_path(path)?;
     if !path_buf.exists() {
         return Err(AppError::msg(format!(
@@ -241,7 +300,6 @@ fn resolve_existing_file_path(path: &str) -> AppResult<PathBuf> {
     Ok(path_buf)
 }
 
-#[cfg(feature = "gdrive-readonly-stub")]
 fn gdrive_resource_ref_from_legacy_path(path: &str) -> AppResult<Option<ResourceRef>> {
     let trimmed = path.trim();
     if !trimmed.starts_with("gdrive://") {
@@ -253,6 +311,94 @@ fn gdrive_resource_ref_from_legacy_path(path: &str) -> AppResult<Option<Resource
         return Ok(None);
     }
     Ok(Some(resource_ref))
+}
+
+#[cfg(not(feature = "gdrive-readonly-stub"))]
+fn sanitize_cache_ext(raw_ext: &str) -> String {
+    let trimmed = raw_ext.trim().trim_start_matches('.');
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    for ch in trimmed.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        }
+    }
+    if out.is_empty() {
+        String::new()
+    } else {
+        format!(".{out}")
+    }
+}
+
+#[cfg(not(feature = "gdrive-readonly-stub"))]
+fn gdrive_cached_file_path_for_resource_ref(resource_ref: &ResourceRef) -> AppResult<PathBuf> {
+    let info = gdrive_entry_info_for_ref_impl(resource_ref)?;
+    if info.is_dir {
+        return Err(AppError::with_kind(
+            AppErrorKind::InvalidPath,
+            format!("gdrive resource is a directory: {}", resource_ref.resource_id),
+        ));
+    }
+
+    let mut cache_dir = std::env::temp_dir();
+    cache_dir.push(GDRIVE_READ_CACHE_DIR_NAME);
+    fs::create_dir_all(&cache_dir)?;
+    cleanup_cache_dir_with_limits(
+        &cache_dir,
+        GDRIVE_READ_CACHE_MAX_AGE_SECS,
+        GDRIVE_READ_CACHE_MAX_FILES,
+        GDRIVE_READ_CACHE_MAX_TOTAL_BYTES,
+    );
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    resource_ref.resource_id.hash(&mut hasher);
+    info.modified.hash(&mut hasher);
+    info.size.hash(&mut hasher);
+    let cache_key = format!("{:016x}", hasher.finish());
+    let ext = sanitize_cache_ext(&info.ext);
+
+    let mut cached_path = cache_dir.clone();
+    cached_path.push(format!("{cache_key}{ext}"));
+    if cached_path.exists() {
+        return Ok(cached_path);
+    }
+
+    let bytes = gdrive_download_file_bytes_for_ref_impl(resource_ref)?;
+    let mut tmp_path = cache_dir;
+    tmp_path.push(format!(
+        "{cache_key}.{}.{}.tmp",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| AppError::msg(e.to_string()))?
+            .as_nanos()
+    ));
+    fs::write(&tmp_path, bytes)?;
+    match fs::rename(&tmp_path, &cached_path) {
+        Ok(_) => {}
+        Err(_) => {
+            let _ = fs::remove_file(&tmp_path);
+        }
+    }
+    if !cached_path.exists() {
+        return Err(AppError::with_kind(
+            AppErrorKind::Io,
+            "failed to persist gdrive temp file",
+        ));
+    }
+    Ok(cached_path)
+}
+
+pub(crate) fn clear_gdrive_read_cache_impl() -> AppResult<()> {
+    let mut cache_dir = std::env::temp_dir();
+    cache_dir.push(GDRIVE_READ_CACHE_DIR_NAME);
+    if !cache_dir.exists() {
+        return Ok(());
+    }
+    fs::remove_dir_all(cache_dir)?;
+    Ok(())
 }
 
 #[cfg(feature = "gdrive-readonly-stub")]
@@ -420,7 +566,7 @@ pub(crate) fn fs_read_text_impl(path: String, max_bytes: usize) -> AppResult<Str
         return Ok(String::from_utf8_lossy(&bytes[..take]).to_string());
     }
 
-    let resolved_path = resolve_legacy_path(&path)?;
+    let resolved_path = resolve_existing_file_path(&path)?;
     let file = fs::File::open(&resolved_path)?;
     let mut limited = file.take(max_bytes as u64);
     let mut data = Vec::with_capacity(max_bytes.min(1024 * 1024));
@@ -437,7 +583,7 @@ pub(crate) fn fs_is_probably_text_impl(path: String, sample_bytes: usize) -> App
     }
 
     let max = sample_bytes.max(1);
-    let resolved_path = resolve_legacy_path(&path)?;
+    let resolved_path = resolve_existing_file_path(&path)?;
     let file = fs::File::open(&resolved_path)?;
     let mut limited = file.take(max as u64);
     let mut data = Vec::with_capacity(max.min(64 * 1024));
@@ -735,7 +881,7 @@ pub(crate) fn fs_read_image_data_url_impl(path: String, normalize: bool) -> AppR
         return Ok(format!("data:{mime};base64,{body}"));
     }
 
-    let path_buf = resolve_legacy_path(&path)?;
+    let path_buf = resolve_existing_file_path(&path)?;
     let bytes = fs::read(&path_buf)?;
     let mime = infer_image_mime(&path_buf, &bytes)
         .ok_or_else(|| AppError::msg("unsupported image mime".to_string()))?;
@@ -790,7 +936,7 @@ pub(crate) fn fs_read_image_normalized_temp_path_impl(path: String) -> AppResult
         return Ok(out_path.to_string_lossy().to_string());
     }
 
-    let path_buf = resolve_legacy_path(&path)?;
+    let path_buf = resolve_existing_file_path(&path)?;
     let metadata = fs::metadata(&path_buf)?;
     let modified_nanos = metadata
         .modified()
@@ -1029,7 +1175,8 @@ pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirS
 #[cfg(test)]
 mod tests {
     use super::{
-        cleanup_viewer_image_cache_dir, fs_get_capabilities_by_ref_impl,
+        cleanup_viewer_image_cache_dir, clear_gdrive_read_cache_impl,
+        fs_get_capabilities_by_ref_impl,
         fs_get_properties_by_ref_impl, fs_is_probably_text_by_ref_impl, fs_is_probably_text_impl,
         fs_list_dir_by_ref_impl, fs_read_image_data_url_by_ref_impl, fs_read_image_data_url_impl,
         fs_read_image_normalized_temp_path_by_ref_impl, fs_read_image_normalized_temp_path_impl,
@@ -1241,6 +1388,20 @@ mod tests {
         assert!(png_count <= 400);
         assert!(txt_exists);
         let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn clear_gdrive_read_cache_impl_removes_cache_dir() {
+        let mut cache_dir = std::env::temp_dir();
+        cache_dir.push(super::GDRIVE_READ_CACHE_DIR_NAME);
+        let _ = fs::remove_dir_all(&cache_dir);
+        fs::create_dir_all(&cache_dir).expect("create gdrive cache dir");
+        let cache_file = cache_dir.join("dummy.bin");
+        fs::write(&cache_file, b"dummy").expect("write gdrive cache file");
+        assert!(cache_file.exists());
+
+        clear_gdrive_read_cache_impl().expect("clear gdrive cache");
+        assert!(!cache_dir.exists());
     }
 
     #[test]
@@ -1509,15 +1670,19 @@ mod tests {
 
     #[test]
     #[cfg(not(feature = "gdrive-readonly-stub"))]
-    fn fs_get_capabilities_by_ref_rejects_gdrive_when_stub_disabled() {
-        let result = fs_get_capabilities_by_ref_impl(ResourceRef {
+    fn fs_get_capabilities_by_ref_reports_gdrive_readonly_when_stub_disabled() {
+        let capabilities = fs_get_capabilities_by_ref_impl(ResourceRef {
             provider: StorageProvider::Gdrive,
             resource_id: "root".to_string(),
-        });
-        let err = match result {
-            Ok(_) => panic!("gdrive must be rejected"),
-            Err(err) => err,
-        };
-        assert_eq!(err.code(), "unknown");
+        })
+        .expect("gdrive capabilities");
+        assert!(capabilities.can_read);
+        assert!(!capabilities.can_create);
+        assert!(!capabilities.can_rename);
+        assert!(!capabilities.can_copy);
+        assert!(!capabilities.can_move);
+        assert!(!capabilities.can_delete);
+        assert!(!capabilities.can_archive_create);
+        assert!(!capabilities.can_archive_extract);
     }
 }

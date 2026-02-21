@@ -50,6 +50,7 @@ export function buildViewActions(params) {
     toggleSelection: pageActions.toggleSelection,
     setSelected: pageActions.setSelected,
     openEntry: pageActions.openEntry,
+    resolveGdriveWorkcopyBadge: pageActions.resolveGdriveWorkcopyBadge,
     matchesAction: params.matchesAction,
     scrollDropdownToIndex: pageActions.scrollDropdownToIndex,
     selectDropdown: pageActions.selectDropdown,

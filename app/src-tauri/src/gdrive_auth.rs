@@ -12,11 +12,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use url::{form_urlencoded, Host, Url};
 
 use crate::error::{AppError, AppErrorKind, AppResult};
+use crate::fs_query::clear_gdrive_read_cache_impl;
 use crate::gdrive_token_store::{default_gdrive_token_store, GdriveTokenStore};
+use crate::log_error;
 
 const GOOGLE_AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
+const GOOGLE_DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive";
 const GOOGLE_DRIVE_READONLY_SCOPE: &str = "https://www.googleapis.com/auth/drive.readonly";
-const DEFAULT_SCOPE: &str = GOOGLE_DRIVE_READONLY_SCOPE;
+const DEFAULT_SCOPE: &str = GOOGLE_DRIVE_SCOPE;
 const ACCESS_TOKEN_EXPIRY_SAFETY_MS: u64 = 30_000;
 const DEFAULT_CALLBACK_WAIT_TIMEOUT_MS: u64 = 180_000;
 const CALLBACK_WAIT_TIMEOUT_MIN_MS: u64 = 1_000;
@@ -197,10 +200,10 @@ fn normalize_scopes(scopes: Vec<String>) -> AppResult<Vec<String>> {
     normalized.dedup();
 
     for scope in &normalized {
-        if scope != GOOGLE_DRIVE_READONLY_SCOPE {
+        if scope != GOOGLE_DRIVE_SCOPE && scope != GOOGLE_DRIVE_READONLY_SCOPE {
             return Err(AppError::with_kind(
                 AppErrorKind::Permission,
-                format!("scope is not allowed for gate 1: {scope}"),
+                format!("scope is not allowed: {scope}"),
             ));
         }
     }
@@ -613,6 +616,14 @@ fn sign_out(
     state.pending = None;
     state.clear_authorized();
     state.last_error.clear();
+    if let Err(err) = clear_gdrive_read_cache_impl() {
+        log_error(
+            "gdrive_sign_out_cache_cleanup",
+            "gdrive://",
+            "",
+            &err.to_string(),
+        );
+    }
     Ok(status_from_state(state, token_store))
 }
 
@@ -704,10 +715,10 @@ fn normalize_scope_text(scope_text: Option<String>) -> Vec<String> {
         .unwrap_or_default()
         .split_whitespace()
         .map(|scope| scope.trim().to_string())
-        .filter(|scope| scope == GOOGLE_DRIVE_READONLY_SCOPE)
+        .filter(|scope| scope == GOOGLE_DRIVE_SCOPE || scope == GOOGLE_DRIVE_READONLY_SCOPE)
         .collect::<Vec<_>>();
     if normalized.is_empty() {
-        vec![GOOGLE_DRIVE_READONLY_SCOPE.to_string()]
+        vec![DEFAULT_SCOPE.to_string()]
     } else {
         normalized
     }
@@ -776,7 +787,7 @@ fn restore_state_from_saved_credentials(
         return;
     }
     state.account_id = Some(account_id.to_string());
-    state.granted_scopes = vec![GOOGLE_DRIVE_READONLY_SCOPE.to_string()];
+    state.granted_scopes = vec![DEFAULT_SCOPE.to_string()];
     state.refresh_token_persisted = true;
 }
 
@@ -990,7 +1001,7 @@ pub(crate) fn gdrive_auth_sign_out_impl(account_id: Option<String>) -> AppResult
 mod tests {
     use super::{
         complete_exchange, compute_pkce_s256_challenge, normalize_scopes, start_auth_session,
-        validate_callback, GdriveAuthPhase, GdriveAuthState, GOOGLE_DRIVE_READONLY_SCOPE,
+        validate_callback, GdriveAuthPhase, GdriveAuthState, GOOGLE_DRIVE_SCOPE,
     };
     use crate::gdrive_token_store::{GdriveTokenStore, InMemoryTokenStore};
 
@@ -1010,7 +1021,7 @@ mod tests {
             &mut auth_state,
             "client-id".to_string(),
             "http://localhost/callback".to_string(),
-            vec![GOOGLE_DRIVE_READONLY_SCOPE.to_string()],
+            vec![GOOGLE_DRIVE_SCOPE.to_string()],
         )
         .expect("start auth");
         assert!(started
@@ -1027,7 +1038,7 @@ mod tests {
             &mut auth_state,
             "client-id".to_string(),
             "http://localhost/callback".to_string(),
-            vec![GOOGLE_DRIVE_READONLY_SCOPE.to_string()],
+            vec![GOOGLE_DRIVE_SCOPE.to_string()],
         )
         .expect("start auth");
         let err = validate_callback(
@@ -1046,7 +1057,7 @@ mod tests {
             &mut auth_state,
             "client-id".to_string(),
             "http://localhost/callback".to_string(),
-            vec![GOOGLE_DRIVE_READONLY_SCOPE.to_string()],
+            vec![GOOGLE_DRIVE_SCOPE.to_string()],
         )
         .expect("start auth");
 
@@ -1070,7 +1081,7 @@ mod tests {
             &mut auth_state,
             &token_store,
             "user@example.com".to_string(),
-            vec![GOOGLE_DRIVE_READONLY_SCOPE.to_string()],
+            vec![GOOGLE_DRIVE_SCOPE.to_string()],
             Some("refresh-token".to_string()),
             Some("access-token".to_string()),
             Some(3600),

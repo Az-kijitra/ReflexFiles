@@ -24,6 +24,8 @@ mod fs_query;
 mod fs_query_cmds;
 mod gdrive_auth;
 mod gdrive_auth_cmds;
+mod gdrive_edit;
+mod gdrive_edit_cmds;
 #[cfg(not(feature = "gdrive-readonly-stub"))]
 mod gdrive_real;
 #[cfg(feature = "gdrive-readonly-stub")]

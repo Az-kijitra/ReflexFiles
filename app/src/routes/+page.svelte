@@ -261,7 +261,9 @@
     gdrive_account_id: "",
   });
   const GDRIVE_DEFAULT_REDIRECT_URI = "http://127.0.0.1:45123/oauth2/callback";
+  const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
   const GDRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+  const GDRIVE_ALLOWED_SCOPES = new Set([GDRIVE_SCOPE, GDRIVE_READONLY_SCOPE]);
   const DEFAULT_GDRIVE_AUTH_STATUS = {
     phase: "signed_out",
     backendMode: "stub",
@@ -891,16 +893,16 @@
       .trim()
       .split(/\s+/)
       .map((scope) => scope.trim())
-      .filter((scope) => scope === GDRIVE_READONLY_SCOPE);
+      .filter((scope) => GDRIVE_ALLOWED_SCOPES.has(scope));
     if (parsedScopes.length > 0) {
       return [...new Set(parsedScopes)];
     }
     const normalizedFallback = Array.isArray(fallbackScopes)
       ? fallbackScopes
           .map((scope) => String(scope || "").trim())
-          .filter((scope) => scope === GDRIVE_READONLY_SCOPE)
+          .filter((scope) => GDRIVE_ALLOWED_SCOPES.has(scope))
       : [];
-    return normalizedFallback.length > 0 ? [...new Set(normalizedFallback)] : [GDRIVE_READONLY_SCOPE];
+    return normalizedFallback.length > 0 ? [...new Set(normalizedFallback)] : [GDRIVE_SCOPE];
   }
 
   async function exchangeGoogleAuthCode(validated, clientSecretRaw = "") {
@@ -979,7 +981,7 @@
     settingsGdriveAuthError = "";
     settingsGdriveAuthMessage = "";
     try {
-      const started = await gdriveAuthStartSession(clientId, redirectUri, [GDRIVE_READONLY_SCOPE]);
+      const started = await gdriveAuthStartSession(clientId, redirectUri, [GDRIVE_SCOPE]);
       await openUrl(started.authorizationUrl);
       settingsGdriveAuthMessage = t("settings.gdrive.started_opened");
       const captured = await gdriveAuthWaitForCallback(180000);

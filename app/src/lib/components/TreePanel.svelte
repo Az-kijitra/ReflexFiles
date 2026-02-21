@@ -14,10 +14,11 @@
   export let toggleTreeNode;
 
   const treeRowId = (index) => `tree-row-${index}`;
+  $: isGdriveTree = String(treeSelectedPath || "").trim().toLowerCase().startsWith("gdrive://");
 </script>
 
 <div
-  class="tree-panel"
+  class="tree-panel {isGdriveTree ? 'gdrive-surface' : ''}"
   tabindex="0"
   role="tree"
   aria-label={t("label.tree")}
@@ -79,6 +80,10 @@
     overflow: hidden;
     font-size: 12px;
     color: var(--ui-fg);
+  }
+
+  .tree-panel.gdrive-surface {
+    background: var(--ui-gdrive-surface);
   }
 
   .tree-panel:focus-visible {

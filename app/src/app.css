@@ -14,6 +14,7 @@
   --ui-selected: #dbe9ff;
   --ui-focused: #7aa7ff;
   --ui-row-head: #f0f0f0;
+  --ui-gdrive-surface: #e2ecff;
   --ui-link: #2a6fdb;
   --ui-error: #b00020;
   --ui-backdrop: rgba(0, 0, 0, 0.35);
@@ -37,6 +38,7 @@ body.ui_theme-dark {
   --ui-selected: #3a4a63;
   --ui-focused: #7aa7ff;
   --ui-row-head: #333741;
+  --ui-gdrive-surface: #304765;
   --ui-link: #7ab4ff;
   --ui-error: #ff8a80;
   --ui-shadow-1: rgba(0, 0, 0, 0.4);

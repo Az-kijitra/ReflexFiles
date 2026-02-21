@@ -92,6 +92,9 @@ pub fn run() {
             crate::gdrive_auth_cmds::gdrive_auth_store_client_secret,
             crate::gdrive_auth_cmds::gdrive_auth_load_client_secret,
             crate::gdrive_auth_cmds::gdrive_auth_clear_client_secret,
+            crate::gdrive_edit_cmds::gdrive_prepare_edit_workcopy,
+            crate::gdrive_edit_cmds::gdrive_check_edit_conflict,
+            crate::gdrive_edit_cmds::gdrive_apply_edit_workcopy,
             crate::watch::fs_watch_start,
             crate::watch::fs_watch_stop
         ])

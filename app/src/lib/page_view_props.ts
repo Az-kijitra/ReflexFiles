@@ -40,6 +40,7 @@ export function buildTreeProps(params) {
 
 export function buildFileListProps(params) {
   return {
+    currentPath: params.currentPath,
     showSize: params.showSize,
     showTime: params.showTime,
     uiFileIconMode: params.uiFileIconMode,
@@ -58,6 +59,7 @@ export function buildFileListProps(params) {
     toggleSelection: params.toggleSelection,
     setSelected: params.setSelected,
     openEntry: params.openEntry,
+    resolveGdriveWorkcopyBadge: params.resolveGdriveWorkcopyBadge,
     formatName: params.formatName,
     formatSize: params.formatSize,
     formatModified: params.formatModified,
