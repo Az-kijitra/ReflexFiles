@@ -118,6 +118,8 @@ npm run tauri build
 ### テストレイヤー
 - `e2e:tauri` -> smoke（ファイル操作の基礎フロー）
 - `e2e:capability` -> provider capability ガード（メニュー/コンテキスト/操作可否）
+  - Google Drive 宛て Paste 無効時の理由文言（`paste.destination_not_writable`）を、コンテキストメニューと Edit メニューの両方で検証する。
+  - `rf:open-settings` イベントで設定画面が「詳細」セクションを開くこと、および設定表示中でもセクション切替できることを検証する。
 - `e2e:viewer` -> viewer フロー
 - `e2e:settings` -> 設定保存・バックアップ/レポート・undo/redo
 - `e2e:full` -> 総合スイート（`smoke` -> `capability_guard` -> `viewer_flow` -> `settings_session`）
@@ -138,10 +140,15 @@ npm run e2e:full
 - 起動モードを選択
   - debug EXE が存在する場合: `existing-binary + vite-dev`
   - それ以外: `tauri dev`
+- 起動前にプロセス間ロック（`e2e_artifacts/.tauri-e2e.lock.json`）を取得し、E2E同時実行を直列化する
 - Windows では起動前に、このリポジトリ配下で残留した `vite dev`（node）プロセスを明示終了
 - アプリ起動待機を実施
 - Selenium シナリオを実行
 - Windows で子プロセスを強制終了してハングを回避
+
+運用ルール:
+- `e2e:tauri` / `e2e:capability` / `e2e:viewer` / `e2e:settings` / `e2e:full` を並列実行しない。
+- 誤って並列起動してもランナーロックで待機するが、ログ再現性のため常に直列実行を優先する。
 
 ## Provider Capability 制御
 - 対象パスの provider capability 取得APIは `fs_get_capabilities`。
@@ -162,9 +169,27 @@ npm run e2e:full
   - `gdrive_check_edit_conflict`（楽観ロックの事前競合判定）
   - `gdrive_get_edit_workcopy_state` / `gdrive_get_edit_workcopy_states`（ローカル作業コピー有無 + dirty 判定）
   - `gdrive_list_edit_workcopies` / `gdrive_delete_edit_workcopy` / `gdrive_cleanup_edit_workcopies`（作業コピー保守）
+- 現在のUI挙動:
+  - Google Drive ファイルを外部アプリで開くときは `gdrive_prepare_edit_workcopy` を使う。
+  - 書き戻しはコンテキストメニュー（`Google Driveへ書き戻し`）で明示実行する。
+  - 書き戻しは `gdrive_apply_edit_workcopy` を呼び、楽観ロック競合なら中止する。
+  - 競合時は frontend 側で base revision を自動更新しない（再試行だけで上書きしない）運用にする。
+  - 競合時は `rf:open-settings` を発火し、設定画面を「詳細」セクションで開く（すでに開いている場合も「詳細」へ切り替える）。
+  - 設定 > Google Drive に、競合復旧ガイドを表示する（直近競合時刻がある場合は強調表示）。
+  - 競合時のステータスメッセージから、`Ctrl+,` で設定を開いて復旧ガイドへ移動できることを案内する。
 - 実行時の堅牢性 / 診断:
+  - `fs_get_capabilities_by_ref` は Google Drive 宛てコピー可否を `canAddChildren` で事前判定し、判定失敗時はフェイルセーフで `can_copy=false` にする。
+  - `root/shared-with-me` は書き込み不可の宛先として扱い、`can_copy=false` を返す。
+  - Google Drive 宛てで Paste が拒否された場合、汎用メッセージではなく専用文言（`paste.destination_not_writable`）を表示する。
+  - `pasteItems` 本体でも最終的に capability を再判定し、メニュー/キー経路を迂回しても同じ専用文言を返す。
   - Google Drive API ブリッジは一時障害（HTTP `429` / `5xx`、timeout、名前解決の一時失敗）を上限付きバックオフで再試行する。
   - 書き戻し時のスコープ不足は `permission_denied` に正規化し、再認証手順が分かるメッセージを返す。
+  - Google Drive 宛てコピー時の競合モーダルで `別名保存` を選択できる（宛先で重複しない名前を自動採番して保存）。
+  - Google Drive -> ローカルコピー時、Google ネイティブ形式を自動エクスポートする:
+    - Docs -> `.docx`
+    - Sheets -> `.xlsx`
+    - Slides -> `.pptx`
+    - Drawings -> `.png`
   - 設定 > Google Drive に追加診断を表示する:
     - 書き込みスコープ許可フラグ
     - アクセストークン有効期限

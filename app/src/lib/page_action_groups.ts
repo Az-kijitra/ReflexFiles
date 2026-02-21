@@ -18,6 +18,7 @@ export function buildPageActionGroups(params) {
     pasteDeleteZip: {
       confirmPasteOverwrite: pageActions.confirmPasteOverwrite,
       confirmPasteSkip: pageActions.confirmPasteSkip,
+      confirmPasteKeepBoth: pageActions.confirmPasteKeepBoth,
       cancelPasteConfirm: pageActions.cancelPasteConfirm,
       confirmDelete: pageActions.confirmDelete,
       cancelDelete: pageActions.cancelDelete,

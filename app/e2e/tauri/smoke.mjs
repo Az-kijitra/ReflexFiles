@@ -381,6 +381,45 @@ try {
   await focusList();
 
   const openCreate = async () => {
+    const openCreateFromFileMenu = async (waitMs) => {
+      const clicked = await driver.executeScript(() => {
+        const textOf = (el) => String(el?.textContent || '').trim();
+        const menuButtons = Array.from(document.querySelectorAll('.menu-bar .menu-button'));
+        const fileButton = menuButtons.find((btn) => {
+          const value = textOf(btn);
+          return value === 'File' || value === 'ファイル';
+        });
+        if (!fileButton) return false;
+        fileButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+        const menuItems = Array.from(document.querySelectorAll('.menu-dropdown .menu-item'));
+        for (const item of menuItems) {
+          const label = textOf(item.querySelector('.menu-label'));
+          if (
+            label !== 'New...' &&
+            label !== '新規作成...' &&
+            label !== '新規作成'
+          ) {
+            continue;
+          }
+          if (item.classList.contains('disabled')) return false;
+          item.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          return true;
+        }
+        return false;
+      });
+      if (!clicked) {
+        throw new Error('file menu new not available');
+      }
+      const input = await withTimeout(
+        driver.wait(until.elementLocated(By.css('#create-name')), waitMs),
+        waitMs,
+        'wait for create input (file menu)'
+      );
+      await input.click();
+      return input;
+    };
+
     await focusList();
     await driver.actions().sendKeys(Key.chord(Key.CONTROL, 'n')).perform();
     try {
@@ -392,18 +431,37 @@ try {
       await input.click();
       return input;
     } catch {
+      try {
+        return await openCreateFromFileMenu(3_000);
+      } catch {
+        // fall through to shortcut-hook/context fallback
+      }
+      try {
+        const triggered = await driver.executeScript(() => {
+          const hooks = window.__rf_test_hooks;
+          if (!hooks || typeof hooks.triggerActionShortcut !== 'function') return false;
+          return Boolean(hooks.triggerActionShortcut('new_file'));
+        });
+        if (triggered) {
+          const input = await withTimeout(
+            driver.wait(until.elementLocated(By.css('#create-name')), 3_000),
+            3_000,
+            'wait for create input (hook)'
+          );
+          await input.click();
+          return input;
+        }
+      } catch {
+        // fall through to context-menu fallback
+      }
       const listEl = await getListElement();
       await driver.actions().contextClick(listEl).perform();
       const newItem = await withTimeout(
         driver.wait(
-          until.elementLocated(
-            By.xpath(
-              "//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'新規作成') or contains(normalize-space(.),'New')]]"
-            )
-          ),
-          timeoutMs
+          until.elementLocated(By.css(".context-menu-item[data-menu-id='ctx-new']")),
+          6_000
         ),
-        timeoutMs,
+        6_000,
         'wait for context new'
       );
       await newItem.click();
@@ -673,11 +731,7 @@ try {
   }, 'context click rowB');
   const compressItem = await withTimeout(
     driver.wait(
-      until.elementLocated(
-        By.xpath(
-          "//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'ZIPに圧縮') or contains(normalize-space(.),'Compress to ZIP')]]"
-        )
-      ),
+      until.elementLocated(By.css(".context-menu-item[data-menu-id='ctx-compress']")),
       timeoutMs
     ),
     timeoutMs,
@@ -735,11 +789,7 @@ try {
     }, 'context click zip row for extract');
     const extractItem = await withTimeout(
       driver.wait(
-        until.elementLocated(
-          By.xpath(
-            "//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'解凍') or contains(normalize-space(.),'Extract')]]"
-          )
-        ),
+        until.elementLocated(By.css(".context-menu-item[data-menu-id='ctx-extract']")),
         timeoutMs
       ),
       timeoutMs,
@@ -871,14 +921,10 @@ try {
   await waitForVisibleName(opB);
   await focusList();
 
-  const clickContextMenuItem = async (labelJa, labelEn) => {
+  const clickContextMenuItemById = async (menuId, labelEn) => {
     const item = await withTimeout(
       driver.wait(
-        until.elementLocated(
-          By.xpath(
-            `//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'${labelJa}') or contains(normalize-space(.),'${labelEn}')]]`
-          )
-        ),
+        until.elementLocated(By.css(`.context-menu-item[data-menu-id='${menuId}']`)),
         timeoutMs
       ),
       timeoutMs,
@@ -892,12 +938,12 @@ try {
     await rowA.click();
   }, 'select opA for copy');
   await driver.actions().contextClick(await rowByName(opA)).perform();
-  await clickContextMenuItem('コピー', 'Copy');
+  await clickContextMenuItemById('ctx-copy', 'Copy');
   await setPath(opsRoot);
   await openDirByName('dst', 'open ops dst');
   await waitForPathValue(opsDstDir);
   await driver.actions().contextClick(await getListElement()).perform();
-  await clickContextMenuItem('ペースト', 'Paste');
+  await clickContextMenuItemById('ctx-paste', 'Paste');
   await waitForVisibleName(opA);
   await waitForFsPath(resolve(opsDstDir, opA), 'copied opA');
   await waitForFileContent(resolve(opsDstDir, opA), opAContent, 'copy opA');
@@ -910,12 +956,12 @@ try {
     await rowB.click();
   }, 'select opB for move');
   await driver.actions().contextClick(await rowByName(opB)).perform();
-  await clickContextMenuItem('カット', 'Cut');
+  await clickContextMenuItemById('ctx-cut', 'Cut');
   await setPath(opsRoot);
   await openDirByName('dst', 'open ops dst for move');
   await waitForPathValue(opsDstDir);
   await driver.actions().contextClick(await getListElement()).perform();
-  await clickContextMenuItem('ペースト', 'Paste');
+  await clickContextMenuItemById('ctx-paste', 'Paste');
   await waitForVisibleName(opB);
   await waitForFsPath(resolve(opsDstDir, opB), 'moved opB');
   await waitForFileContent(resolve(opsDstDir, opB), opBContent, 'move opB');

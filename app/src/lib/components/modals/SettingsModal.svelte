@@ -2,6 +2,7 @@
   import ModalShell from "$lib/components/modals/ModalShell.svelte";
 
   export let modalEl = null;
+  export let initialSection = "general";
   export let trapModalTab;
   export let autofocus;
   export let t;
@@ -44,6 +45,7 @@
   export let onGdriveWorkcopyCleanup = () => {};
 
   let activeSection = "general";
+  let lastInitialSectionApplied = "";
   let draft = {};
   let reportOptions = {
     mask_sensitive_paths: true,
@@ -132,6 +134,8 @@
   $: normalizedDraft = normalizeForSubmit(draft || {});
   $: normalizedGdriveInitial = normalizeGdriveForSubmit(initial || {});
   $: normalizedGdriveDraft = normalizeGdriveForSubmit(gdriveDraft || {});
+  $: hasRecentGdriveWriteConflict =
+    Number(gdriveAuthStatus?.lastWriteConflictAtMs ?? Number.NaN) > 0;
   $: hasUnsavedChanges =
     JSON.stringify(normalizedInitial) !== JSON.stringify(normalizedDraft) ||
     JSON.stringify(normalizedGdriveInitial) !== JSON.stringify(normalizedGdriveDraft);
@@ -190,6 +194,22 @@
     { id: "external", label: "settings.section.external" },
     { id: "advanced", label: "settings.section.advanced" },
   ];
+
+  function normalizeSectionId(value) {
+    const section = String(value || "").trim().toLowerCase();
+    if (section === "external" || section === "advanced") {
+      return section;
+    }
+    return "general";
+  }
+
+  $: {
+    const next = normalizeSectionId(initialSection);
+    if (next !== lastInitialSectionApplied) {
+      activeSection = next;
+      lastInitialSectionApplied = next;
+    }
+  }
 
   function gdrivePhaseLabel(phase) {
     if (phase === "pending") return t("settings.gdrive.phase_pending");
@@ -274,6 +294,7 @@
       {#each sections as section}
         <button
           type="button"
+          data-settings-section={section.id}
           class:selected={activeSection === section.id}
           onclick={() => {
             activeSection = section.id;
@@ -526,6 +547,15 @@
             <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.tokenStoreAvailable))}</div>
             <div class="settings-gdrive-key">{t("settings.gdrive.last_error")}</div>
             <div>{gdriveAuthStatus?.lastError || "-"}</div>
+          </div>
+
+          <div class="settings-gdrive-conflict-help" class:is-warning={hasRecentGdriveWriteConflict}>
+            <div class="settings-gdrive-conflict-title">{t("settings.gdrive.conflict_help_title")}</div>
+            <p class="settings-help settings-help-compact">
+              {hasRecentGdriveWriteConflict
+                ? t("settings.gdrive.conflict_help_recent")
+                : t("settings.gdrive.conflict_help")}
+            </p>
           </div>
 
           <div class="settings-gdrive-actions">
@@ -953,6 +983,24 @@
     flex-wrap: wrap;
     gap: 8px;
     margin: 8px 0 10px;
+  }
+
+  .settings-gdrive-conflict-help {
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface-2);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+
+  .settings-gdrive-conflict-help.is-warning {
+    border-color: var(--ui-warning);
+  }
+
+  .settings-gdrive-conflict-title {
+    font-size: 12px;
+    color: var(--ui-fg);
+    margin-bottom: 4px;
   }
 
   .settings-gdrive-workcopy {

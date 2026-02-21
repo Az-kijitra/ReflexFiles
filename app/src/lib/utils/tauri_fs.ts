@@ -20,8 +20,12 @@ export function fsCopyPairs(pairs: { from: string; to: string }[]): Promise<OpSu
   return invoke("fs_copy_pairs", { pairs });
 }
 
-export function fsCopy(items: string[], destination: string): Promise<OpSummary> {
-  return invoke("fs_copy", { items, destination });
+export function fsCopy(
+  items: string[],
+  destination: string,
+  nameOverrides: Record<string, string> | null = null
+): Promise<OpSummary> {
+  return invoke("fs_copy", { items, destination, name_overrides: nameOverrides });
 }
 
 export function fsMove(items: string[], destination: string): Promise<OpSummary> {

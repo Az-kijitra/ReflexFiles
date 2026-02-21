@@ -41,6 +41,24 @@ enum GdriveResourceKind {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct DriveFileCapabilitiesDto {
+    #[serde(default)]
+    can_add_children: bool,
+    #[serde(default)]
+    can_edit: bool,
+}
+
+impl Default for DriveFileCapabilitiesDto {
+    fn default() -> Self {
+        Self {
+            can_add_children: false,
+            can_edit: false,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
 struct DriveFileDto {
     id: String,
     #[serde(default)]
@@ -53,6 +71,8 @@ struct DriveFileDto {
     #[serde(rename = "md5Checksum")]
     md5_checksum: Option<String>,
     version: Option<String>,
+    #[serde(default)]
+    capabilities: DriveFileCapabilitiesDto,
 }
 
 #[derive(Deserialize, Debug)]
@@ -450,7 +470,7 @@ fn drive_files_get(access_token: &str, file_id: &str) -> AppResult<DriveFileDto>
         ("supportsAllDrives", "true".to_string()),
         (
             "fields",
-            "id,name,mimeType,modifiedTime,size,md5Checksum,version".to_string(),
+            "id,name,mimeType,modifiedTime,size,md5Checksum,version,capabilities(canAddChildren,canEdit)".to_string(),
         ),
     ]);
     let uri = format!("{endpoint}?{query}");
@@ -465,6 +485,10 @@ fn drive_files_get(access_token: &str, file_id: &str) -> AppResult<DriveFileDto>
             AppError::with_kind(AppErrorKind::Io, format!("invalid files.get JSON: {err}"))
         })
     })
+}
+
+fn gdrive_can_add_children(file: &DriveFileDto) -> bool {
+    file.capabilities.can_add_children || file.capabilities.can_edit
 }
 
 fn drive_files_get_media(access_token: &str, file_id: &str) -> AppResult<Vec<u8>> {
@@ -1169,6 +1193,7 @@ pub(crate) fn gdrive_copy_file_to_local_for_ref_impl(
 pub(crate) fn gdrive_copy_file_to_gdrive_for_ref_impl(
     source_ref: &ResourceRef,
     destination_dir_ref: &ResourceRef,
+    file_name: Option<&str>,
 ) -> AppResult<GdriveRevisionInfo> {
     let source_info = gdrive_entry_info_for_ref_impl(source_ref)?;
     if source_info.is_dir {
@@ -1187,7 +1212,7 @@ pub(crate) fn gdrive_copy_file_to_gdrive_for_ref_impl(
         &access_token,
         &source_revision.file_id,
         &parent_id,
-        Some(source_info.name.as_str()),
+        file_name.or(Some(source_info.name.as_str())),
     )?;
     let resource_id =
         gdrive_child_resource_id_for_destination(destination_dir_ref, copied.id.trim())?;
@@ -1196,9 +1221,29 @@ pub(crate) fn gdrive_copy_file_to_gdrive_for_ref_impl(
     Ok(revision_info_from_file(&copied, copied.id.trim()))
 }
 
+pub(crate) fn gdrive_can_write_into_ref_impl(resource_ref: &ResourceRef) -> AppResult<bool> {
+    match parse_resource_kind(resource_ref)? {
+        GdriveResourceKind::Root => Ok(true),
+        GdriveResourceKind::RootMyDrive => Ok(true),
+        GdriveResourceKind::RootSharedWithMe => Ok(false),
+        GdriveResourceKind::MyDrive { file_id } | GdriveResourceKind::SharedWithMe { file_id } => {
+            let info = gdrive_entry_info_for_ref_impl(resource_ref)?;
+            if !info.is_dir {
+                return Ok(false);
+            }
+            let access_token = gdrive_auth_access_token_impl()?;
+            let file = drive_files_get(&access_token, &file_id)?;
+            if file.mime_type != MIME_GOOGLE_FOLDER {
+                return Ok(false);
+            }
+            Ok(gdrive_can_add_children(&file))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_resource_kind, GdriveResourceKind};
+    use super::{gdrive_can_write_into_ref_impl, parse_resource_kind, GdriveResourceKind};
     use crate::types::{ResourceRef, StorageProvider};
 
     #[test]
@@ -1245,5 +1290,15 @@ mod tests {
             GdriveResourceKind::RootMyDrive => {}
             _ => panic!("unexpected resource kind"),
         }
+    }
+
+    #[test]
+    fn gdrive_can_write_returns_false_for_shared_with_me_root() {
+        let input = ResourceRef {
+            provider: StorageProvider::Gdrive,
+            resource_id: "root/shared-with-me".to_string(),
+        };
+        let allowed = gdrive_can_write_into_ref_impl(&input).expect("write capability");
+        assert!(!allowed);
     }
 }

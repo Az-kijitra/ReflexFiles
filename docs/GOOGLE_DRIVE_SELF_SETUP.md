@@ -129,7 +129,17 @@ Each user configures and owns their own Google Cloud project and OAuth client.
 6. Write-back says no local workcopy
    - open the file once in an external app first (this creates local workcopy).
 7. Write-back conflict
-   - Google Drive file changed since your workcopy was created. Re-open external app flow to refresh workcopy and retry.
+   - Cause: the Google Drive file was updated after your local workcopy was created.
+   - Current behavior: ReflexFiles blocks upload on conflict and keeps your previous base revision (it does not auto-advance to latest remote revision).
+   - On conflict, ReflexFiles also opens Settings automatically at the conflict guidance area.
+   - Safe recovery steps:
+     1. Do not repeat `Write Back to Google Drive` immediately.
+     2. In ReflexFiles, open the same Google Drive file again in external app (this creates/refreshes local workcopy against latest remote).
+     3. Manually merge your pending local edits into that latest workcopy (use your editor/diff tool).
+     4. Save merged content locally.
+     5. Run `Write Back to Google Drive` again.
+     6. Confirm success status (`Uploaded local workcopy to Google Drive: ...`).
+   - If conflict repeats, another user/process is still updating remote; repeat merge from latest remote state.
 8. `Request had insufficient authentication scopes` on write-back
    - Your token was authorized with read-only scope. Run `Sign Out`, then `Start Sign-In` and `Complete Sign-In` again so ReflexFiles obtains `https://www.googleapis.com/auth/drive`.
 

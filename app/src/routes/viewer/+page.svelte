@@ -872,13 +872,15 @@
         if (
           normalized.includes("keymap") ||
           normalized.includes("keyboard") ||
+          normalized.includes("key binding") ||
+          normalized.includes("shortcut") ||
           heading.includes("\u30ad\u30fc\u64cd\u4f5c") ||
           heading.includes("\u30ad\u30fc\u4e00\u89a7")
         ) {
           return heading;
         }
       }
-      return "\u30ad\u30fc\u64cd\u4f5c";
+      return "keymap";
     }
 
     return hint;
@@ -900,6 +902,14 @@
     }
 
     const targetNorm = normalizeMatchText(heading);
+    if (targetNorm === "keymap") {
+      const anchored = root.querySelector("#keymap");
+      if (anchored) {
+        anchored.scrollIntoView({ block: "start", inline: "nearest" });
+        return true;
+      }
+    }
+
     const elements = root.querySelectorAll("h1, h2, h3, h4, h5, h6");
     for (const element of elements) {
       const currentNorm = normalizeMatchText(element.textContent || "");
@@ -912,6 +922,25 @@
       }
     }
 
+    return false;
+  }
+
+  /**
+   * @param {string} headingText
+   */
+  async function focusMarkdownHeadingWithRetry(headingText) {
+    const heading = String(headingText || "").trim();
+    if (!heading) {
+      return false;
+    }
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      if (await focusMarkdownHeading(heading)) {
+        return true;
+      }
+      await tick();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
     return false;
   }
 
@@ -1871,7 +1900,7 @@
         pendingMarkdownJumpHeading = "";
         // Ensure markdown DOM is rendered after Loading... is dismissed.
         await tick();
-        await focusMarkdownHeading(heading);
+        await focusMarkdownHeadingWithRetry(heading);
       }
     }
   }

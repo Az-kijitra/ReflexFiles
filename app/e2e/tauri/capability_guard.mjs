@@ -182,6 +182,15 @@ try {
     }
   };
 
+  const assertReasonContains = async (element, needles, label) => {
+    const reasonEl = await element.findElement(By.css(".menu-reason"));
+    const reason = String((await reasonEl.getText()) || "").trim();
+    const matched = needles.some((needle) => reason.includes(needle));
+    if (!matched) {
+      throw new Error(`${label} reason mismatch: "${reason}"`);
+    }
+  };
+
   const focusList = async () => {
     await driver.executeScript(() => {
       const list = document.querySelector(".list");
@@ -207,9 +216,26 @@ try {
     });
   };
 
+  const setCurrentPathForTest = async (path) => {
+    await driver.executeScript((nextPath) => {
+      window.__rf_test_hooks.setCurrentPathForTest?.(nextPath);
+    }, path);
+  };
+
+  const openSettingsByEvent = async (section) => {
+    await driver.executeScript((nextSection) => {
+      window.dispatchEvent(
+        new CustomEvent("rf:open-settings", {
+          detail: { section: nextSection, reason: "e2e-capability-guard" },
+        })
+      );
+    }, section);
+  };
+
   await waitMainUiReady();
   await waitHooksReady();
   await setCapabilitiesBlocked();
+  await setCurrentPathForTest("gdrive://root/shared-with-me");
 
   console.log("[capability-guard] verify blank context menu gating...");
   const listEl = await withTimeout(
@@ -220,11 +246,7 @@ try {
   await driver.actions().contextClick(listEl).perform();
   const newItem = await withTimeout(
     driver.wait(
-      until.elementLocated(
-        By.xpath(
-          "//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'新規作成') or contains(normalize-space(.),'New')]]"
-        )
-      ),
+      until.elementLocated(By.css(".context-menu-item[data-menu-id='ctx-new']")),
       timeoutMs
     ),
     timeoutMs,
@@ -232,11 +254,7 @@ try {
   );
   const pasteItem = await withTimeout(
     driver.wait(
-      until.elementLocated(
-        By.xpath(
-          "//button[contains(@class,'context-menu-item')][.//span[contains(normalize-space(.),'ペースト') or contains(normalize-space(.),'Paste')]]"
-        )
-      ),
+      until.elementLocated(By.css(".context-menu-item[data-menu-id='ctx-paste']")),
       timeoutMs
     ),
     timeoutMs,
@@ -244,16 +262,17 @@ try {
   );
   await assertDisabled(newItem, "context new");
   await assertDisabled(pasteItem, "context paste");
+  await assertReasonContains(
+    pasteItem,
+    ["書き込めません", "not writable"],
+    "context paste"
+  );
   await driver.actions().sendKeys(Key.ESCAPE).perform();
 
   console.log("[capability-guard] verify edit menu paste gating...");
   const editButton = await withTimeout(
     driver.wait(
-      until.elementLocated(
-        By.xpath(
-          "//button[contains(@class,'menu-button')][contains(normalize-space(.),'Edit') or contains(normalize-space(.),'編集')]"
-        )
-      ),
+      until.elementLocated(By.css(".menu-button[data-menu-group='edit']")),
       timeoutMs
     ),
     timeoutMs,
@@ -262,17 +281,18 @@ try {
   await editButton.click();
   const menuPaste = await withTimeout(
     driver.wait(
-      until.elementLocated(
-        By.xpath(
-          "//div[contains(@class,'menu-dropdown')]//button[contains(@class,'menu-item')][.//span[contains(@class,'menu-label')][contains(normalize-space(.),'Paste') or contains(normalize-space(.),'ペースト')]]"
-        )
-      ),
+      until.elementLocated(By.css(".menu-dropdown .menu-item[data-menu-id='menu-edit-paste']")),
       timeoutMs
     ),
     timeoutMs,
     "wait edit paste item"
   );
   await assertDisabled(menuPaste, "edit paste");
+  await assertReasonContains(
+    menuPaste,
+    ["書き込めません", "not writable"],
+    "edit paste"
+  );
   await driver.actions().sendKeys(Key.ESCAPE).perform();
 
   console.log("[capability-guard] verify action-level capability decisions...");
@@ -290,6 +310,43 @@ try {
   if (Boolean(decisions?.canPasteCurrentPath)) {
     throw new Error("canPasteCurrentPath should be false under blocked capability");
   }
+
+  console.log("[capability-guard] verify rf:open-settings advanced routing...");
+  await openSettingsByEvent("advanced");
+  await withTimeout(
+    driver.wait(async () => {
+      try {
+        return Boolean(
+          await driver.executeScript(() => Boolean(window.__rf_settings_open))
+        );
+      } catch {
+        return false;
+      }
+    }, timeoutMs),
+    timeoutMs,
+    "wait settings open"
+  );
+  await withTimeout(
+    driver.wait(
+      until.elementLocated(
+        By.css(".settings-sidebar button[data-settings-section='advanced'].selected")
+      ),
+      timeoutMs
+    ),
+    timeoutMs,
+    "wait settings advanced section"
+  );
+  await openSettingsByEvent("general");
+  await withTimeout(
+    driver.wait(
+      until.elementLocated(
+        By.css(".settings-sidebar button[data-settings-section='general'].selected")
+      ),
+      timeoutMs
+    ),
+    timeoutMs,
+    "wait settings general section switch"
+  );
 
   console.log("[capability-guard] passed.");
 } catch (error) {

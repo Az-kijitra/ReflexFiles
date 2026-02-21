@@ -90,6 +90,7 @@ export function buildMenuSetupInputs(params) {
       pasteItems: page.pasteItems,
       hasOperationTargets: page.hasOperationTargets,
       hasSelection: page.hasSelection,
+      getCurrentPath: state.getCurrentPath,
       canCreateCurrentPath: page.canCreateCurrentPath,
       canPasteCurrentPath: page.canPasteCurrentPath,
       canCopyTargets: page.canCopyTargets,

@@ -18,7 +18,10 @@ use crate::types::{
 use crate::utils::{is_hidden, system_time_to_rfc3339};
 
 #[cfg(not(feature = "gdrive-readonly-stub"))]
-use crate::gdrive_real::{gdrive_download_file_bytes_for_ref_impl, gdrive_entry_info_for_ref_impl};
+use crate::gdrive_real::{
+    gdrive_can_write_into_ref_impl, gdrive_download_file_bytes_for_ref_impl,
+    gdrive_entry_info_for_ref_impl,
+};
 
 #[cfg(feature = "gdrive-readonly-stub")]
 use crate::gdrive_stub::{
@@ -1145,7 +1148,15 @@ pub(crate) fn fs_get_capabilities_by_ref_impl(
 ) -> AppResult<ProviderCapabilities> {
     let registry = provider_registry();
     let provider = registry.provider_for_ref(&resource_ref)?;
-    Ok(provider_capabilities(provider))
+    let mut capabilities = provider_capabilities(provider);
+
+    #[cfg(not(feature = "gdrive-readonly-stub"))]
+    if matches!(resource_ref.provider, StorageProvider::Gdrive) && capabilities.can_copy {
+        // Fail-safe: when the write-capability probe fails, disable copy for destination checks.
+        capabilities.can_copy = gdrive_can_write_into_ref_impl(&resource_ref).unwrap_or(false);
+    }
+
+    Ok(capabilities)
 }
 
 pub(crate) fn fs_dir_stats_impl(path: String, timeout_ms: u64) -> AppResult<DirStats> {
@@ -1177,12 +1188,15 @@ mod tests {
     use super::{
         cleanup_viewer_image_cache_dir, clear_gdrive_read_cache_impl,
         fs_get_capabilities_by_ref_impl,
-        fs_get_properties_by_ref_impl, fs_is_probably_text_by_ref_impl, fs_is_probably_text_impl,
-        fs_list_dir_by_ref_impl, fs_read_image_data_url_by_ref_impl, fs_read_image_data_url_impl,
-        fs_read_image_normalized_temp_path_by_ref_impl, fs_read_image_normalized_temp_path_impl,
-        fs_read_text_by_ref_impl, fs_read_text_impl, fs_read_text_viewport_lines_by_ref_impl,
-        fs_read_text_viewport_lines_impl, fs_text_viewport_info_by_ref_impl,
-        fs_text_viewport_info_impl, infer_image_mime,
+        fs_get_properties_by_ref_impl, fs_is_probably_text_impl, fs_list_dir_by_ref_impl,
+        fs_read_image_data_url_impl, fs_read_image_normalized_temp_path_impl, fs_read_text_impl,
+        fs_read_text_viewport_lines_impl, fs_text_viewport_info_impl, infer_image_mime,
+    };
+    #[cfg(feature = "gdrive-readonly-stub")]
+    use super::{
+        fs_is_probably_text_by_ref_impl, fs_read_image_data_url_by_ref_impl,
+        fs_read_image_normalized_temp_path_by_ref_impl, fs_read_text_by_ref_impl,
+        fs_read_text_viewport_lines_by_ref_impl, fs_text_viewport_info_by_ref_impl,
     };
     use crate::types::{PropertyKind, ResourceRef, StorageProvider};
     use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};

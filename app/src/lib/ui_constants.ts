@@ -267,8 +267,10 @@
       "paste.body": "{count} item(s) already exist in the destination.",
       "paste.empty_clipboard": "Clipboard has no files",
       "paste.nothing": "Nothing to paste",
+      "paste.destination_not_writable": "This Google Drive folder is not writable",
       "paste.apply_all": "Apply to all",
       "paste.overwrite": "Overwrite",
+      "paste.keep_both": "Keep both",
       "paste.skip": "Skip",
       "create.title": "New",
       "create.type": "Type",
@@ -426,6 +428,11 @@
       "settings.gdrive.token_store": "Token store backend",
       "settings.gdrive.token_store_available": "Token store available",
       "settings.gdrive.last_error": "Last auth error",
+      "settings.gdrive.conflict_help_title": "Write-back conflict recovery",
+      "settings.gdrive.conflict_help":
+        "If write-back is blocked by conflict, re-open from Google Drive, merge local changes into the latest copy, then write back again.",
+      "settings.gdrive.conflict_help_recent":
+        "Recent write-back conflict detected. Re-open from Google Drive, merge local changes into latest copy, then write back again.",
       "settings.gdrive.refresh_status": "Refresh Auth Status",
       "settings.gdrive.sign_out": "Sign Out",
       "settings.gdrive.client_id": "OAuth client_id",
@@ -594,7 +601,7 @@
       "status.gdrive_writeback_done": "Uploaded local workcopy to Google Drive: {name}",
       "status.gdrive_writeback_no_change": "No local changes to upload: {name}",
       "status.gdrive_writeback_conflict":
-        "Upload blocked by conflict on Google Drive: {name}",
+        "Upload blocked by conflict on Google Drive: {name}. Re-open from Google Drive, merge changes, then write back again. Open Settings with Ctrl+, for conflict guidance.",
       "status.gdrive_writeback_unknown":
         "Write-back finished with unknown result: {name}",
       "focus.list": "List",
@@ -750,8 +757,10 @@
       "paste.body": "{count}件が既に存在します。",
       "paste.empty_clipboard": "クリップボードにファイルがありません",
       "paste.nothing": "貼り付ける項目がありません",
+      "paste.destination_not_writable": "この Google Drive フォルダには書き込めません",
       "paste.apply_all": "すべてに適用",
       "paste.overwrite": "上書き",
+      "paste.keep_both": "別名保存",
       "paste.skip": "スキップ",
       "create.title": "新規作成",
       "create.type": "種別",
@@ -908,6 +917,11 @@
       "settings.gdrive.token_store": "トークン保存バックエンド",
       "settings.gdrive.token_store_available": "トークン保存の利用可否",
       "settings.gdrive.last_error": "直近の認証エラー",
+      "settings.gdrive.conflict_help_title": "書き戻し競合の対処",
+      "settings.gdrive.conflict_help":
+        "書き戻しが競合で止まった場合は、Google Drive から開き直し、最新コピーにローカル変更をマージしてから再書き戻ししてください。",
+      "settings.gdrive.conflict_help_recent":
+        "直近で書き戻し競合が発生しています。Google Drive から開き直し、最新コピーにローカル変更をマージしてから再書き戻ししてください。",
       "settings.gdrive.refresh_status": "認証状態を更新",
       "settings.gdrive.sign_out": "サインアウト",
       "settings.gdrive.client_id": "OAuth クライアント ID",
@@ -1083,7 +1097,7 @@
       "status.gdrive_writeback_no_change":
         "書き戻すローカル変更がありません: {name}",
       "status.gdrive_writeback_conflict":
-        "Google Drive 側の競合により書き戻しを中止しました: {name}",
+        "Google Drive 側の競合により書き戻しを中止しました: {name}。Google Drive から開き直して差分をマージし、再度書き戻してください。Ctrl+, で設定を開くと競合対処ガイドを確認できます。",
       "status.gdrive_writeback_unknown":
         "書き戻し結果を確認できませんでした: {name}",
       "focus.list": "リスト",

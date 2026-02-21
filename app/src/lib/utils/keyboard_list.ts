@@ -5,6 +5,14 @@
 export function handleListKey(event, ctx) {
   const active = ctx.activeElement;
   const reportCapabilityUnavailable = () => ctx.setStatusMessage(ctx.t("capability.not_available"));
+  const reportPasteUnavailable = () => {
+    const currentPath = String(ctx.currentPath || "").trim().toLowerCase();
+    if (currentPath.startsWith("gdrive://")) {
+      ctx.setStatusMessage(ctx.t("paste.destination_not_writable"));
+      return;
+    }
+    reportCapabilityUnavailable();
+  };
   const isPlainDeleteKey =
     !event.ctrlKey &&
     !event.altKey &&
@@ -209,7 +217,7 @@ export function handleListKey(event, ctx) {
         typeof ctx.canPasteCurrentPath === "function" &&
         !ctx.canPasteCurrentPath()
       ) {
-        reportCapabilityUnavailable();
+        reportPasteUnavailable();
         return true;
       }
       ctx.pasteItems();
@@ -368,7 +376,7 @@ export function handleListKey(event, ctx) {
       typeof ctx.canPasteCurrentPath === "function" &&
       !ctx.canPasteCurrentPath()
     ) {
-      reportCapabilityUnavailable();
+      reportPasteUnavailable();
       return true;
     }
     ctx.pasteItems();

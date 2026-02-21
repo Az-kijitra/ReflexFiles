@@ -61,7 +61,7 @@
               focusList();
             }
           } else {
-            handlePathTabCompletion();
+            handlePathTabCompletion(pathInput);
           }
         }
       }}

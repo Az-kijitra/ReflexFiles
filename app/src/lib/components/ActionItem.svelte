@@ -11,6 +11,7 @@
 
 <ActionButton
   className={isContext ? "context-menu-item" : "menu-item"}
+  dataMenuId={String(item?.id || "")}
   enabled={item?.enabled}
   active={item?.enabled && active}
   onSelect={() => {
@@ -20,7 +21,7 @@
 >
   <span class="menu-text">
     <span class="menu-label">{item?.label}</span>
-    {#if isContext && item?.reason}
+    {#if item?.reason}
       <span class="menu-reason">{item.reason}</span>
     {/if}
   </span>

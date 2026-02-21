@@ -1,4 +1,5 @@
 import { STATUS_LONG_MS, STATUS_MEDIUM_MS } from "$lib/ui_durations";
+import { basename, makeDuplicateName } from "$lib/utils/file_ops";
 
 /**
  * @param {object} ctx
@@ -10,6 +11,22 @@ import { STATUS_LONG_MS, STATUS_MEDIUM_MS } from "$lib/ui_durations";
  */
 export function createClipboardActions(ctx, helpers) {
   const { setStatusMessage, showError, showFailures, pushUndoEntry } = helpers;
+  const isCurrentPathGdrive = () =>
+    String(ctx.getCurrentPath?.() || "")
+      .trim()
+      .toLowerCase()
+      .startsWith("gdrive://");
+  const currentPathCanPaste = () => {
+    const caps = ctx.getCurrentPathCapabilities?.();
+    const canCopy = Boolean(caps?.can_copy ?? true);
+    const canMove = Boolean(caps?.can_move ?? true);
+    return canCopy || canMove;
+  };
+  const notifyPasteUnavailable = () => {
+    setStatusMessage(
+      isCurrentPathGdrive() ? ctx.t("paste.destination_not_writable") : ctx.t("capability.not_available")
+    );
+  };
 
   async function confirmPasteOverwrite() {
     ctx.setPasteConfirmOpen(false);
@@ -29,6 +46,26 @@ export function createClipboardActions(ctx, helpers) {
     ctx.setPastePendingPaths([]);
     ctx.setPasteConflicts([]);
     await runPaste(filtered, ctx.getPasteMode() === "cut");
+  }
+
+  async function confirmPasteKeepBoth() {
+    ctx.setPasteConfirmOpen(false);
+    const paths = ctx.getPastePendingPaths();
+    const conflicts = new Set(ctx.getPasteConflicts().map((name) => String(name || "").toLowerCase()));
+    const entries = ctx.getEntries();
+    const existingLower = new Set(entries.map((entry) => String(entry?.name || "").toLowerCase()));
+    const nameOverrides = {};
+    for (const path of paths) {
+      const name = basename(path);
+      if (!name) continue;
+      if (!conflicts.has(name.toLowerCase())) continue;
+      const nextName = makeDuplicateName(name, existingLower, ctx.t("duplicate.suffix"));
+      existingLower.add(nextName.toLowerCase());
+      nameOverrides[path] = nextName;
+    }
+    ctx.setPastePendingPaths([]);
+    ctx.setPasteConflicts([]);
+    await runPaste(paths, ctx.getPasteMode() === "cut", nameOverrides);
   }
 
   function cancelPasteConfirm() {
@@ -82,6 +119,10 @@ export function createClipboardActions(ctx, helpers) {
 
   async function pasteItems() {
     try {
+      if (!currentPathCanPaste()) {
+        notifyPasteUnavailable();
+        return;
+      }
       const clip = await ctx.clipboardGetFiles();
       const lastClipboard = ctx.getLastClipboard();
       const effectiveClip =
@@ -113,7 +154,7 @@ export function createClipboardActions(ctx, helpers) {
    * @param {string[]} paths
    * @param {boolean} cut
    */
-  async function runPaste(paths, cut) {
+  async function runPaste(paths, cut, nameOverrides = null) {
     const currentPath = ctx.getCurrentPath();
     if (!paths.length) {
       setStatusMessage(ctx.t("paste.nothing"));
@@ -152,7 +193,7 @@ export function createClipboardActions(ctx, helpers) {
         const suffix = failCount ? ` (failed ${failCount})` : "";
         setStatusMessage(`${base} ${okCount}/${totalCount} item(s)${suffix}`);
       } else {
-        const summary = await ctx.fsCopy(filtered, currentPath);
+        const summary = await ctx.fsCopy(filtered, currentPath, nameOverrides);
         const okCount = typeof summary?.ok === "number" ? summary.ok : filtered.length;
         const failCount = typeof summary?.failed === "number" ? summary.failed : 0;
         const totalCount =
@@ -189,6 +230,7 @@ export function createClipboardActions(ctx, helpers) {
   return {
     confirmPasteOverwrite,
     confirmPasteSkip,
+    confirmPasteKeepBoth,
     cancelPasteConfirm,
     copySelected,
     cutSelected,

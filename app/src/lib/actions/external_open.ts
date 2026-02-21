@@ -17,6 +17,14 @@ const VIEWER_SUPPORTED_EXTS = new Set([
 export function createExternalActions(ctx, helpers) {
   const { setStatusMessage, showError } = helpers;
   const gdriveWorkcopyMap = new Map();
+  const openSettingsForGdriveConflict = () => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("rf:open-settings", {
+        detail: { section: "advanced", reason: "gdrive_write_conflict" },
+      })
+    );
+  };
 
   function gdriveWorkcopyKey(resourceRef) {
     const provider = String(resourceRef?.provider || "").trim().toLowerCase();
@@ -306,17 +314,20 @@ export function createExternalActions(ctx, helpers) {
         localPath: cached.localPath,
         baseRevision: cached.revision,
       });
-      const nextRevision = result?.revision || null;
-      if (nextRevision) {
-        cached.revision = nextRevision;
-      }
       if (result?.conflict) {
+        // Keep the previous base revision on conflict to prevent accidental overwrite
+        // by repeated write-back without explicitly refreshing/merging.
         cached.dirty = true;
         setStatusMessage(
           ctx.t("status.gdrive_writeback_conflict", { name: cached.fileName || entry.name || "file" }),
           STATUS_LONG_MS
         );
+        openSettingsForGdriveConflict();
         return;
+      }
+      const nextRevision = result?.revision || null;
+      if (nextRevision) {
+        cached.revision = nextRevision;
       }
       if (result?.unchanged) {
         cached.dirty = false;
@@ -500,7 +511,7 @@ export function createExternalActions(ctx, helpers) {
 
   function getManualLanguageId() {
     const value = String(ctx.getUiLanguage?.() || "en").toLowerCase();
-    return value === "ja" ? "ja" : "en";
+    return value.startsWith("ja") ? "ja" : "en";
   }
 
   async function resolveUserManualMarkdownPath() {

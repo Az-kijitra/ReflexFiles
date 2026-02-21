@@ -233,6 +233,7 @@
   /** @type {HTMLElement | null} */
   let settingsModalEl = $state(null);
   let settingsOpen = $state(false);
+  let settingsInitialSection = $state("general");
   let settingsSaving = $state(false);
   let settingsError = $state("");
   let settingsTesting = $state(false);
@@ -811,7 +812,16 @@
     settingsShortcutConflicts = [...knownItems, ...internalItems];
   }
 
-  async function openSettingsModal() {
+  function normalizeSettingsSection(value) {
+    const section = String(value || "").trim().toLowerCase();
+    if (section === "external" || section === "advanced") {
+      return section;
+    }
+    return "general";
+  }
+
+  async function openSettingsModal(options = undefined) {
+    settingsInitialSection = normalizeSettingsSection(options?.initialSection);
     settingsSaving = false;
     settingsError = "";
     settingsTesting = false;
@@ -1485,8 +1495,13 @@
     };
   });
   onMount(() => {
-    const handler = () => {
-      void openSettingsModal();
+    const handler = (event) => {
+      const requestedSection = normalizeSettingsSection(event?.detail?.section);
+      if (settingsOpen) {
+        settingsInitialSection = requestedSection;
+        return;
+      }
+      void openSettingsModal({ initialSection: requestedSection });
     };
     window.addEventListener("rf:open-settings", handler);
     return () => {
@@ -1589,6 +1604,11 @@
         testCapabilityOverride = value ? normalizeProviderCapabilities(value) : null;
         state.currentPathCapabilities = normalizeProviderCapabilities(testCapabilityOverride);
       },
+      setCurrentPathForTest: (value) => {
+        const nextPath = String(value || "");
+        state.currentPath = nextPath;
+        state.pathInput = nextPath;
+      },
       getCurrentPathCapabilities: () => ({ ...state.currentPathCapabilities }),
       getStatusMessage: () => String(state.statusMessage || ""),
       clearStatusMessage: () => {
@@ -1653,6 +1673,7 @@
     gdriveWorkcopyError={settingsGdriveWorkcopyError}
     gdriveWorkcopyMessage={settingsGdriveWorkcopyMessage}
     error={settingsError}
+    initialSection={settingsInitialSection}
     onCancel={closeSettingsModal}
     onSave={saveSettings}
     onOpenConfig={openConfigFromSettings}

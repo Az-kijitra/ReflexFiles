@@ -1,4 +1,5 @@
 use std::fs;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -28,6 +29,7 @@ pub fn fs_copy(
     app: AppHandle,
     items: Vec<String>,
     destination: String,
+    name_overrides: Option<HashMap<String, String>>,
 ) -> Result<OpSummary, String> {
     let started = Instant::now();
     reset_cancel_request();
@@ -68,7 +70,14 @@ pub fn fs_copy(
     if all_local {
         return fs_copy_all_local(app, items, destination, started);
     }
-    fs_copy_mixed(app, item_refs, destination, destination_ref, started)
+    fs_copy_mixed(
+        app,
+        item_refs,
+        destination,
+        destination_ref,
+        name_overrides,
+        started,
+    )
 }
 
 fn fs_copy_all_local(
@@ -244,6 +253,7 @@ fn fs_copy_mixed(
     item_refs: Vec<(String, ResourceRef)>,
     destination_raw: String,
     destination_ref: ResourceRef,
+    name_overrides: Option<HashMap<String, String>>,
     started: Instant,
 ) -> Result<OpSummary, String> {
     let local_destination = if matches!(destination_ref.provider, StorageProvider::Local) {
@@ -365,6 +375,11 @@ fn fs_copy_mixed(
                 }
             }
         } else {
+            let override_name = name_overrides
+                .as_ref()
+                .and_then(|map| map.get(&raw_item))
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
             match destination_ref.provider {
                 StorageProvider::Gdrive => match source_ref.provider {
                     StorageProvider::Local => {
@@ -399,7 +414,7 @@ fn fs_copy_mixed(
                                 gdrive_upload_file_from_path_to_dir_for_ref_impl(
                                     &destination_ref,
                                     &from,
-                                    None,
+                                    override_name.as_deref(),
                                 )
                                 .map(|revision| {
                                     format!(
@@ -421,7 +436,11 @@ fn fs_copy_mixed(
                     StorageProvider::Gdrive => {
                         #[cfg(not(feature = "gdrive-readonly-stub"))]
                         {
-                            gdrive_copy_file_to_gdrive_for_ref_impl(&source_ref, &destination_ref)
+                            gdrive_copy_file_to_gdrive_for_ref_impl(
+                                &source_ref,
+                                &destination_ref,
+                                override_name.as_deref(),
+                            )
                                 .map(|revision| {
                                     format!(
                                         "gdrive://{}/{}",

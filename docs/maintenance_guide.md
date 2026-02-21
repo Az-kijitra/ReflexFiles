@@ -116,6 +116,8 @@ npm run tauri build
 ### Test layers
 - `e2e:tauri` -> smoke flow (file operations baseline)
 - `e2e:capability` -> provider capability guard flow (menu/context/action gating)
+  - Also verifies Google Drive paste-disabled reason text (`paste.destination_not_writable`) on both context menu and Edit menu.
+  - Also verifies `rf:open-settings` event routing opens Settings at `advanced` section and can switch section while Settings is already open.
 - `e2e:viewer` -> viewer behavior flow
 - `e2e:settings` -> settings persistence, backup/report, undo/redo checks
 - `e2e:full` -> sequential suite (`smoke` -> `capability_guard` -> `viewer_flow` -> `settings_session`)
@@ -136,10 +138,15 @@ npm run e2e:full
 - Chooses bootstrap mode:
   - `existing-binary + vite-dev` when debug EXE exists
   - fallback to `tauri dev` otherwise
+- Acquires cross-process lock (`e2e_artifacts/.tauri-e2e.lock.json`) before startup and serializes concurrent E2E runs.
 - On Windows, proactively terminates lingering `vite dev` node processes in this repo before app startup
 - Waits for app readiness on `localhost:1422` equivalents
 - Executes Selenium scenario
 - Performs aggressive child-process shutdown on Windows to avoid stale process hangs
+
+Operational rule:
+- Do not run multiple E2E commands in parallel (`e2e:tauri`, `e2e:capability`, `e2e:viewer`, `e2e:settings`, `e2e:full`).
+- Even when started accidentally in parallel, runner lock will queue/wait; still prefer explicit serial execution for deterministic logs.
 
 ## Provider Capability Enforcement
 - `fs_get_capabilities` is the backend API to fetch provider capabilities for a target path.
@@ -166,11 +173,25 @@ npm run e2e:full
   - Opening Google Drive files in associated external apps now uses local workcopies via `gdrive_prepare_edit_workcopy`.
   - Upload-back is explicit/manual via context menu action (`Write Back to Google Drive`).
   - Upload-back calls `gdrive_apply_edit_workcopy` and blocks on optimistic-lock conflict.
+  - On conflict, frontend keeps previous base revision (does not auto-advance to remote latest) to prevent accidental overwrite by repeated write-back.
+  - On conflict, frontend dispatches `rf:open-settings` and opens Settings in `advanced` section (or switches to it if already open).
   - Workcopy badge (`local` / `dirty`) is now refreshed from backend state, not only in-memory flag state.
   - Settings > Google Drive includes workcopy maintenance UI (list / delete / age-based cleanup).
+  - Settings > Google Drive now includes conflict-recovery guidance; it is highlighted when recent write conflict timestamp exists.
+  - Conflict status message directs users to Settings (`Ctrl+,`) for recovery guidance.
 - Runtime resilience / diagnostics:
+  - `fs_get_capabilities_by_ref` now applies a Google Drive destination write probe (`canAddChildren`) and fails safe (`can_copy=false`) when probe fails.
+  - `root/shared-with-me` is treated as non-writable destination (`can_copy=false`).
+  - When paste is blocked on a Google Drive destination, UI shows a dedicated message (`paste.destination_not_writable`) instead of generic capability text.
+  - `pasteItems` performs a final runtime capability guard (not only menu/key gating) and returns the same destination-specific message.
   - Google Drive API bridge retries transient failures (HTTP `429` / `5xx`, timeout, temporary network resolution issues) with bounded backoff.
   - Upload-back scope-insufficient errors are normalized to `permission_denied` with actionable remediation text.
+  - Paste conflict modal supports `Keep both` for copy to Google Drive destinations (creates a non-conflicting name on destination).
+  - Copy from Google Drive to local exports Google-native docs automatically:
+    - Docs -> `.docx`
+    - Sheets -> `.xlsx`
+    - Slides -> `.pptx`
+    - Drawings -> `.png`
   - Settings > Google Drive shows additional diagnostics:
     - write-scope granted flag
     - access-token expiry timestamp

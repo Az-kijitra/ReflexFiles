@@ -57,6 +57,7 @@ export function createPageActionPlaceholders(
     confirmCreate: noop,
     confirmPasteOverwrite: noop,
     confirmPasteSkip: noop,
+    confirmPasteKeepBoth: noop,
     cancelPasteConfirm: noop,
     confirmDelete: noop,
     cancelDelete: noop,

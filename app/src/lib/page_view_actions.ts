@@ -68,6 +68,7 @@ export function buildViewActions(params) {
     cancelDelete: pageActions.cancelDelete,
     confirmPasteOverwrite: pageActions.confirmPasteOverwrite,
     confirmPasteSkip: pageActions.confirmPasteSkip,
+    confirmPasteKeepBoth: pageActions.confirmPasteKeepBoth,
     cancelPasteConfirm: pageActions.cancelPasteConfirm,
     confirmCreate: pageActions.confirmCreate,
     cancelCreate: pageActions.cancelCreate,

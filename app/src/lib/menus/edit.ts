@@ -11,6 +11,7 @@
  * @param {() => void} params.pasteItems
  * @param {() => boolean} [params.hasOperationTargets]
  * @param {() => boolean} [params.hasSelection]
+ * @param {() => string} [params.getCurrentPath]
  * @param {() => boolean} [params.canPasteCurrentPath]
  * @param {() => boolean} [params.canCopyTargets]
  * @param {() => boolean} [params.canDuplicateTargets]
@@ -38,6 +39,7 @@ export function buildEditMenuItems(params) {
     pasteItems,
     hasOperationTargets,
     hasSelection,
+    getCurrentPath,
     canPasteCurrentPath,
     canCopyTargets,
     canDuplicateTargets,
@@ -60,18 +62,29 @@ export function buildEditMenuItems(params) {
   const prefixDateEnabled = hasTargets && (canPrefixDateTargets ? canPrefixDateTargets() : true);
   const cutEnabled = hasTargets && (canCutTargets ? canCutTargets() : true);
   const pasteEnabled = canPasteCurrentPath ? canPasteCurrentPath() : true;
+  const pasteReason =
+    pasteEnabled
+      ? ""
+      : String(getCurrentPath ? getCurrentPath() : "")
+          .trim()
+          .toLowerCase()
+          .startsWith("gdrive://")
+        ? t("paste.destination_not_writable")
+        : t("capability.not_available");
   const deleteEnabled = hasSelectedItems && (canDeleteSelection ? canDeleteSelection() : true);
   const propertiesEnabled =
     hasSelectedItems && (canOpenPropertiesSelection ? canOpenPropertiesSelection() : true);
 
   return [
     {
+      id: "menu-edit-undo",
       label: t("menu.undo"),
       enabled: true,
       action: () => performUndo(),
       shortcut: getMenuShortcut("undo"),
     },
     {
+      id: "menu-edit-redo",
       label: t("menu.redo"),
       enabled: true,
       action: () => performRedo(),
@@ -79,44 +92,51 @@ export function buildEditMenuItems(params) {
     },
     { separator: true },
     {
+      id: "menu-edit-copy",
       label: t("menu.copy"),
       enabled: copyEnabled,
       action: () => copySelected(),
       shortcut: getMenuShortcut("copy"),
     },
     {
+      id: "menu-edit-duplicate",
       label: t("menu.duplicate"),
       enabled: duplicateEnabled,
       action: () => duplicateSelected(),
       shortcut: getMenuShortcut("duplicate"),
     },
     {
+      id: "menu-edit-prefix-date",
       label: t("menu.prefix_date"),
       enabled: prefixDateEnabled,
       action: () => prefixDateSelected(),
       shortcut: getMenuShortcut("prefix_date"),
     },
     {
+      id: "menu-edit-cut",
       label: t("menu.cut"),
       enabled: cutEnabled,
       action: () => cutSelected(),
       shortcut: getMenuShortcut("cut"),
     },
     {
+      id: "menu-edit-paste",
       label: t("menu.paste"),
       enabled: pasteEnabled,
-      reason: pasteEnabled ? "" : t("capability.not_available"),
+      reason: pasteReason,
       action: () => pasteItems(),
       shortcut: getMenuShortcut("paste"),
     },
     { separator: true },
     {
+      id: "menu-edit-delete",
       label: t("menu.delete"),
       enabled: deleteEnabled,
       action: () => requestDeleteSelected(),
       shortcut: getMenuShortcut("delete"),
     },
     {
+      id: "menu-edit-properties",
       label: t("menu.properties"),
       enabled: propertiesEnabled,
       action: () => requestOpenPropertiesSelected(),
@@ -124,18 +144,21 @@ export function buildEditMenuItems(params) {
     },
     { separator: true },
     {
+      id: "menu-edit-select-all",
       label: t("menu.select_all"),
       enabled: true,
       action: () => selectAll(),
       shortcut: getMenuShortcut("select_all"),
     },
     {
+      id: "menu-edit-clear-selection",
       label: t("menu.clear_selection"),
       enabled: true,
       action: () => clearSelection(),
       shortcut: getMenuShortcut("clear_selection"),
     },
     {
+      id: "menu-edit-invert-selection",
       label: t("menu.invert_selection"),
       enabled: true,
       action: () => invertSelection(),
@@ -143,6 +166,7 @@ export function buildEditMenuItems(params) {
     },
     { separator: true },
     {
+      id: "menu-edit-find",
       label: t("menu.find"),
       enabled: true,
       action: () => openSearch(),

@@ -30,6 +30,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const {
     confirmPasteOverwrite,
     confirmPasteSkip,
+    confirmPasteKeepBoth,
     cancelPasteConfirm,
     copySelected,
     cutSelected,
@@ -239,6 +240,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   return {
     confirmPasteOverwrite,
     confirmPasteSkip,
+    confirmPasteKeepBoth,
     cancelPasteConfirm,
     confirmDelete,
     cancelDelete,
