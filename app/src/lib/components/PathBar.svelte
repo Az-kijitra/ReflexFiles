@@ -16,6 +16,9 @@
   export let focusList;
   export let focusTreeTop;
   export let handlePathTabCompletion;
+  export let handlePathCompletionSeparator;
+  export let handlePathCompletionInputChange;
+  export let clearPathCompletionPreview;
   export let setStatusMessage;
 </script>
 
@@ -25,6 +28,7 @@
     class="path-input"
     onsubmit={async (event) => {
       event.preventDefault();
+      clearPathCompletionPreview?.();
       await loadDir(pathInput);
       await tick();
       focusList();
@@ -36,9 +40,16 @@
       spellcheck="false"
       bind:this={pathInputEl}
       aria-label={t("label.path")}
-      onkeydown={(event) => {
+      oninput={() => {
+        handlePathCompletionInputChange?.(pathInput);
+      }}
+      onblur={() => {
+        clearPathCompletionPreview?.();
+      }}
+      onkeydown={async (event) => {
         if (event.key === "Escape") {
           event.preventDefault();
+          clearPathCompletionPreview?.();
           pathInput = currentPath;
           focusList();
         }
@@ -55,13 +66,30 @@
           event.preventDefault();
           event.stopPropagation();
           if (event.shiftKey) {
+            clearPathCompletionPreview?.();
             if (showTree && treeEl) {
               focusTreeTop();
             } else {
               focusList();
             }
           } else {
-            handlePathTabCompletion(pathInput);
+            await handlePathTabCompletion(pathInput);
+          }
+        }
+        if (event.key === "\\" || event.key === "¥" || event.code === "Backslash") {
+          event.preventDefault();
+          event.stopPropagation();
+          const keyForSeparator = event.key === "¥" ? "¥" : "\\";
+          const consumed = await handlePathCompletionSeparator?.(pathInput, keyForSeparator);
+          if (!consumed) {
+            const inputEl = pathInputEl;
+            const insertAt = inputEl?.selectionStart ?? pathInput.length;
+            const replaceTo = inputEl?.selectionEnd ?? insertAt;
+            pathInput = `${pathInput.slice(0, insertAt)}\\${pathInput.slice(replaceTo)}`;
+            handlePathCompletionInputChange?.(pathInput);
+            await tick();
+            const cursor = insertAt + 1;
+            inputEl?.setSelectionRange(cursor, cursor);
           }
         }
       }}

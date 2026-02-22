@@ -22,6 +22,7 @@ export function buildViewInputsState(params) {
       uiFileIconMode: params.state.uiFileIconMode,
       loading: params.state.loading,
       filteredEntries: params.state.filteredEntries,
+      pathCompletionPreviewActive: params.state.pathCompletionPreviewActive,
       entries: params.state.entries,
       overflowLeft: params.state.overflowLeft,
       overflowRight: params.state.overflowRight,

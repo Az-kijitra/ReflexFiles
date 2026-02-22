@@ -14,6 +14,9 @@ export function buildViewInputsActions(params) {
       focusList: params.actions.focusList,
       focusTreeTop: params.actions.focusTreeTop,
       handlePathTabCompletion: params.actions.handlePathTabCompletion,
+      handlePathCompletionSeparator: params.actions.handlePathCompletionSeparator,
+      handlePathCompletionInputChange: params.actions.handlePathCompletionInputChange,
+      clearPathCompletionPreview: params.actions.clearPathCompletionPreview,
       setStatusMessage: params.actions.setStatusMessage,
     },
     tree: {

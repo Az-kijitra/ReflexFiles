@@ -16,6 +16,10 @@ export function updateStatusMessage(message, durationMs, ctx) {
   if (currentTimer) {
     clearTimeout(currentTimer);
   }
+  if (Number(durationMs) <= 0) {
+    ctx.setTimer(null);
+    return;
+  }
   const timer = setTimeout(() => {
     ctx.setMessage("");
     ctx.setTimer(null);

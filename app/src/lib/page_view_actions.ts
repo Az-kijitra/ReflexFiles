@@ -8,6 +8,9 @@
  *   focusList: () => void;
  *   focusTreeTop: () => void;
  *   handlePathTabCompletion: () => Promise<void>;
+ *   handlePathCompletionSeparator: (pathInput: string, key: string) => Promise<boolean>;
+ *   handlePathCompletionInputChange: (pathInput: string) => void;
+ *   clearPathCompletionPreview: () => void;
  *   setStatusMessage: (message: string, opts?: any) => void;
  *   getVisibleTreeNodes: (...args: any[]) => any[];
  *   focusTree: () => void;
@@ -40,6 +43,9 @@ export function buildViewActions(params) {
     focusList: params.focusList,
     focusTreeTop: params.focusTreeTop,
     handlePathTabCompletion: params.handlePathTabCompletion,
+    handlePathCompletionSeparator: params.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: params.handlePathCompletionInputChange,
+    clearPathCompletionPreview: params.clearPathCompletionPreview,
     setStatusMessage: params.setStatusMessage,
     getVisibleTreeNodes: params.getVisibleTreeNodes,
     focusTree: params.focusTree,

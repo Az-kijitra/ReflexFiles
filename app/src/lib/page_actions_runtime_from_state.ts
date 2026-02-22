@@ -113,6 +113,13 @@ export function setupPageActionsRuntimeFromState(params) {
           setPathInput: (value) => {
             state.pathInput = value;
           },
+          setFilteredEntries: (value) => {
+            state.filteredEntries = value;
+          },
+          setPathCompletionPreviewActive: (value) => {
+            state.pathCompletionPreviewActive = Boolean(value);
+          },
+          getRecomputeSearch: () => params.actions.recomputeSearch,
           setStatusMessage: params.actions.setStatusMessage,
         },
         showError: params.showError,

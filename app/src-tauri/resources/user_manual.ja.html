@@ -147,6 +147,9 @@
 <li><strong>Tab</strong> で補完（PATH 入力時）</li>
 <li><strong>Tab / Shift+Tab</strong> でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）</li>
 <li><strong>Ctrl+J / Ctrl+Y</strong> でジャンプリスト / 履歴を表示</li>
+<li>PATH補完および候補表示は、<strong>ローカルファイルシステムのパスのみ</strong>を対象とします。</li>
+<li><code>gdrive://</code> パスは PATH補完/候補表示の対象外です。</li>
+<li>Google Drive で実用的に運用する場合は、Google Drive のローカル同期クライアントを併用し、同期済みローカルフォルダを ReflexFiles で操作してください。</li>
 </ul>
 <hr>
 <h2>ReflexViewer（プレビュー / コード表示）</h2>
@@ -533,6 +536,11 @@
 <p>Google Drive 連携の設定手順は、次の専用ガイドを参照してください。</p>
 <ul>
 <li><code>docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md</code></li>
+</ul>
+<p>ReflexFiles の Google Drive サポートは、意図的に限定範囲です。</p>
+<ul>
+<li>PATH補完/候補表示は <code>gdrive://</code> を対象にしません。</li>
+<li>常時補完や大量操作を重視する場合は、Google Drive のローカル同期を利用し、ローカルミラーパス上で作業してください。</li>
 </ul>
 <p>このガイドには以下を記載しています。</p>
 <ul>

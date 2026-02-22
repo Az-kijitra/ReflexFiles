@@ -10,6 +10,9 @@ import { buildJumpHandlersSetupInputsFromVars } from "./page_jump_inputs_from_va
  *     setDropdownMode: (value: "history" | "jump") => void;
  *     setDropdownOpen: (value: boolean) => void;
  *     setPathInput: (value: string) => void;
+ *     setFilteredEntries: (value: unknown[]) => void;
+ *     setPathCompletionPreviewActive: (value: boolean) => void;
+ *     getRecomputeSearch: () => (() => void) | null | undefined;
  *     setStatusMessage: (message: string, timeoutMs?: number) => void;
  *   };
  *   showError: (err: unknown) => void;
@@ -29,12 +32,17 @@ export function buildJumpHandlersInputsFromState(params) {
       pathHistory: params.state.pathHistory,
       currentPath: params.state.currentPath,
       showHidden: params.state.showHidden,
+      entries: params.state.entries,
+      statusMessage: params.state.statusMessage,
       showError: params.showError,
     }),
     actions: () => ({
       setDropdownMode: params.actions.setDropdownMode,
       setDropdownOpen: params.actions.setDropdownOpen,
       setPathInput: params.actions.setPathInput,
+      setFilteredEntries: params.actions.setFilteredEntries,
+      setPathCompletionPreviewActive: params.actions.setPathCompletionPreviewActive,
+      getRecomputeSearch: params.actions.getRecomputeSearch,
       setStatusMessage: params.actions.setStatusMessage,
     }),
     deps: params.deps,

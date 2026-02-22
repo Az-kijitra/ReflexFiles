@@ -20,6 +20,9 @@ export function buildPathBarProps(params) {
     focusList: params.focusList,
     focusTreeTop: params.focusTreeTop,
     handlePathTabCompletion: params.handlePathTabCompletion,
+    handlePathCompletionSeparator: params.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: params.handlePathCompletionInputChange,
+    clearPathCompletionPreview: params.clearPathCompletionPreview,
     setStatusMessage: params.setStatusMessage,
   };
 }
@@ -46,6 +49,7 @@ export function buildFileListProps(params) {
     uiFileIconMode: params.uiFileIconMode,
     loading: params.loading,
     filteredEntries: params.filteredEntries,
+    pathCompletionPreviewActive: params.pathCompletionPreviewActive,
     entries: params.entries,
     overflowLeft: params.overflowLeft,
     overflowRight: params.overflowRight,

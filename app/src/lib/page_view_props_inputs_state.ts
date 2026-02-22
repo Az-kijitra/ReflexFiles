@@ -19,6 +19,7 @@ export function buildViewPropsInputsState(params) {
     uiFileIconMode: state.list.uiFileIconMode,
     loading: state.list.loading,
     filteredEntries: state.list.filteredEntries,
+    pathCompletionPreviewActive: state.list.pathCompletionPreviewActive,
     entries: state.list.entries,
     overflowLeft: state.list.overflowLeft,
     overflowRight: state.list.overflowRight,

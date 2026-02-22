@@ -68,6 +68,9 @@ Installation steps depend on the distribution type.
 - **Tab** performs path completion while editing PATH
 - **Tab / Shift+Tab** cycles focus (list -> PATH -> tree -> list)
 - **Ctrl+J / Ctrl+Y** opens Jump List / History
+- PATH completion and candidate preview are supported for **local filesystem paths only**.
+- `gdrive://` paths are out of scope for PATH completion/candidate preview.
+- For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.
 
 ---
 
@@ -235,6 +238,10 @@ Diagnostic output folder:
 ### Google Drive Setup Guide (Personal Use)
 For Google Drive integration setup, see:
 - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+
+Google Drive support in ReflexFiles is intentionally limited.
+- PATH completion/candidate preview does not target `gdrive://` paths.
+- If you need always-on completion and rich bulk operations, use Google Drive local sync and work on the local mirror path.
 
 The guide includes:
 - Google Cloud input examples

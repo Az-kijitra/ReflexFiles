@@ -15,6 +15,9 @@ export function buildPathBarViewInputs({ state, actions, helpers }) {
     focusList: actions.focusList,
     focusTreeTop: actions.focusTreeTop,
     handlePathTabCompletion: actions.handlePathTabCompletion,
+    handlePathCompletionSeparator: actions.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: actions.handlePathCompletionInputChange,
+    clearPathCompletionPreview: actions.clearPathCompletionPreview,
     setStatusMessage: actions.setStatusMessage,
   };
 }

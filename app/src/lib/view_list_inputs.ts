@@ -13,6 +13,7 @@ export function buildListViewInputs({ state, actions, formatters, helpers }) {
     uiFileIconMode: state.uiFileIconMode,
     loading: state.loading,
     filteredEntries: state.filteredEntries,
+    pathCompletionPreviewActive: state.pathCompletionPreviewActive,
     entries: state.entries,
     overflowLeft: state.overflowLeft,
     overflowRight: state.overflowRight,

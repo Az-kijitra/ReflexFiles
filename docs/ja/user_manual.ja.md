@@ -67,6 +67,9 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
 - **Tab** で補完（PATH 入力時）
 - **Tab / Shift+Tab** でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）
 - **Ctrl+J / Ctrl+Y** でジャンプリスト / 履歴を表示
+- PATH補完および候補表示は、**ローカルファイルシステムのパスのみ**を対象とします。
+- `gdrive://` パスは PATH補完/候補表示の対象外です。
+- Google Drive で実用的に運用する場合は、Google Drive のローカル同期クライアントを併用し、同期済みローカルフォルダを ReflexFiles で操作してください。
 
 ---
 
@@ -235,6 +238,10 @@ Windows Terminal のプロファイル名を固定で指定できます。
 ### Google Drive 設定ガイド（個人利用）
 Google Drive 連携の設定手順は、次の専用ガイドを参照してください。
 - `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+
+ReflexFiles の Google Drive サポートは、意図的に限定範囲です。
+- PATH補完/候補表示は `gdrive://` を対象にしません。
+- 常時補完や大量操作を重視する場合は、Google Drive のローカル同期を利用し、ローカルミラーパス上で作業してください。
 
 このガイドには以下を記載しています。
 - Google Cloud の画面入力例

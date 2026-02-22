@@ -27,6 +27,9 @@
  *     loadDir: (path: string) => Promise<void>;
  *     focusList: () => void;
  *     handlePathTabCompletion: () => Promise<void>;
+ *     handlePathCompletionSeparator: (pathInput: string, key: string) => Promise<boolean>;
+ *     handlePathCompletionInputChange: (pathInput: string) => void;
+ *     clearPathCompletionPreview: () => void;
  *   };
  *   tree: {
  *     focusTree: () => void;
@@ -74,6 +77,9 @@ function buildViewRuntimeActionsFromState(params) {
     focusList: params.list.focusList,
     focusTreeTop: params.tree.focusTreeTop,
     handlePathTabCompletion: params.list.handlePathTabCompletion,
+    handlePathCompletionSeparator: params.list.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: params.list.handlePathCompletionInputChange,
+    clearPathCompletionPreview: params.list.clearPathCompletionPreview,
     setStatusMessage: status.setStatusMessage,
     getVisibleTreeNodes: params.deps.getVisibleTreeNodes,
     focusTree: params.tree.focusTree,

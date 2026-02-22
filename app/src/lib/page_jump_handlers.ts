@@ -8,6 +8,18 @@ import { createPathCompletionHelpers } from "$lib/page_path_completion";
  */
 export function setupJumpHandlers({ dropdown, pathCompletion }) {
   const { openJumpList, openHistoryList } = createDropdownHelpers(dropdown);
-  const { handlePathTabCompletion } = createPathCompletionHelpers(pathCompletion);
-  return { openJumpList, openHistoryList, handlePathTabCompletion };
+  const {
+    handlePathTabCompletion,
+    handlePathCompletionSeparator,
+    handlePathCompletionInputChange,
+    clearPathCompletionPreview,
+  } = createPathCompletionHelpers(pathCompletion);
+  return {
+    openJumpList,
+    openHistoryList,
+    handlePathTabCompletion,
+    handlePathCompletionSeparator,
+    handlePathCompletionInputChange,
+    clearPathCompletionPreview,
+  };
 }

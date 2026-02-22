@@ -148,6 +148,9 @@ copy, and archive files quickly.</p>
 <li><strong>Tab</strong> performs path completion while editing PATH</li>
 <li><strong>Tab / Shift+Tab</strong> cycles focus (list -&gt; PATH -&gt; tree -&gt; list)</li>
 <li><strong>Ctrl+J / Ctrl+Y</strong> opens Jump List / History</li>
+<li>PATH completion and candidate preview are supported for <strong>local filesystem paths only</strong>.</li>
+<li><code>gdrive://</code> paths are out of scope for PATH completion/candidate preview.</li>
+<li>For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.</li>
 </ul>
 <hr>
 <h2>ReflexViewer (Preview / Source)</h2>
@@ -534,6 +537,11 @@ Open <code>config.toml</code> from File menu -&gt; Settings, or press <strong>Ct
 <p>For Google Drive integration setup, see:</p>
 <ul>
 <li><code>docs/GOOGLE_DRIVE_SELF_SETUP.md</code></li>
+</ul>
+<p>Google Drive support in ReflexFiles is intentionally limited.</p>
+<ul>
+<li>PATH completion/candidate preview does not target <code>gdrive://</code> paths.</li>
+<li>If you need always-on completion and rich bulk operations, use Google Drive local sync and work on the local mirror path.</li>
 </ul>
 <p>The guide includes:</p>
 <ul>

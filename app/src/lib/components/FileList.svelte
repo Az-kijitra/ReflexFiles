@@ -11,6 +11,7 @@
   export let uiFileIconMode = "by_type";
   export let loading = false;
   export let filteredEntries = [];
+  export let pathCompletionPreviewActive = false;
   export let entries = [];
   export let focusedIndex = 0;
   export let anchorIndex = null;
@@ -63,7 +64,7 @@
 </script>
 
 <div
-  class="list {showSize ? 'show-size' : ''} {showTime ? 'show-time' : ''} {isGdrivePath ? 'gdrive-surface' : ''}"
+  class="list {showSize ? 'show-size' : ''} {showTime ? 'show-time' : ''} {isGdrivePath ? 'gdrive-surface' : ''} {pathCompletionPreviewActive ? 'path-completion-surface' : ''}"
   tabindex="0"
   role="listbox"
   aria-label={t("label.list")}
@@ -142,6 +143,10 @@
 
   .list.gdrive-surface {
     background: var(--ui-gdrive-surface);
+  }
+
+  .list.path-completion-surface {
+    background: var(--ui-path-completion-surface);
   }
 
   .list:focus-visible {

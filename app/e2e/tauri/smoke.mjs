@@ -636,6 +636,137 @@ try {
     );
   };
 
+  const assertPathTabMultiCandidateFlow = async ({
+    basePath,
+    typedPrefix,
+    orderedCandidateNames,
+    expectedPreviewNames,
+    excludedPreviewNames = [],
+    childPreviewName,
+  }) => {
+    const normalizeCompare = (value) =>
+      normalizePath(String(value || ''))
+        .replace(/[\\\/]+$/, '')
+        .toLowerCase();
+    const buildCandidatePath = (name) => normalizePath(resolve(basePath, name));
+    const firstPath = buildCandidatePath(orderedCandidateNames[0]);
+    const secondPath = buildCandidatePath(orderedCandidateNames[1]);
+
+    await setPath(basePath);
+    const input = await getPathInput();
+    await input.click();
+    await input.sendKeys(Key.chord(Key.CONTROL, 'a'));
+    await input.sendKeys(Key.DELETE);
+    await input.sendKeys(`${basePath}\\${typedPrefix}`);
+
+    await input.sendKeys(Key.TAB);
+    if (!(await waitForPathValue(firstPath))) {
+      const latest = await (await getPathInput()).getAttribute('value');
+      throw new Error(`path tab cycle(1) failed: expected=${firstPath} actual=${latest}`);
+    }
+    const previewNamesAfterFirst = await collectVisibleNames();
+    const hasAllCandidates = expectedPreviewNames.every((name) =>
+      previewNamesAfterFirst.some((entry) => displayCandidates(name).includes(entry))
+    );
+    if (!hasAllCandidates) {
+      throw new Error(
+        `path tab preview mismatch: expected=${expectedPreviewNames.join(',')} visible=${previewNamesAfterFirst.join(',')}`
+      );
+    }
+    const hasExcludedCandidate = excludedPreviewNames.some((name) =>
+      previewNamesAfterFirst.some((entry) => displayCandidates(name).includes(entry))
+    );
+    if (hasExcludedCandidate) {
+      throw new Error(
+        `path tab preview includes excluded entries: excluded=${excludedPreviewNames.join(',')} visible=${previewNamesAfterFirst.join(',')}`
+      );
+    }
+    const completionUiState = await driver.executeScript(() => {
+      const list = document.querySelector('.list');
+      const statusItems = Array.from(document.querySelectorAll('.status-bar .status-item'))
+        .map((el) => String(el.textContent || '').trim())
+        .filter(Boolean);
+      return {
+        hasCompletionSurface: Boolean(list?.classList?.contains('path-completion-surface')),
+        statusLine: statusItems.join(' | '),
+      };
+    });
+    if (!completionUiState.hasCompletionSurface) {
+      throw new Error('path tab preview did not apply completion surface class');
+    }
+    if (!String(completionUiState.statusLine || '').includes('PATH')) {
+      throw new Error(`path tab preview status missing PATH message: ${completionUiState.statusLine}`);
+    }
+    await driver.sleep(3200);
+    const statusAfterWait = await driver.executeScript(() => {
+      const list = document.querySelector('.list');
+      const statusItems = Array.from(document.querySelectorAll('.status-bar .status-item'))
+        .map((el) => String(el.textContent || '').trim())
+        .filter(Boolean);
+      return {
+        hasCompletionSurface: Boolean(list?.classList?.contains('path-completion-surface')),
+        statusLine: statusItems.join(' | '),
+      };
+    });
+    if (!statusAfterWait.hasCompletionSurface) {
+      throw new Error('path completion surface disappeared while preview is active');
+    }
+    if (!String(statusAfterWait.statusLine || '').includes('PATH')) {
+      throw new Error(`path completion status disappeared while preview is active: ${statusAfterWait.statusLine}`);
+    }
+
+    await input.sendKeys(Key.TAB);
+    if (!(await waitForPathValue(secondPath))) {
+      const latest = await (await getPathInput()).getAttribute('value');
+      throw new Error(`path tab cycle(2) failed: expected=${secondPath} actual=${latest}`);
+    }
+
+    await triggerShortcut({ key: '\\', code: 'Backslash' });
+    const slashExpected = normalizeCompare(secondPath);
+    const slashDeadline = Date.now() + timeoutMs;
+    while (Date.now() < slashDeadline) {
+      const current = await (await getPathInput()).getAttribute('value');
+      if (normalizeCompare(current) === slashExpected) {
+        break;
+      }
+      await driver.sleep(120);
+    }
+    const slashLatest = await (await getPathInput()).getAttribute('value');
+    if (normalizeCompare(slashLatest) !== slashExpected) {
+      throw new Error(`path slash confirm failed: expected=${secondPath} actual=${slashLatest}`);
+    }
+    if (/[\\\/]{2,}$/.test(String(slashLatest || ''))) {
+      throw new Error(`path slash confirm appended duplicate separator: actual=${slashLatest}`);
+    }
+
+    const childDeadline = Date.now() + timeoutMs;
+    while (Date.now() < childDeadline) {
+      const visibleNames = await collectVisibleNames();
+      if (visibleNames.some((entry) => displayCandidates(childPreviewName).includes(entry))) {
+        break;
+      }
+      await driver.sleep(120);
+    }
+    const childVisible = await collectVisibleNames();
+    if (!childVisible.some((entry) => displayCandidates(childPreviewName).includes(entry))) {
+      throw new Error(
+        `path slash child preview failed: expected=${childPreviewName} visible=${childVisible.join(',')}`
+      );
+    }
+
+    await input.sendKeys(Key.ENTER);
+    const enterDeadline = Date.now() + timeoutMs;
+    while (Date.now() < enterDeadline) {
+      const current = await (await getPathInput()).getAttribute('value');
+      if (normalizeCompare(current) === normalizeCompare(secondPath)) {
+        return;
+      }
+      await driver.sleep(120);
+    }
+    const enterLatest = await (await getPathInput()).getAttribute('value');
+    throw new Error(`path enter confirm failed: expected=${secondPath} actual=${enterLatest}`);
+  };
+
   const assertPathInputCopyPaste = async ({ basePath, suffix }) => {
     await setPath(basePath);
     const input = await getPathInput();
@@ -836,6 +967,26 @@ try {
     targetName: tabCompleteDirName,
     typedPrefix: `tab_com`,
   });
+
+  const tabMultiAName = `tab_multi_${testId}_adasa`;
+  const tabMultiBName = `tab_multi_${testId}_asada`;
+  const tabMultiFileName = `tab_multi_${testId}_afile.txt`;
+  const tabMultiChildName = `child_${testId}`;
+  await confirmCreateFolder(tabMultiAName);
+  await confirmCreateFolder(tabMultiBName);
+  writeFileSync(resolve(targetPath, tabMultiFileName), `tab-multi-file-${testId}`, 'utf8');
+  await setPath(resolve(targetPath, tabMultiBName));
+  await confirmCreateFolder(tabMultiChildName);
+  await setPath(targetPath);
+  await assertPathTabMultiCandidateFlow({
+    basePath: targetPath,
+    typedPrefix: `tab_multi_${testId}_a`,
+    orderedCandidateNames: [tabMultiAName, tabMultiBName],
+    expectedPreviewNames: [tabMultiAName, tabMultiBName],
+    excludedPreviewNames: [tabMultiFileName],
+    childPreviewName: tabMultiChildName,
+  });
+  await setPath(targetPath);
 
   const bigFileName = `e2e_${testId}_big.bin`;
   const bigFilePath = resolve(targetPath, bigFileName);
@@ -1140,6 +1291,231 @@ try {
         `visible=${visibleNames.join(', ')}`
     );
   };
+
+  const getListSelectionStats = async () =>
+    driver.executeScript(() => {
+      const total = document.querySelectorAll('.list .row .text').length;
+      const selected = document.querySelectorAll('.list .row.selected .text').length;
+      return { total, selected };
+    });
+
+  const getFocusKind = async () =>
+    driver.executeScript(() => {
+      const active = document.activeElement;
+      const pathInput = document.querySelector('header.path-bar input');
+      const list = document.querySelector('.list');
+      const tree = document.querySelector('.tree');
+      const searchInput = document.querySelector('.search-bar input');
+      const isWithin = (container, el) =>
+        Boolean(container && el && (container === el || (container.contains && container.contains(el))));
+      if (isWithin(pathInput, active)) return 'path';
+      if (isWithin(list, active)) return 'list';
+      if (isWithin(tree, active)) return 'tree';
+      if (isWithin(searchInput, active)) return 'search';
+      return 'other';
+    });
+
+  const waitForFocusKind = async (expectedKinds, label) => {
+    const expected = Array.isArray(expectedKinds) ? expectedKinds : [expectedKinds];
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const kind = await getFocusKind();
+      if (expected.includes(kind)) {
+        return kind;
+      }
+      await driver.sleep(80);
+    }
+    const latest = await getFocusKind();
+    throw new Error(`${label} failed: expected=${expected.join(',')} actual=${latest}`);
+  };
+
+  const waitForFocusNotKind = async (forbiddenKind, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const kind = await getFocusKind();
+      if (kind !== forbiddenKind) {
+        return kind;
+      }
+      await driver.sleep(80);
+    }
+    const latest = await getFocusKind();
+    throw new Error(`${label} failed: forbidden=${forbiddenKind} actual=${latest}`);
+  };
+
+  const isSearchBarOpen = async () =>
+    driver.executeScript(() => {
+      const input = document.querySelector('.search-bar input');
+      return Boolean(input && input.offsetParent);
+    });
+
+  const waitForSearchBarOpen = async (open, label) => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const current = await isSearchBarOpen();
+      if (Boolean(current) === Boolean(open)) return;
+      await driver.sleep(100);
+    }
+    const latest = await isSearchBarOpen();
+    throw new Error(`${label} failed: expected=${open} actual=${latest}`);
+  };
+
+  const assertPathCtrlAAndDeleteBoundary = async (sampleName, workingPath) => {
+    await setPath(workingPath);
+    await withStaleRetry(async () => {
+      const row = await rowByName(sampleName);
+      await row.click();
+    }, `select ${sampleName} for path key boundary`);
+    const baseline = await getListSelectionStats();
+    if (baseline.selected < 1) {
+      throw new Error(`path key boundary precondition failed: ${JSON.stringify(baseline)}`);
+    }
+
+    const input = await getPathInput();
+    await input.click();
+    await input.sendKeys(Key.chord(Key.CONTROL, 'a'));
+    await input.sendKeys('Z');
+
+    const ctrlADeadline = Date.now() + timeoutMs;
+    while (Date.now() < ctrlADeadline) {
+      const current = await (await getPathInput()).getAttribute('value');
+      if (String(current || '') === 'Z') {
+        break;
+      }
+      await driver.sleep(80);
+    }
+    const ctrlALatest = await (await getPathInput()).getAttribute('value');
+    if (String(ctrlALatest || '') !== 'Z') {
+      throw new Error(`path ctrl+a replace failed: actual=${ctrlALatest}`);
+    }
+    const afterCtrlA = await getListSelectionStats();
+    if (afterCtrlA.selected !== baseline.selected) {
+      throw new Error(
+        `path ctrl+a changed list selection: before=${JSON.stringify(
+          baseline
+        )} after=${JSON.stringify(afterCtrlA)}`
+      );
+    }
+
+    const deleteProbeSuffix = `delete_probe_${testId}`;
+    const deleteProbe = `${workingPath}\\${deleteProbeSuffix}`;
+    await driver.executeScript(
+      (el, value) => {
+        el.focus();
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+      input,
+      deleteProbe
+    );
+    await driver.executeScript(
+      (el, suffix) => {
+        const value = String(el?.value || '');
+        const index = value.lastIndexOf(suffix);
+        if (index < 0) return false;
+        el.focus();
+        el.setSelectionRange(index, index + suffix.length);
+        return true;
+      },
+      input,
+      deleteProbeSuffix
+    );
+    await input.sendKeys(Key.DELETE);
+    const deleteLatest = await (await getPathInput()).getAttribute('value');
+    if (String(deleteLatest || '').includes(deleteProbeSuffix)) {
+      throw new Error(`path delete did not edit text: actual=${deleteLatest}`);
+    }
+    const afterDelete = await getListSelectionStats();
+    if (afterDelete.selected !== baseline.selected) {
+      throw new Error(
+        `path delete changed list selection: before=${JSON.stringify(
+          baseline
+        )} after=${JSON.stringify(afterDelete)}`
+      );
+    }
+
+    await setPath(workingPath);
+    await focusList();
+  };
+
+  const assertListCtrlASelectsAll = async () => {
+    await focusList();
+    await triggerShortcut({ key: 'a', code: 'KeyA', ctrl: true });
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const stats = await getListSelectionStats();
+      if (stats.total > 0 && stats.selected === stats.total) {
+        return;
+      }
+      await driver.sleep(120);
+    }
+    const latest = await getListSelectionStats();
+    throw new Error(`list ctrl+a select all failed: ${JSON.stringify(latest)}`);
+  };
+
+  const assertSearchEscTabBoundary = async (workingPath) => {
+    await setPath(workingPath);
+    await focusList();
+    await waitForFocusKind('list', 'initial list focus for tab boundary');
+    await driver.actions().sendKeys(Key.TAB).perform();
+    await waitForFocusKind('path', 'list tab to path');
+    await driver.actions().keyDown(Key.SHIFT).sendKeys(Key.TAB).keyUp(Key.SHIFT).perform();
+    await waitForFocusNotKind('path', 'path shift+tab should leave path focus');
+    await focusList();
+    await waitForFocusKind('list', 'recover list focus after path shift+tab');
+
+    await setPath(workingPath);
+    await focusList();
+    await waitForSearchBarOpen(false, 'search closed precondition');
+    await triggerShortcut({ key: '/', code: 'Slash' });
+    await waitForSearchBarOpen(true, 'open search from list');
+    const searchInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('.search-bar input')), timeoutMs),
+      timeoutMs,
+      'wait search input for escape'
+    );
+    await searchInput.click();
+    await waitForFocusKind('search', 'focus search input before escape');
+    await searchInput.sendKeys(Key.ESCAPE);
+    await waitForSearchBarOpen(false, 'close search with escape');
+
+    await setPath(workingPath);
+    const input = await getPathInput();
+    await input.click();
+    await input.sendKeys(Key.chord(Key.CONTROL, 'a'));
+    await input.sendKeys(`${workingPath}\\esc_probe_${testId}`);
+    await input.sendKeys(Key.ESCAPE);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const current = await (await getPathInput()).getAttribute('value');
+      if (normalizePath(current).toLowerCase() === normalizePath(workingPath).toLowerCase()) {
+        break;
+      }
+      await driver.sleep(80);
+    }
+    const latestPath = await (await getPathInput()).getAttribute('value');
+    if (normalizePath(latestPath).toLowerCase() !== normalizePath(workingPath).toLowerCase()) {
+      throw new Error(`path escape restore failed: expected=${workingPath} actual=${latestPath}`);
+    }
+    await waitForFocusKind('list', 'path escape should focus list');
+
+    await setPath(workingPath);
+    await waitForSearchBarOpen(false, 'search closed before path slash');
+    const pathInput = await getPathInput();
+    await pathInput.click();
+    await triggerShortcut({ key: '/', code: 'Slash' });
+    await driver.sleep(200);
+    const searchOpen = await isSearchBarOpen();
+    if (searchOpen) {
+      throw new Error('path slash unexpectedly opened search');
+    }
+  };
+
+  console.log('[smoke] verify keyboard focus boundary (PATH Ctrl+A/Delete / list Ctrl+A)...');
+  await assertPathCtrlAAndDeleteBoundary(opA, opsDstDir);
+  await assertListCtrlASelectsAll();
+  console.log('[smoke] verify keyboard focus boundary (Search/Escape/Tab)...');
+  await assertSearchEscTabBoundary(opsDstDir);
 
   await withStaleRetry(async () => {
     const rowCopy = await rowByName(opA);
