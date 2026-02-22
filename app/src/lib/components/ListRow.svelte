@@ -22,6 +22,8 @@
   export let onClick;
   export let onContextMenu;
   export let onDoubleClick;
+  export let draggable = false;
+  export let onDragStart;
 
   $: entryIcon = getEntryIcon(entry, uiFileIconMode);
 </script>
@@ -31,10 +33,12 @@
   class="row {selected ? 'selected' : ''} {focused ? 'focused' : ''}"
   role="option"
   tabindex="-1"
+  draggable={draggable}
   aria-selected={selected}
   onclick={onClick}
   oncontextmenu={onContextMenu}
   ondblclick={onDoubleClick}
+  ondragstart={onDragStart}
   onkeydown={(event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();

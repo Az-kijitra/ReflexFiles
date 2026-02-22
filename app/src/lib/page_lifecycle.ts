@@ -307,6 +307,14 @@ export async function setupPageLifecycle(ctx) {
   window.addEventListener("keydown", onWindowKeydownCapture, { capture: true });
   window.addEventListener("click", ctx.onClick, { capture: true });
   window.addEventListener("beforeunload", ctx.onBeforeUnload);
+  const onDndExperimentStatus = (event) => {
+    const detail = event?.detail ?? {};
+    const message = String(detail?.message || "");
+    if (!message) return;
+    const durationMs = Number(detail?.durationMs ?? 0);
+    ctx.setStatusMessage(message, Number.isFinite(durationMs) && durationMs > 0 ? durationMs : undefined);
+  };
+  window.addEventListener("rf:dnd-experiment-status", onDndExperimentStatus);
   const onFocusIn = () => {
     ctx.recomputeStatusItems?.();
   };
@@ -354,6 +362,7 @@ export async function setupPageLifecycle(ctx) {
     window.removeEventListener("keydown", onWindowKeydownCapture, { capture: true });
     window.removeEventListener("click", ctx.onClick, { capture: true });
     window.removeEventListener("beforeunload", ctx.onBeforeUnload);
+    window.removeEventListener("rf:dnd-experiment-status", onDndExperimentStatus);
     window.removeEventListener("focusin", onFocusIn, { capture: true });
     unlistenMove();
     unlistenResize();

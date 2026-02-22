@@ -1,5 +1,10 @@
 <script>
   import ListRow from "$lib/components/ListRow.svelte";
+  import { clipboardSetFiles } from "$lib/utils/tauri_fs";
+  import {
+    evaluateOutboundAppDragCandidate,
+    readDragDropExperimentPolicyFromStorage,
+  } from "$lib/utils/drag_drop_experiment";
 
   /** @type {HTMLElement | null} */
   export let listEl = null;
@@ -61,6 +66,61 @@
   }
 
   $: isGdrivePath = String(currentPath || "").trim().toLowerCase().startsWith("gdrive://");
+  $: dndExperimentPolicy =
+    typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+      ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
+      : { enabled: false, phase: "phase0_foundation" };
+  $: outboundDragProbeEnabled =
+    dndExperimentPolicy.enabled && dndExperimentPolicy.phase === "phase2_outbound_local_only";
+
+  function emitDndExperimentStatus(message, durationMs = 2500) {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("rf:dnd-experiment-status", { detail: { message, durationMs } })
+    );
+  }
+
+  /** @param {import("$lib/types").Entry} entry */
+  function buildDragSelection(entry) {
+    if (selectedPaths.includes(entry.path)) {
+      return entries.filter((item) => selectedPaths.includes(item.path));
+    }
+    return [entry];
+  }
+
+  /** @param {DragEvent} event @param {import("$lib/types").Entry} entry */
+  function handleRowDragStart(event, entry) {
+    if (!outboundDragProbeEnabled) {
+      event.preventDefault();
+      return;
+    }
+    const dragEntries = buildDragSelection(entry);
+    const decision = evaluateOutboundAppDragCandidate({
+      policy: dndExperimentPolicy,
+      selectedEntries: dragEntries.map((item) => ({ path: item.path, provider: item.provider })),
+    });
+    if (!decision.allowed) {
+      event.preventDefault();
+      emitDndExperimentStatus(`D&D export blocked (${decision.reason})`);
+      return;
+    }
+    try {
+      event.dataTransfer?.setData("text/plain", decision.acceptedPaths.join("\r\n"));
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "copy";
+      }
+    } catch {
+      // Best-effort only; Explorer transfer depends on native shell integration.
+    }
+    clipboardSetFiles(decision.acceptedPaths, false, "copy")
+      .then(() => {
+        emitDndExperimentStatus(`D&D export probe ready (experimental): ${decision.acceptedPaths.length} item(s)`);
+      })
+      .catch((err) => {
+        const msg = typeof err === "string" ? err : err?.message || "clipboard_set_files failed";
+        emitDndExperimentStatus(`D&D export probe failed (${msg})`, 4000);
+      });
+  }
 </script>
 
 <div
@@ -122,6 +182,10 @@
           onContextMenu={(event) => openContextMenu(event, entry)}
           onDoubleClick={() => {
             openEntry(entry);
+          }}
+          draggable={outboundDragProbeEnabled}
+          onDragStart={(event) => {
+            handleRowDragStart(event, entry);
           }}
         />
       {/each}
