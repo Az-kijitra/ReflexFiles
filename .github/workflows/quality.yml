@@ -35,6 +35,10 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Keyboard regression gate
+        working-directory: app
+        run: npm run test:keys
+
       - name: Frontend type/check gate
         working-directory: app
         run: npm run check

@@ -612,7 +612,7 @@ try {
     await waitForVisibleName(name);
   };
 
-  const assertPathTabCompletion = async ({ basePath, targetName, typedPrefix }) => {
+  const assertPathCompletionForward = async ({ basePath, targetName, typedPrefix }) => {
     const expectedPath = normalizePath(resolve(basePath, targetName)).toLowerCase();
     await setPath(basePath);
     const input = await getPathInput();
@@ -620,7 +620,7 @@ try {
     await input.sendKeys(Key.chord(Key.CONTROL, 'a'));
     await input.sendKeys(Key.DELETE);
     await input.sendKeys(`${basePath}\\${typedPrefix}`);
-    await input.sendKeys(Key.TAB);
+    await triggerShortcut({ key: ' ', code: 'Space', ctrl: true });
 
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -632,11 +632,11 @@ try {
     }
     const latest = normalizePath(await (await getPathInput()).getAttribute('value'));
     throw new Error(
-      `path tab completion failed: expected=${expectedPath} actual=${latest}`
+      `path completion failed: expected=${expectedPath} actual=${latest}`
     );
   };
 
-  const assertPathTabMultiCandidateFlow = async ({
+  const assertPathCompletionMultiCandidateFlow = async ({
     basePath,
     typedPrefix,
     orderedCandidateNames,
@@ -659,10 +659,10 @@ try {
     await input.sendKeys(Key.DELETE);
     await input.sendKeys(`${basePath}\\${typedPrefix}`);
 
-    await input.sendKeys(Key.TAB);
+    await triggerShortcut({ key: ' ', code: 'Space', ctrl: true });
     if (!(await waitForPathValue(firstPath))) {
       const latest = await (await getPathInput()).getAttribute('value');
-      throw new Error(`path tab cycle(1) failed: expected=${firstPath} actual=${latest}`);
+      throw new Error(`path completion cycle(1) failed: expected=${firstPath} actual=${latest}`);
     }
     const previewNamesAfterFirst = await collectVisibleNames();
     const hasAllCandidates = expectedPreviewNames.every((name) =>
@@ -670,7 +670,7 @@ try {
     );
     if (!hasAllCandidates) {
       throw new Error(
-        `path tab preview mismatch: expected=${expectedPreviewNames.join(',')} visible=${previewNamesAfterFirst.join(',')}`
+        `path completion preview mismatch: expected=${expectedPreviewNames.join(',')} visible=${previewNamesAfterFirst.join(',')}`
       );
     }
     const hasExcludedCandidate = excludedPreviewNames.some((name) =>
@@ -678,7 +678,7 @@ try {
     );
     if (hasExcludedCandidate) {
       throw new Error(
-        `path tab preview includes excluded entries: excluded=${excludedPreviewNames.join(',')} visible=${previewNamesAfterFirst.join(',')}`
+        `path completion preview includes excluded entries: excluded=${excludedPreviewNames.join(',')} visible=${previewNamesAfterFirst.join(',')}`
       );
     }
     const completionUiState = await driver.executeScript(() => {
@@ -692,10 +692,10 @@ try {
       };
     });
     if (!completionUiState.hasCompletionSurface) {
-      throw new Error('path tab preview did not apply completion surface class');
+      throw new Error('path completion preview did not apply completion surface class');
     }
     if (!String(completionUiState.statusLine || '').includes('PATH')) {
-      throw new Error(`path tab preview status missing PATH message: ${completionUiState.statusLine}`);
+      throw new Error(`path completion preview status missing PATH message: ${completionUiState.statusLine}`);
     }
     await driver.sleep(3200);
     const statusAfterWait = await driver.executeScript(() => {
@@ -715,10 +715,10 @@ try {
       throw new Error(`path completion status disappeared while preview is active: ${statusAfterWait.statusLine}`);
     }
 
-    await input.sendKeys(Key.TAB);
+    await triggerShortcut({ key: ' ', code: 'Space', ctrl: true });
     if (!(await waitForPathValue(secondPath))) {
       const latest = await (await getPathInput()).getAttribute('value');
-      throw new Error(`path tab cycle(2) failed: expected=${secondPath} actual=${latest}`);
+      throw new Error(`path completion cycle(2) failed: expected=${secondPath} actual=${latest}`);
     }
 
     await triggerShortcut({ key: '\\', code: 'Backslash' });
@@ -929,7 +929,7 @@ try {
     throw new Error(`${label} was not created: ${path}`);
   };
 
-  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH copy/paste / PATH Tab completion)...');
+  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH copy/paste / PATH completion)...');
   const shortcutProbeFile = `e2e_${testId}_shortcut_probe.txt`;
   await confirmCreateViaShortcutOnly(shortcutProbeFile);
   await assertPathInputCopyPaste({
@@ -962,7 +962,7 @@ try {
 
   const tabCompleteDirName = `tab_complete_${testId}`;
   await confirmCreateFolder(tabCompleteDirName);
-  await assertPathTabCompletion({
+  await assertPathCompletionForward({
     basePath: targetPath,
     targetName: tabCompleteDirName,
     typedPrefix: `tab_com`,
@@ -978,7 +978,7 @@ try {
   await setPath(resolve(targetPath, tabMultiBName));
   await confirmCreateFolder(tabMultiChildName);
   await setPath(targetPath);
-  await assertPathTabMultiCandidateFlow({
+  await assertPathCompletionMultiCandidateFlow({
     basePath: targetPath,
     typedPrefix: `tab_multi_${testId}_a`,
     orderedCandidateNames: [tabMultiAName, tabMultiBName],
@@ -1467,7 +1467,7 @@ try {
     await setPath(workingPath);
     await focusList();
     await waitForSearchBarOpen(false, 'search closed precondition');
-    await triggerShortcut({ key: '/', code: 'Slash' });
+    await triggerShortcut({ key: 'f', code: 'KeyF', ctrl: true });
     await waitForSearchBarOpen(true, 'open search from list');
     const searchInput = await withTimeout(
       driver.wait(until.elementLocated(By.css('.search-bar input')), timeoutMs),
@@ -1500,14 +1500,14 @@ try {
     await waitForFocusKind('list', 'path escape should focus list');
 
     await setPath(workingPath);
-    await waitForSearchBarOpen(false, 'search closed before path slash');
+    await waitForSearchBarOpen(false, 'search closed before path Ctrl+F');
     const pathInput = await getPathInput();
     await pathInput.click();
-    await triggerShortcut({ key: '/', code: 'Slash' });
+    await triggerShortcut({ key: 'f', code: 'KeyF', ctrl: true });
     await driver.sleep(200);
     const searchOpen = await isSearchBarOpen();
     if (searchOpen) {
-      throw new Error('path slash unexpectedly opened search');
+      throw new Error('path Ctrl+F unexpectedly opened search');
     }
   };
 
