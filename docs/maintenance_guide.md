@@ -114,7 +114,7 @@ npm run tauri build
 
 ## Automated E2E Strategy
 ### Test layers
-- `e2e:tauri` -> smoke flow (file operations baseline + keyboard regression guard: `Ctrl+N`, `Ctrl+C/X/V`, PATH `Tab` completion)
+- `e2e:tauri` -> smoke flow (file operations baseline + keyboard regression guard: `Ctrl+N`, `Ctrl+C/X/V`, PATH completion)
 - `e2e:capability` -> provider capability guard flow (menu/context/action gating)
   - Also verifies Google Drive paste-disabled reason text (`paste.destination_not_writable`) on both context menu and Edit menu.
   - Also verifies `rf:open-settings` event routing opens Settings at `advanced` section and can switch section while Settings is already open.
@@ -252,6 +252,7 @@ Workflow file:
 
 Current CI split:
 - **Quality gate (PR/Push)**:
+  - `npm run test:keys` (lightweight keyboard regression gate)
   - `npm run check`
   - `cargo check`
   - `cargo test`
@@ -316,6 +317,17 @@ Output report:
 cd app
 npm run check
 ```
+1.5. If key input / focus / shortcut behavior was changed, run lightweight keyboard regression first
+```bash
+npm run test:keys
+npm run docs:keymap-main
+```
+Recommended order for key-related changes:
+- `npm run test:keys` (fast regression)
+- `npm run docs:keymap-main` (refresh main-screen keyboard behavior document)
+- `npm run build`
+- targeted E2E only for impacted area
+- review diff of `docs/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` for unintended keymap/behavior changes
 2. Run targeted E2E for touched area
 - viewer changes -> `npm run e2e:viewer`
 - settings/config changes -> `npm run e2e:settings`
@@ -374,6 +386,7 @@ Actions:
 - `docs/VIEWER_SPEC.md`
 - `docs/ADR-0001-storage-provider-boundary.md`
 - `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
+- `docs/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md`
 - `docs/THREAT_MODEL_GDRIVE_GATE0.md`
 - `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
 - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
