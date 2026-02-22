@@ -202,6 +202,16 @@ export async function setupPageLifecycle(ctx) {
       unlistenDragDrop = await win.onDragDropEvent((event) => {
         const payload = event?.payload ?? event;
         if (!payload || payload.type !== "drop") return;
+        if (typeof window !== "undefined") {
+          const suppressUntil = Number(
+            (window as Window & { __rf_native_outbound_drag_suppress_until?: number })
+              .__rf_native_outbound_drag_suppress_until ?? 0
+          );
+          if (Number.isFinite(suppressUntil) && Date.now() < suppressUntil) {
+            ctx.setStatusMessage("D&D import blocked (self native drag-out)", 1500);
+            return;
+          }
+        }
         if (
           typeof document !== "undefined" &&
           document.querySelector(

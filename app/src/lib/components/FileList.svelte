@@ -1,6 +1,6 @@
 <script>
   import ListRow from "$lib/components/ListRow.svelte";
-  import { clipboardSetFiles } from "$lib/utils/tauri_fs";
+  import { clipboardSetFiles, shellStartFileDrag } from "$lib/utils/tauri_fs";
   import {
     evaluateOutboundAppDragCandidate,
     readDragDropExperimentPolicyFromStorage,
@@ -126,6 +126,46 @@
         emitDndExperimentStatus(`D&D export probe failed (${msg})`, 5000);
       });
   }
+
+  /** @param {MouseEvent} event @param {import("$lib/types").Entry} entry */
+  async function handleRowMouseDown(event, entry) {
+    if (!outboundDragProbeEnabled) return;
+    if (event.button !== 0) return;
+    // Gate D direct-integration probe: modifier-gated to avoid changing normal list behavior.
+    if (!(event.altKey && event.shiftKey)) return;
+
+    const dragEntries = buildDragSelection(entry);
+    const decision = evaluateOutboundAppDragCandidate({
+      policy: dndExperimentPolicy,
+      selectedEntries: dragEntries.map((item) => ({ path: item.path, provider: item.provider })),
+    });
+    if (!decision.allowed) {
+      event.preventDefault();
+      event.stopPropagation();
+      emitDndExperimentStatus(`D&D direct export blocked (${decision.reason})`, 4000);
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof window !== "undefined") {
+      window.__rf_native_outbound_drag_suppress_until = Date.now() + 15000;
+    }
+    emitDndExperimentStatus(
+      `D&D direct export starting (experimental): ${decision.acceptedPaths.length} item(s)`,
+      2500
+    );
+    try {
+      const result = await shellStartFileDrag(decision.acceptedPaths);
+      emitDndExperimentStatus(`D&D direct export finished (experimental): ${String(result)}`, 4000);
+    } catch (err) {
+      const msg = typeof err === "string" ? err : err?.message || "shell_start_file_drag failed";
+      emitDndExperimentStatus(`D&D direct export failed (${msg})`, 5000);
+    } finally {
+      if (typeof window !== "undefined") {
+        window.__rf_native_outbound_drag_suppress_until = Date.now() + 1000;
+      }
+    }
+  }
 </script>
 
 <div
@@ -187,6 +227,9 @@
           onContextMenu={(event) => openContextMenu(event, entry)}
           onDoubleClick={() => {
             openEntry(entry);
+          }}
+          onMouseDown={(event) => {
+            handleRowMouseDown(event, entry);
           }}
           draggable={outboundDragProbeEnabled}
           onDragStart={(event) => {

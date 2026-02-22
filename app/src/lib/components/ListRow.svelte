@@ -24,6 +24,7 @@
   export let onDoubleClick;
   export let draggable = false;
   export let onDragStart;
+  export let onMouseDown;
 
   $: entryIcon = getEntryIcon(entry, uiFileIconMode);
 </script>
@@ -39,6 +40,7 @@
   oncontextmenu={onContextMenu}
   ondblclick={onDoubleClick}
   ondragstart={onDragStart}
+  onmousedown={onMouseDown}
   onkeydown={(event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();

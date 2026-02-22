@@ -172,6 +172,10 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       6000,
     );
     try {
+      if (typeof window !== "undefined") {
+        (window as Window & { __rf_native_outbound_drag_suppress_until?: number })
+          .__rf_native_outbound_drag_suppress_until = Date.now() + 15000;
+      }
       const result = await ctx.invoke("shell_start_file_drag_debug", {
         paths: decision.acceptedPaths,
       });
@@ -183,6 +187,11 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       }
     } catch (err) {
       showError(err);
+    } finally {
+      if (typeof window !== "undefined") {
+        (window as Window & { __rf_native_outbound_drag_suppress_until?: number })
+          .__rf_native_outbound_drag_suppress_until = Date.now() + 1000;
+      }
     }
   };
 
