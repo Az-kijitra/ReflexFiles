@@ -283,10 +283,13 @@ export async function setupPageLifecycle(ctx) {
             dndImportInFlight = false;
           });
       });
-      ctx.setStatusMessage(
-        `D&D experiment active (${policy.phase})`,
-        1500
-      );
+      if (policy.phase === "phase1_inbound_local_only") {
+        ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase1_active"), 2500);
+      } else if (policy.phase === "phase2_outbound_local_only") {
+        ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase2_active"), 4500);
+      } else {
+        ctx.setStatusMessage(`D&D experiment active (${policy.phase})`, 1500);
+      }
     }
   } catch {
     // D&D experiment probe is optional and must not break startup.

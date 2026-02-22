@@ -623,6 +623,10 @@
         "D&D export ready ({count} item(s)). Hold left mouse button and drag to Explorer.",
       "status.dnd_export_native_finished": "D&D export finished: {result}",
       "status.dnd_export_native_canceled": "D&D export canceled",
+      "status.dnd_experiment_phase1_active":
+        "D&D experiment active (phase1 inbound local-only). Drag from Explorer into a local folder in ReflexFiles.",
+      "status.dnd_experiment_phase2_active":
+        "D&D experiment active (phase2 outbound local-only). Use context menu 'Explorer D&D (Exp)' or Alt+Shift + left click on a list item.",
       "focus.list": "List",
       "focus.tree": "Tree",
       "focus.path": "Path",
@@ -1134,6 +1138,10 @@
         "D&D書き出しの準備完了（{count}件）。左ボタンを押したままエクスプローラーへドラッグしてください。",
       "status.dnd_export_native_finished": "D&D書き出しを終了しました: {result}",
       "status.dnd_export_native_canceled": "D&D書き出しをキャンセルしました",
+      "status.dnd_experiment_phase1_active":
+        "D&D実験を有効化しました（phase1: 取り込み/ローカルのみ）。エクスプローラーから ReflexFiles のローカルフォルダへドロップできます。",
+      "status.dnd_experiment_phase2_active":
+        "D&D実験を有効化しました（phase2: 書き出し/ローカルのみ）。右クリックの実験項目、または Alt+Shift+左クリックで開始できます。",
       "focus.list": "リスト",
       "focus.tree": "ツリー",
       "focus.path": "パス",
