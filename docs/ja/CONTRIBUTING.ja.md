@@ -57,7 +57,7 @@ npm run e2e:tauri
 
 キー関連の変更時の推奨順序:
 1. `npm run test:keys`（軽量・高速）
-2. `npm run docs:keymap-main`（`docs/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` を再生成）
+2. `npm run docs:keymap-main`（内部文書 `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` を再生成）
 3. `npm run build`
 4. 影響範囲に応じた対象 E2E（`e2e:tauri` / `e2e:viewer` / `e2e:settings`）
 

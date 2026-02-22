@@ -155,12 +155,21 @@ copy, and archive files quickly.</p>
 <hr>
 <h2>ReflexViewer (Preview / Source)</h2>
 <p>Supported files open in ReflexViewer.</p>
+<ul>
+<li>Viewer title includes the opened file name.</li>
+<li>If a file is unsupported or unreadable, the viewer shows an error state instead of crashing.</li>
+</ul>
 <h3>Main View Modes</h3>
 <ul>
 <li><strong>Markdown Preview</strong>: Render Markdown as formatted HTML</li>
 <li><strong>Text (Markdown Source)</strong>: Markdown source with syntax highlighting</li>
 <li><strong>Source Code Highlight</strong>: Syntax coloring for C/C++/Rust/JavaScript/TypeScript/Python/JSON and more</li>
-<li><strong>Image Viewer</strong>: PNG/JPEG/BMP with zoom and pan</li>
+<li><strong>Image Viewer</strong>: PNG/JPEG/BMP with zoom and pan
+<ul>
+<li>Zoom presets include <strong>Fit / 100% / 200%</strong></li>
+<li>Zoom indicator shows current zoom mode/ratio</li>
+</ul>
+</li>
 </ul>
 <h3>Basic Viewer Shortcuts</h3>
 <ul>
@@ -169,6 +178,7 @@ copy, and archive files quickly.</p>
 <li><strong>Alt+Left / Alt+Right</strong>: Previous/next file in same folder</li>
 <li><strong>Ctrl+PageUp / Ctrl+PageDown</strong>: Previous/next file in same folder</li>
 <li><strong>Prev / Next buttons</strong>: Previous/next file in same folder</li>
+<li><strong>Position indicator</strong>: Shows current file index / total (for example <code>2 / 3</code>)</li>
 <li><strong>Ctrl+O</strong>: Open file picker</li>
 <li><strong>Ctrl+F</strong>: Open search panel (text/Markdown)</li>
 <li><strong>Ctrl + wheel / Ctrl+Plus / Ctrl+Minus / Ctrl+0</strong>: Zoom (image or Markdown HTML)</li>
@@ -533,22 +543,127 @@ Open <code>config.toml</code> from File menu -&gt; Settings, or press <strong>Ct
 <ul>
 <li><code>%APPDATA%\\ReflexFIles\\diagnostics\\</code></li>
 </ul>
-<h3>Google Drive Setup Guide (Personal Use)</h3>
-<p>For Google Drive integration setup, see:</p>
+<h3>Google Drive (Personal Google Cloud Setup and Usage)</h3>
+<p>ReflexFiles does not distribute shared Google API credentials in the public repository.
+Each user configures and owns their own Google Cloud project and OAuth client.</p>
+<p>Current Google Drive support is intentionally limited.</p>
 <ul>
-<li><code>docs/GOOGLE_DRIVE_SELF_SETUP.md</code></li>
+<li><code>gdrive://root/my-drive</code> lists real Drive data only when backend mode is <code>Real Google Drive API</code></li>
+<li>if backend mode is <code>Stub (virtual test data)</code>, <code>gdrive://</code> shows test data</li>
+<li>viewing is available for viewer-supported formats (text / markdown / image)</li>
+<li>write-back to Google Drive is manual (<code>Write Back to Google Drive</code> from context menu)</li>
+<li>opening a Google Drive file in an external app uses a local workcopy (no automatic upload-back)</li>
+<li>PATH completion/candidate preview does not target <code>gdrive://</code> paths</li>
+<li>for heavy Google Drive workflows, use Google Drive local sync and work on the synced local folder</li>
 </ul>
-<p>Google Drive support in ReflexFiles is intentionally limited.</p>
+<h4>Security Rules (Mandatory)</h4>
 <ul>
-<li>PATH completion/candidate preview does not target <code>gdrive://</code> paths.</li>
-<li>If you need always-on completion and rich bulk operations, use Google Drive local sync and work on the local mirror path.</li>
+<li>Do not publish API keys, OAuth client secrets, or tokens in GitHub.</li>
+<li>Do not commit <code>.env</code> files containing credential values.</li>
+<li>Keep credentials only in your own local environment / Google Cloud project.</li>
 </ul>
-<p>The guide includes:</p>
+<h4>Cost (Important)</h4>
 <ul>
-<li>Google Cloud input examples</li>
-<li>Common auth troubles (<code>ERR_CONNECTION_REFUSED</code>, <code>client_secret is missing</code>, etc.)</li>
-<li>No-charge operation guidance (billing avoidance rules and monthly checks)</li>
+<li>Google Drive API usage itself is documented by Google as no additional cost.</li>
+<li>Exceeding Drive API request quotas does not create extra billing by itself.</li>
+<li>Charges can still occur if you enable other paid Google Cloud services in the same project.</li>
+<li>Recommended: use a dedicated Google Cloud project for ReflexFiles and enable only <code>Google Drive API</code>.</li>
 </ul>
+<h4>No-Charge Operating Rules (Recommended)</h4>
+<ol>
+<li>Create a dedicated Google Cloud project only for ReflexFiles.</li>
+<li>Enable only <code>Google Drive API</code>.</li>
+<li>Do not request quota increases.</li>
+<li>If billing is linked, configure budget alerts.</li>
+<li>Check monthly Billing report and keep it at <code>¥0</code> / <code>$0</code>.</li>
+<li>If you require strict no-charge operation, unlink billing from that project (some features may become unavailable).</li>
+</ol>
+<h4>Google Cloud Setup (User-Owned)</h4>
+<ol>
+<li>Open Google Cloud Console and create/select a project (for example <code>ReflexFiles Personal</code>).</li>
+<li>Open <code>Google Auth Platform</code> and fill required app information.</li>
+<li>Enable <code>Google Drive API</code> in <code>APIs &amp; Services</code> -&gt; <code>Library</code>.</li>
+<li>Configure OAuth consent screen.
+<ul>
+<li>If your Gmail appears as &quot;ineligible&quot; in Test users, project Owner/Editor accounts may already be usable without explicit test-user registration.</li>
+</ul>
+</li>
+<li>Create OAuth client (<code>Desktop app</code>) and save:
+<ul>
+<li>Client ID (required)</li>
+<li>Client secret (optional; use only if needed)</li>
+</ul>
+</li>
+</ol>
+<h4>ReflexFiles Setup (Settings)</h4>
+<ol>
+<li>Open <strong>Settings &gt; Advanced</strong> and open the Google Drive auth block.</li>
+<li>Fill:
+<ul>
+<li><code>OAuth Client ID</code> (required)</li>
+<li><code>OAuth Client Secret (optional)</code> (normally blank; used only when Google requires it)</li>
+<li><code>OAuth Redirect URI</code> (default <code>http://127.0.0.1:45123/oauth2/callback</code>, must match exactly)</li>
+</ul>
+</li>
+<li>Click <strong>Start Sign-In</strong> and complete Google login/consent in browser.</li>
+<li>ReflexFiles auto-fills Callback URL after consent.
+<ul>
+<li>If auto-capture fails, paste the full browser URL including both <code>state</code> and <code>code</code>.</li>
+</ul>
+</li>
+<li>Enter Account ID (email) and click <strong>Complete Sign-In</strong>.</li>
+<li>Confirm:
+<ul>
+<li>success message</li>
+<li>auth phase becomes Authorized</li>
+</ul>
+</li>
+<li>After one successful sign-in, saved credentials are reused on next launch and ReflexFiles reconnects automatically on <code>gdrive://</code> access.</li>
+<li>On sign-out, saved refresh token is cleared and Google Drive read-cache files are removed from local temp.</li>
+</ol>
+<h4>Troubleshooting (Common)</h4>
+<ol>
+<li><code>Google token exchange failed: client_secret is missing.</code>
+<ul>
+<li>Fill optional client secret and retry <strong>Complete Sign-In</strong>.</li>
+</ul>
+</li>
+<li>Browser shows <code>ERR_CONNECTION_REFUSED</code>
+<ul>
+<li>Expected in this flow; copy full address-bar URL and continue.</li>
+</ul>
+</li>
+<li>callback parse error (<code>state</code>/<code>code</code> missing)
+<ul>
+<li>Paste the full callback URL, not partial text.</li>
+</ul>
+</li>
+<li><code>redirect_uri_mismatch</code>
+<ul>
+<li>Ensure exact URI match between ReflexFiles and Google Cloud config.</li>
+</ul>
+</li>
+<li>Auth succeeds but only mock files appear
+<ul>
+<li>Check backend mode. <code>Stub</code> mode shows test data, not real Drive files.</li>
+</ul>
+</li>
+<li>Write-back says no local workcopy
+<ul>
+<li>Open the target file once in an external app first.</li>
+</ul>
+</li>
+<li>Write-back conflict
+<ul>
+<li>Re-open the same Google Drive file in external app to refresh local workcopy against latest remote, then manually merge and retry write-back.</li>
+</ul>
+</li>
+<li><code>Request had insufficient authentication scopes</code> on write-back
+<ul>
+<li>Sign out, then run sign-in again so ReflexFiles obtains <code>https://www.googleapis.com/auth/drive</code>.</li>
+</ul>
+</li>
+</ol>
 <h3>Shortcut Conflict Warnings (Settings Screen)</h3>
 <p>In <strong>Settings &gt; Advanced</strong>, conflict warnings include:</p>
 <ul>

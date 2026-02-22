@@ -76,12 +76,16 @@ Installation steps depend on the distribution type.
 
 ## ReflexViewer (Preview / Source)
 Supported files open in ReflexViewer.
+- Viewer title includes the opened file name.
+- If a file is unsupported or unreadable, the viewer shows an error state instead of crashing.
 
 ### Main View Modes
 - **Markdown Preview**: Render Markdown as formatted HTML
 - **Text (Markdown Source)**: Markdown source with syntax highlighting
 - **Source Code Highlight**: Syntax coloring for C/C++/Rust/JavaScript/TypeScript/Python/JSON and more
 - **Image Viewer**: PNG/JPEG/BMP with zoom and pan
+  - Zoom presets include **Fit / 100% / 200%**
+  - Zoom indicator shows current zoom mode/ratio
 
 ### Basic Viewer Shortcuts
 - **Esc**: Close viewer
@@ -89,6 +93,7 @@ Supported files open in ReflexViewer.
 - **Alt+Left / Alt+Right**: Previous/next file in same folder
 - **Ctrl+PageUp / Ctrl+PageDown**: Previous/next file in same folder
 - **Prev / Next buttons**: Previous/next file in same folder
+- **Position indicator**: Shows current file index / total (for example `2 / 3`)
 - **Ctrl+O**: Open file picker
 - **Ctrl+F**: Open search panel (text/Markdown)
 - **Ctrl + wheel / Ctrl+Plus / Ctrl+Minus / Ctrl+0**: Zoom (image or Markdown HTML)
@@ -235,18 +240,81 @@ In **Settings > Advanced > Export Diagnostic Report**:
 Diagnostic output folder:
 - `%APPDATA%\\ReflexFIles\\diagnostics\\`
 
-### Google Drive Setup Guide (Personal Use)
-For Google Drive integration setup, see:
-- `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+### Google Drive (Personal Google Cloud Setup and Usage)
+ReflexFiles does not distribute shared Google API credentials in the public repository.
+Each user configures and owns their own Google Cloud project and OAuth client.
 
-Google Drive support in ReflexFiles is intentionally limited.
-- PATH completion/candidate preview does not target `gdrive://` paths.
-- If you need always-on completion and rich bulk operations, use Google Drive local sync and work on the local mirror path.
+Current Google Drive support is intentionally limited.
+- `gdrive://root/my-drive` lists real Drive data only when backend mode is `Real Google Drive API`
+- if backend mode is `Stub (virtual test data)`, `gdrive://` shows test data
+- viewing is available for viewer-supported formats (text / markdown / image)
+- write-back to Google Drive is manual (`Write Back to Google Drive` from context menu)
+- opening a Google Drive file in an external app uses a local workcopy (no automatic upload-back)
+- PATH completion/candidate preview does not target `gdrive://` paths
+- for heavy Google Drive workflows, use Google Drive local sync and work on the synced local folder
 
-The guide includes:
-- Google Cloud input examples
-- Common auth troubles (`ERR_CONNECTION_REFUSED`, `client_secret is missing`, etc.)
-- No-charge operation guidance (billing avoidance rules and monthly checks)
+#### Security Rules (Mandatory)
+- Do not publish API keys, OAuth client secrets, or tokens in GitHub.
+- Do not commit `.env` files containing credential values.
+- Keep credentials only in your own local environment / Google Cloud project.
+
+#### Cost (Important)
+- Google Drive API usage itself is documented by Google as no additional cost.
+- Exceeding Drive API request quotas does not create extra billing by itself.
+- Charges can still occur if you enable other paid Google Cloud services in the same project.
+- Recommended: use a dedicated Google Cloud project for ReflexFiles and enable only `Google Drive API`.
+
+#### No-Charge Operating Rules (Recommended)
+1. Create a dedicated Google Cloud project only for ReflexFiles.
+2. Enable only `Google Drive API`.
+3. Do not request quota increases.
+4. If billing is linked, configure budget alerts.
+5. Check monthly Billing report and keep it at `¥0` / `$0`.
+6. If you require strict no-charge operation, unlink billing from that project (some features may become unavailable).
+
+#### Google Cloud Setup (User-Owned)
+1. Open Google Cloud Console and create/select a project (for example `ReflexFiles Personal`).
+2. Open `Google Auth Platform` and fill required app information.
+3. Enable `Google Drive API` in `APIs & Services` -> `Library`.
+4. Configure OAuth consent screen.
+   - If your Gmail appears as "ineligible" in Test users, project Owner/Editor accounts may already be usable without explicit test-user registration.
+5. Create OAuth client (`Desktop app`) and save:
+   - Client ID (required)
+   - Client secret (optional; use only if needed)
+
+#### ReflexFiles Setup (Settings)
+1. Open **Settings > Advanced** and open the Google Drive auth block.
+2. Fill:
+   - `OAuth Client ID` (required)
+   - `OAuth Client Secret (optional)` (normally blank; used only when Google requires it)
+   - `OAuth Redirect URI` (default `http://127.0.0.1:45123/oauth2/callback`, must match exactly)
+3. Click **Start Sign-In** and complete Google login/consent in browser.
+4. ReflexFiles auto-fills Callback URL after consent.
+   - If auto-capture fails, paste the full browser URL including both `state` and `code`.
+5. Enter Account ID (email) and click **Complete Sign-In**.
+6. Confirm:
+   - success message
+   - auth phase becomes Authorized
+7. After one successful sign-in, saved credentials are reused on next launch and ReflexFiles reconnects automatically on `gdrive://` access.
+8. On sign-out, saved refresh token is cleared and Google Drive read-cache files are removed from local temp.
+
+#### Troubleshooting (Common)
+1. `Google token exchange failed: client_secret is missing.`
+   - Fill optional client secret and retry **Complete Sign-In**.
+2. Browser shows `ERR_CONNECTION_REFUSED`
+   - Expected in this flow; copy full address-bar URL and continue.
+3. callback parse error (`state`/`code` missing)
+   - Paste the full callback URL, not partial text.
+4. `redirect_uri_mismatch`
+   - Ensure exact URI match between ReflexFiles and Google Cloud config.
+5. Auth succeeds but only mock files appear
+   - Check backend mode. `Stub` mode shows test data, not real Drive files.
+6. Write-back says no local workcopy
+   - Open the target file once in an external app first.
+7. Write-back conflict
+   - Re-open the same Google Drive file in external app to refresh local workcopy against latest remote, then manually merge and retry write-back.
+8. `Request had insufficient authentication scopes` on write-back
+   - Sign out, then run sign-in again so ReflexFiles obtains `https://www.googleapis.com/auth/drive`.
 
 ### Shortcut Conflict Warnings (Settings Screen)
 In **Settings > Advanced**, conflict warnings include:

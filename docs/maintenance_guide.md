@@ -219,8 +219,8 @@ cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-r
   - credential-bearing `.env` files
 - Keep app defaults credential-empty.
 - Official user-facing setup must follow:
-  - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
-  - `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+  - Internal self-setup guide (release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+  - Internal self-setup guide JA (release-excluded): `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - If credential exposure is detected:
   1. Stop merge/release immediately.
   2. Remove leaked value from history/archives as needed.
@@ -324,10 +324,10 @@ npm run docs:keymap-main
 ```
 Recommended order for key-related changes:
 - `npm run test:keys` (fast regression)
-- `npm run docs:keymap-main` (refresh main-screen keyboard behavior document)
+- `npm run docs:keymap-main` (refresh internal main-screen keyboard behavior document)
 - `npm run build`
 - targeted E2E only for impacted area
-- review diff of `docs/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` for unintended keymap/behavior changes
+- review diff of `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` for unintended keymap/behavior changes
 2. Run targeted E2E for touched area
 - viewer changes -> `npm run e2e:viewer`
 - settings/config changes -> `npm run e2e:settings`
@@ -383,14 +383,14 @@ Actions:
 - Preserve backward compatibility for user config whenever feasible.
 
 ## Related Docs
-- `docs/VIEWER_SPEC.md`
-- `docs/ADR-0001-storage-provider-boundary.md`
-- `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
-- `docs/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md`
-- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
-- `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
-- `docs/GOOGLE_DRIVE_SELF_SETUP.md`
-- `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- Viewer spec (internal/release-excluded): `development_documents/VIEWER_SPEC.md`
+- Internal ADR (release-excluded): `development_documents/ADR-0001-storage-provider-boundary.md`
+- Internal ADR JA (release-excluded): `development_documents/ja/ADR-0001-storage-provider-boundary.ja.md`
+- Internal keyboard behavior reference (release-excluded): `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md`
+- Internal threat model (release-excluded): `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
+- Internal threat model JA (release-excluded): `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Internal self-setup guide (release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+- Internal self-setup guide JA (release-excluded): `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`

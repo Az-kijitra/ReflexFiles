@@ -57,7 +57,7 @@ npm run e2e:tauri
 
 Recommended order for keyboard-related changes:
 1. `npm run test:keys` (lightweight / fast)
-2. `npm run docs:keymap-main` (regenerate `docs/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md`)
+2. `npm run docs:keymap-main` (regenerate internal doc `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md`)
 3. `npm run build`
 4. Targeted E2E for impacted areas (`e2e:tauri` / `e2e:viewer` / `e2e:settings`)
 

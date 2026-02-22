@@ -5,7 +5,7 @@ import { KEYMAP_ACTIONS, KEYMAP_DEFAULTS, STRINGS } from "../src/lib/ui_constant
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..", "..");
-const outPath = resolve(repoRoot, "docs", "ja", "KEYBOARD_BEHAVIOR_MAIN.ja.md");
+const outPath = resolve(repoRoot, "development_documents", "ja", "KEYBOARD_BEHAVIOR_MAIN.ja.md");
 
 const ja = STRINGS.ja || {};
 
@@ -175,4 +175,3 @@ lines.push("");
 mkdirSync(dirname(outPath), { recursive: true });
 writeFileSync(outPath, lines.join("\n"), "utf8");
 console.log(`[docs:keymap-main] wrote ${outPath}`);
-

@@ -36,9 +36,9 @@ cargo install cargo-audit
 ```
 
 ## 外部Providerの基準（Google Drive）
-- Gate 0 脅威モデル: `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
-- Storage Provider ADR: `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
-- ユーザー自己設定ガイド: `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- Gate 0 脅威モデル（内部管理・リリース対象外）: `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Storage Provider ADR（内部管理・リリース対象外）: `development_documents/ja/ADR-0001-storage-provider-boundary.ja.md`
+- ユーザー自己設定ガイド（内部管理・リリース対象外）: `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 
 ## 資格情報の所有モデル（Google Drive）
 - 開発時はメンテナ個人の Google Cloud プロジェクト利用を許可する。

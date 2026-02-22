@@ -37,9 +37,9 @@ cargo install cargo-audit
 ```
 
 ## External Provider Baseline (Google Drive)
-- Gate 0 threat model: `docs/THREAT_MODEL_GDRIVE_GATE0.md`
-- Storage provider ADR: `docs/ADR-0001-storage-provider-boundary.md`
-- User self-setup guide: `docs/GOOGLE_DRIVE_SELF_SETUP.md`
+- Gate 0 threat model (internal, release-excluded): `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
+- Storage provider ADR (internal, release-excluded): `development_documents/ADR-0001-storage-provider-boundary.md`
+- User self-setup guide (internal, release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
 
 ## Credential Ownership Model (Google Drive)
 - Development may use maintainer personal Google Cloud projects.

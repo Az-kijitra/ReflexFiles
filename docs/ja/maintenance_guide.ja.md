@@ -216,8 +216,8 @@ cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-r
   - 資格情報を含む `.env` ファイル
 - アプリ既定値は資格情報なしを維持する。
 - ユーザー向け公式手順は次を参照する:
-  - `docs/GOOGLE_DRIVE_SELF_SETUP.md`
-  - `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+  - 内部自己設定ガイド（リリース対象外）: `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+  - 内部自己設定ガイド日本語版（リリース対象外）: `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - 資格情報漏えいを検知した場合:
   1. マージ/リリースを即時停止。
   2. 必要に応じて履歴・成果物から漏えい値を除去。
@@ -371,13 +371,13 @@ npm run check
 
 ## 関連ドキュメント
 - `docs/maintenance_guide.md`
-- `docs/VIEWER_SPEC.md`
-- `docs/ADR-0001-storage-provider-boundary.md`
-- `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
-- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
-- `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
-- `docs/GOOGLE_DRIVE_SELF_SETUP.md`
-- `docs/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- Viewer仕様（内部管理・リリース対象外）: `development_documents/VIEWER_SPEC.md`
+- 内部ADR（リリース対象外）: `development_documents/ADR-0001-storage-provider-boundary.md`
+- 内部ADR日本語版（リリース対象外）: `development_documents/ja/ADR-0001-storage-provider-boundary.ja.md`
+- 内部脅威モデル（リリース対象外）: `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
+- 内部脅威モデル日本語版（リリース対象外）: `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- 内部自己設定ガイド（リリース対象外）: `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+- 内部自己設定ガイド日本語版（リリース対象外）: `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`
