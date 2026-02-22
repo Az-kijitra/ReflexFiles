@@ -36,13 +36,13 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
 3. **PATH で移動**
    - PATH バーにフォルダを入力し **Enter** で移動します。
 4. **検索**
-   - `/` で Search バーを表示し、文字列を入力します。
+   - **Ctrl+F** で Search バーを表示し、文字列を入力します。
 5. **コピー / ペースト**
    - **Ctrl+C** でコピー、**Ctrl+V** でペーストします。
 6. **よく使う場所を登録**
-   - **Ctrl+Shift+J** でジャンプリストに追加し、**Ctrl+J** で開きます。
+   - **Ctrl+D** でジャンプリストに追加し、**Ctrl+Shift+O** で開きます。
 7. **フォルダ履歴**
-   - **Ctrl+Shift+Y** でフォルダの履歴を開きます。
+   - **Ctrl+H** でフォルダの履歴を開きます。
 
 ---
 
@@ -64,9 +64,9 @@ ReflexFiles は、キーボード操作に最適化された Windows 向けフ�
 ### PATH バー
 - 直接入力して **Enter** で移動
 - **Esc** で入力を破棄し一覧へ戻る
-- **Tab** で補完（PATH 入力時）
+- **Ctrl+Space / Ctrl+Shift+Space** で補完（PATH 入力時）
 - **Tab / Shift+Tab** でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）
-- **Ctrl+J / Ctrl+Y** でジャンプリスト / 履歴を表示
+- **Ctrl+Shift+O / Ctrl+H** でジャンプリスト / 履歴を表示
 - PATH補完および候補表示は、**ローカルファイルシステムのパスのみ**を対象とします。
 - `gdrive://` パスは PATH補完/候補表示の対象外です。
 - Google Drive で実用的に運用する場合は、Google Drive のローカル同期クライアントを併用し、同期済みローカルフォルダを ReflexFiles で操作してください。
@@ -102,7 +102,7 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
   - ファイル一覧と連動
   - 表示/非表示の切り替え（View メニュー / Ctrl+Shift+B）
 - **検索**
-  - `/` で Search バーを表示
+  - **Ctrl+F** で Search バーを表示
   - 部分一致 / 正規表現（Regex）
 - **履歴 / ジャンプリスト**
   - 履歴: 過去に訪れたパス
@@ -142,39 +142,39 @@ ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer 
 | 移動 | 上/下/左/右 | Up / Down / Left / Right |
 | 移動 | ページ移動 | PageUp / PageDown |
 | 操作 | 元に戻す | Ctrl+Z |
-| 操作 | やり直し | Ctrl+Shift+Z |
+| 操作 | やり直し | Ctrl+Y |
 | 選択 | 選択トグル | Space |
 | 選択 | 全選択 | Ctrl+A |
 | 選択 | 選択解除 | Esc |
 | 操作 | 開く | Enter |
 | 操作 | 関連付けアプリで開く（強制） | Shift+Enter |
-| 操作 | 親フォルダへ | Backspace |
-| 操作 | 検索 | / |
+| 操作 | 親フォルダへ | Alt+Up / Backspace |
+| 操作 | 検索 | Ctrl+F |
 | 操作 | 更新 | F5 |
 | 操作 | プロパティ | Alt+Enter |
 | 操作 | 設定ファイルを開く | Ctrl+, |
 | 操作 | 終了 | Ctrl+Q |
 | 表示 | ツリービュー表示切替 | Ctrl+Shift+B |
-| 表示 | 隠しファイル切替 | Ctrl+H |
+| 表示 | 隠しファイル切替 | Ctrl+Shift+H |
 | 表示 | サイズ列切替 | Ctrl+Shift+S |
 | 表示 | 時刻列切替 | Ctrl+Shift+T |
-| 操作 | ソートメニュー | S |
-| 操作 | PATHへフォーカス | Ctrl+L |
+| 操作 | ソートメニュー | Alt+S |
+| 操作 | PATHへフォーカス | Alt+D |
 | 操作 | フォーカス移動（一覧/パス/ツリー） | Tab / Shift+Tab |
-| 操作 | PATH補完 | Tab |
+| 操作 | PATH補完 | Ctrl+Space / Ctrl+Shift+Space |
 | 操作 | キー一覧 | F1 |
-| 履歴 | 履歴を表示 | Ctrl+Y |
-| ジャンプリスト | ジャンプリストを表示 | Ctrl+J |
-| ジャンプリスト | ジャンプリストに追加 | Ctrl+Shift+J |
-| ジャンプリスト | URLをジャンプリストに追加 | Ctrl+Shift+U |
+| 履歴 | 履歴を表示 | Ctrl+H |
+| ジャンプリスト | ジャンプリストを表示 | Ctrl+Shift+O |
+| ジャンプリスト | ジャンプリストに追加 | Ctrl+D |
+| ジャンプリスト | URLをジャンプリストに追加 | Ctrl+Shift+D |
 | ファイル | コピー | Ctrl+C |
 | ファイル | カット | Ctrl+X |
 | ファイル | ペースト | Ctrl+V |
 | ファイル | 削除 | Delete |
 | ファイル | リネーム | F2 |
 | ファイル | 新規作成 | Ctrl+N |
-| ファイル | 複製 | Ctrl+D |
-| ファイル | 日付プレフィックス | Ctrl+Shift+D |
+| ファイル | 複製 | Ctrl+Shift+C |
+| ファイル | 日付プレフィックス | Ctrl+Alt+D |
 | ZIP | ZIP 作成 | Ctrl+Alt+Z |
 | ZIP | ZIP 解凍 | Ctrl+Alt+X |
 | 外部アプリ | エクスプローラーで開く | Ctrl+Alt+E |
@@ -265,8 +265,8 @@ ReflexFiles の Google Drive サポートは、意図的に限定範囲です。
 
 ### 例2: 作業フォルダをジャンプリストで管理
 1. 作業フォルダを開く
-2. **Ctrl+Shift+J** でジャンプリストに追加
-3. 次回以降は **Ctrl+J** から即移動
+2. **Ctrl+D** でジャンプリストに追加
+3. 次回以降は **Ctrl+Shift+O** から即移動
 
 ### 例3: ZIP を作成して共有する
 1. 対象ファイルを選択
@@ -339,7 +339,7 @@ ReflexFiles の Google Drive サポートは、意図的に限定範囲です。
 | キー | 型 | 説明 | 例 / 備考 |
 | --- | --- | --- | --- |
 | `input_keymap_profile` | string | キーマップ選択 | `windows` / `vim` |
-| `input_keymap_custom` | table | キーの上書き設定 | 例: `{ open = "Enter", jump_add_url = "Ctrl+Shift+U" }` |
+| `input_keymap_custom` | table | キーの上書き設定 | 例: `{ open = "Enter", jump_add_url = "Ctrl+Shift+D" }` |
 
 > `input_keymap_custom` で指定できる操作名は、ヘルプ → キー一覧に表示される操作IDです。
 
@@ -372,5 +372,6 @@ external_apps = [
 ### 参考: キー割り当て
 既定キーの一覧は、**ヘルプ → キー一覧** から確認できます。  
 `config.toml` に既定キー一覧は出力されません。変更したい場合は `input_keymap_custom` を使用してください。
+
 
 

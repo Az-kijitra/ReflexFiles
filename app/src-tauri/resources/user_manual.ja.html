@@ -100,7 +100,7 @@
 </li>
 <li><strong>検索</strong>
 <ul>
-<li><code>/</code> で Search バーを表示し、文字列を入力します。</li>
+<li><strong>Ctrl+F</strong> で Search バーを表示し、文字列を入力します。</li>
 </ul>
 </li>
 <li><strong>コピー / ペースト</strong>
@@ -110,12 +110,12 @@
 </li>
 <li><strong>よく使う場所を登録</strong>
 <ul>
-<li><strong>Ctrl+Shift+J</strong> でジャンプリストに追加し、<strong>Ctrl+J</strong> で開きます。</li>
+<li><strong>Ctrl+D</strong> でジャンプリストに追加し、<strong>Ctrl+Shift+O</strong> で開きます。</li>
 </ul>
 </li>
 <li><strong>フォルダ履歴</strong>
 <ul>
-<li><strong>Ctrl+Shift+Y</strong> でフォルダの履歴を開きます。</li>
+<li><strong>Ctrl+H</strong> でフォルダの履歴を開きます。</li>
 </ul>
 </li>
 </ol>
@@ -144,9 +144,9 @@
 <ul>
 <li>直接入力して <strong>Enter</strong> で移動</li>
 <li><strong>Esc</strong> で入力を破棄し一覧へ戻る</li>
-<li><strong>Tab</strong> で補完（PATH 入力時）</li>
+<li><strong>Ctrl+Space / Ctrl+Shift+Space</strong> で補完（PATH 入力時）</li>
 <li><strong>Tab / Shift+Tab</strong> でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）</li>
-<li><strong>Ctrl+J / Ctrl+Y</strong> でジャンプリスト / 履歴を表示</li>
+<li><strong>Ctrl+Shift+O / Ctrl+H</strong> でジャンプリスト / 履歴を表示</li>
 <li>PATH補完および候補表示は、<strong>ローカルファイルシステムのパスのみ</strong>を対象とします。</li>
 <li><code>gdrive://</code> パスは PATH補完/候補表示の対象外です。</li>
 <li>Google Drive で実用的に運用する場合は、Google Drive のローカル同期クライアントを併用し、同期済みローカルフォルダを ReflexFiles で操作してください。</li>
@@ -185,7 +185,7 @@
 </li>
 <li><strong>検索</strong>
 <ul>
-<li><code>/</code> で Search バーを表示</li>
+<li><strong>Ctrl+F</strong> で Search バーを表示</li>
 <li>部分一致 / 正規表現（Regex）</li>
 </ul>
 </li>
@@ -268,7 +268,7 @@
 <tr>
 <td>操作</td>
 <td>やり直し</td>
-<td>Ctrl+Shift+Z</td>
+<td>Ctrl+Y</td>
 </tr>
 <tr>
 <td>選択</td>
@@ -298,12 +298,12 @@
 <tr>
 <td>操作</td>
 <td>親フォルダへ</td>
-<td>Backspace</td>
+<td>Alt+Up / Backspace</td>
 </tr>
 <tr>
 <td>操作</td>
 <td>検索</td>
-<td>/</td>
+<td>Ctrl+F</td>
 </tr>
 <tr>
 <td>操作</td>
@@ -333,7 +333,7 @@
 <tr>
 <td>表示</td>
 <td>隠しファイル切替</td>
-<td>Ctrl+H</td>
+<td>Ctrl+Shift+H</td>
 </tr>
 <tr>
 <td>表示</td>
@@ -348,12 +348,12 @@
 <tr>
 <td>操作</td>
 <td>ソートメニュー</td>
-<td>S</td>
+<td>Alt+S</td>
 </tr>
 <tr>
 <td>操作</td>
 <td>PATHへフォーカス</td>
-<td>Ctrl+L</td>
+<td>Alt+D</td>
 </tr>
 <tr>
 <td>操作</td>
@@ -363,7 +363,7 @@
 <tr>
 <td>操作</td>
 <td>PATH補完</td>
-<td>Tab</td>
+<td>Ctrl+Space / Ctrl+Shift+Space</td>
 </tr>
 <tr>
 <td>操作</td>
@@ -373,22 +373,22 @@
 <tr>
 <td>履歴</td>
 <td>履歴を表示</td>
-<td>Ctrl+Y</td>
+<td>Ctrl+H</td>
 </tr>
 <tr>
 <td>ジャンプリスト</td>
 <td>ジャンプリストを表示</td>
-<td>Ctrl+J</td>
+<td>Ctrl+Shift+O</td>
 </tr>
 <tr>
 <td>ジャンプリスト</td>
 <td>ジャンプリストに追加</td>
-<td>Ctrl+Shift+J</td>
+<td>Ctrl+D</td>
 </tr>
 <tr>
 <td>ジャンプリスト</td>
 <td>URLをジャンプリストに追加</td>
-<td>Ctrl+Shift+U</td>
+<td>Ctrl+Shift+D</td>
 </tr>
 <tr>
 <td>ファイル</td>
@@ -423,12 +423,12 @@
 <tr>
 <td>ファイル</td>
 <td>複製</td>
-<td>Ctrl+D</td>
+<td>Ctrl+Shift+C</td>
 </tr>
 <tr>
 <td>ファイル</td>
 <td>日付プレフィックス</td>
-<td>Ctrl+Shift+D</td>
+<td>Ctrl+Alt+D</td>
 </tr>
 <tr>
 <td>ZIP</td>
@@ -568,8 +568,8 @@
 <h3>例2: 作業フォルダをジャンプリストで管理</h3>
 <ol>
 <li>作業フォルダを開く</li>
-<li><strong>Ctrl+Shift+J</strong> でジャンプリストに追加</li>
-<li>次回以降は <strong>Ctrl+J</strong> から即移動</li>
+<li><strong>Ctrl+D</strong> でジャンプリストに追加</li>
+<li>次回以降は <strong>Ctrl+Shift+O</strong> から即移動</li>
 </ol>
 <h3>例3: ZIP を作成して共有する</h3>
 <ol>
@@ -765,7 +765,7 @@
 <td><code>input_keymap_custom</code></td>
 <td>table</td>
 <td>キーの上書き設定</td>
-<td>例: <code>{ open = &quot;Enter&quot;, jump_add_url = &quot;Ctrl+Shift+U&quot; }</code></td>
+<td>例: <code>{ open = &quot;Enter&quot;, jump_add_url = &quot;Ctrl+Shift+D&quot; }</code></td>
 </tr>
 </tbody>
 </table>
