@@ -4,6 +4,19 @@
  */
 export function handleOverlayKey(event, ctx) {
   const active = ctx.activeElement;
+  const target = event.target;
+  const isWithin = (el) =>
+    !!el && !!target && typeof el.contains === "function" && el.contains(target);
+  const inRenameModal = isWithin(ctx.renameModalEl);
+  const inCreateModal = isWithin(ctx.createModalEl);
+  const inJumpUrlModal = isWithin(ctx.jumpUrlModalEl);
+
+  // Let modal-local handlers own Enter/Escape/Tab for input-based modals.
+  // We still report "handled" here to block main-view shortcuts while the modal is open.
+  if ((ctx.renameOpen && inRenameModal) || (ctx.createOpen && inCreateModal) || (ctx.jumpUrlOpen && inJumpUrlModal)) {
+    return true;
+  }
+
   if (ctx.pasteConfirmOpen || ctx.deleteConfirmOpen || ctx.jumpUrlOpen) {
     return true;
   }

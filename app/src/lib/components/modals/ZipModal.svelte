@@ -18,6 +18,9 @@
   export let runZipAction;
   export let closeZipModal;
   export let trapModalTab;
+
+  // Kept for binding compatibility while overwrite confirmation moved to conflict-time dialog.
+  $: void zipOverwriteConfirmed;
 </script>
 
 <ModalShell
@@ -59,12 +62,6 @@
       <label for="zip-password">{t("zip.password")}</label>
       <input id="zip-password" type="password" bind:value={zipPassword} />
     </div>
-    {#if zipMode === "extract"}
-      <label class="modal-inline">
-        <input type="checkbox" bind:checked={zipOverwriteConfirmed} />
-        {t("zip.overwrite_confirm")}
-      </label>
-    {/if}
     {#if zipError}
       <div class="error">{zipError}</div>
     {/if}
@@ -81,7 +78,7 @@
         onSelect: runZipAction,
         disabled:
           zipMode === "extract" &&
-          (zipPasswordAttempts >= ZIP_PASSWORD_MAX_ATTEMPTS || !zipOverwriteConfirmed),
+          zipPasswordAttempts >= ZIP_PASSWORD_MAX_ATTEMPTS,
       },
       { label: t("cancel"), onSelect: closeZipModal },
     ]}

@@ -43,6 +43,7 @@
           handleConfirmCancelKeydown(event, {
             onConfirm: confirmJumpUrl,
             onCancel: cancelJumpUrl,
+            stopPropagation: true,
           });
         }}
       />

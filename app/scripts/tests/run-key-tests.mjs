@@ -206,20 +206,32 @@ function createKeydownParams(overrides = {}) {
     cut: 0,
     paste: 0,
     create: 0,
+    createKinds: [],
     jumpAdd: 0,
     jumpAddUrl: 0,
     openConfig: 0,
     openKeymap: 0,
     openSort: 0,
+    rename: 0,
+    zipCreate: 0,
+    zipExtract: 0,
+    focusSearch: 0,
     searchSet: [],
     dropdownSet: [],
     dropdownModeSet: [],
     pathInputSet: [],
+    selectedSet: [],
+    anchorSet: [],
     focusPath: 0,
     status: [],
     global: 0,
   };
   const pathInputEl = overrides.pathInputEl ?? { contains: () => false, tagName: "INPUT" };
+  const searchInputEl = overrides.searchInputEl ?? {
+    focus() {
+      calls.focusSearch += 1;
+    },
+  };
   const entries = overrides.entries ?? [{ path: "C:\\Users\\toshi\\a.txt", name: "a.txt", type: "file" }];
   const selectedPaths = overrides.selectedPaths ?? [];
   const focusedIndex = overrides.focusedIndex ?? 0;
@@ -227,6 +239,7 @@ function createKeydownParams(overrides = {}) {
   const jumpList = overrides.jumpList ?? [];
   const params = {
     getPathInputEl: () => pathInputEl,
+    getSearchInputEl: () => searchInputEl,
     getSelectedPaths: () => selectedPaths,
     getEntries: () => entries,
     getFocusedIndex: () => focusedIndex,
@@ -248,8 +261,9 @@ function createKeydownParams(overrides = {}) {
       if (key === "status.no_selection") return "NO_SELECTION";
       return key;
     },
-    openCreate: () => {
+    openCreate: (kind) => {
       calls.create += 1;
+      calls.createKinds.push(kind);
     },
     copySelected: () => {
       calls.copy += 1;
@@ -302,8 +316,12 @@ function createKeydownParams(overrides = {}) {
     performRedo: () => {},
     clearDirStatsCache: () => {},
     selectAll: () => {},
-    setSelected: () => {},
-    setAnchorIndex: () => {},
+    setSelected: (value) => {
+      calls.selectedSet.push(value);
+    },
+    setAnchorIndex: (value) => {
+      calls.anchorSet.push(value);
+    },
     updateListRows: () => {},
     scheduleUiSave: () => {},
     buildTreeRoot: () => {},
@@ -315,15 +333,21 @@ function createKeydownParams(overrides = {}) {
     openInTerminalWsl: () => {},
     openInVSCode: () => {},
     openInGitClient: () => {},
-    openZipCreate: () => {},
-    openZipExtract: () => {},
+    openZipCreate: () => {
+      calls.zipCreate += 1;
+    },
+    openZipExtract: () => {
+      calls.zipExtract += 1;
+    },
     openProperties: () => {},
     loadDir: () => {},
     moveFocusByRow: () => {},
     moveFocusByColumn: () => {},
     toggleSelection: () => {},
     openEntry: () => {},
-    openRename: () => {},
+    openRename: () => {
+      calls.rename += 1;
+    },
     duplicateSelected: () => {},
     prefixDateSelected: () => {},
     hasOperationTargets: () => true,
@@ -525,7 +549,7 @@ defineTest("gdrive path completion is local-only", async () => {
   assert.equal(state.invokeCalls.length, 0);
 });
 
-defineTest("keydown fallback Ctrl+N/C/V", () => {
+defineTest("keydown fallback Ctrl+N/Ctrl+Shift+N/C/V", () => {
   const prevDocument = globalThis.document;
   const prevWindow = globalThis.window;
   try {
@@ -536,6 +560,13 @@ defineTest("keydown fallback Ctrl+N/C/V", () => {
     const ctrlN = createCtrlEvent("N", 78);
     onKeyDown(ctrlN.event);
     assert.equal(calls.create, 1);
+    assert.equal(calls.createKinds.at(-1), "file");
+    assert.equal(calls.global, 0);
+
+    const ctrlShiftN = createKeyEvent({ ctrlKey: true, shiftKey: true, letter: "N", keyCode: 78 });
+    onKeyDown(ctrlShiftN.event);
+    assert.equal(calls.create, 2);
+    assert.equal(calls.createKinds.at(-1), "folder");
     assert.equal(calls.global, 0);
 
     const ctrlV = createCtrlEvent("V", 86);
@@ -589,6 +620,7 @@ defineTest("keydown fallback Alt+D and Ctrl+F boundaries", () => {
     onKeyDown(ctrlF.event);
     assert.equal(ctrlF.prevented, 1);
     assert.equal(base.calls.searchSet.at(-1), true);
+    assert.ok(base.calls.focusSearch >= 1);
     assert.equal(base.calls.global, 0);
 
     const pathInputEl = { contains: () => false };
@@ -600,9 +632,177 @@ defineTest("keydown fallback Alt+D and Ctrl+F boundaries", () => {
     const onKeyDownPath = createPageKeydownHandler(pathCase.params);
     const ctrlFInPath = createCtrlEvent("F", 70);
     onKeyDownPath(ctrlFInPath.event);
-    assert.equal(ctrlFInPath.prevented, 0);
-    assert.equal(pathCase.calls.searchSet.length, 0);
+    assert.equal(ctrlFInPath.prevented, 1);
+    assert.equal(pathCase.calls.searchSet.at(-1), true);
+    assert.ok(pathCase.calls.focusSearch >= 1);
     assert.equal(pathCase.calls.global, 0);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
+defineTest("keydown fallback F2 / Ctrl+Alt+Z / Ctrl+Alt+X", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+    globalThis.document = { activeElement: null };
+    const zipEntry = { path: "C:\\Users\\toshi\\a.zip", name: "a.zip", ext: ".zip", type: "file" };
+    const base = createKeydownParams({ entries: [zipEntry], selectedPaths: [] });
+    const onKeyDown = createPageKeydownHandler(base.params);
+
+    const f2 = {
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      key: "F2",
+      code: "F2",
+      keyCode: 113,
+      which: 113,
+      getModifierState: () => false,
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(f2);
+    assert.equal(f2._prevented, 1);
+    assert.equal(base.calls.rename, 1);
+
+    const ctrlAltZ = createKeyEvent({ ctrlKey: true, altKey: true, letter: "Z", keyCode: 90 });
+    onKeyDown(ctrlAltZ.event);
+    assert.equal(ctrlAltZ.prevented, 1);
+    assert.equal(base.calls.zipCreate, 1);
+
+    const ctrlAltX = createKeyEvent({ ctrlKey: true, altKey: true, letter: "X", keyCode: 88 });
+    onKeyDown(ctrlAltX.event);
+    assert.equal(ctrlAltX.prevented, 1);
+    assert.equal(base.calls.zipExtract, 1);
+    assert.deepEqual(base.calls.selectedSet.at(-1), [zipEntry.path]);
+    assert.equal(base.calls.anchorSet.at(-1), 0);
+    assert.equal(base.calls.global, 0);
+
+    const pathInputEl = { contains: () => false, tagName: "INPUT" };
+    globalThis.document = { activeElement: pathInputEl };
+    const pathCase = createKeydownParams({ pathInputEl, entries: [zipEntry] });
+    const onKeyDownPath = createPageKeydownHandler(pathCase.params);
+    const f2Path = {
+      ...f2,
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDownPath(f2Path);
+    assert.equal(f2Path._prevented, 0);
+    assert.equal(pathCase.calls.rename, 0);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
+defineTest("keydown does not block main shortcuts when settings flag is stale outside settings modal", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = { __rf_settings_open: true };
+    globalThis.document = { activeElement: null };
+    const base = createKeydownParams();
+    const onKeyDown = createPageKeydownHandler(base.params);
+
+    const ctrlF = createCtrlEvent("F", 70);
+    ctrlF.event.target = { closest: () => null };
+    onKeyDown(ctrlF.event);
+    assert.equal(ctrlF.prevented, 1);
+    assert.equal(base.calls.searchSet.at(-1), true);
+
+    const f2 = {
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      key: "F2",
+      code: "F2",
+      keyCode: 113,
+      which: 113,
+      getModifierState: () => false,
+      target: { closest: () => null },
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(f2);
+    assert.equal(f2._prevented, 1);
+    assert.equal(base.calls.rename, 1);
+
+    const blocked = createCtrlEvent("F", 70);
+    blocked.event.target = { closest: (sel) => (sel === ".settings-modal" ? {} : null) };
+    onKeyDown(blocked.event);
+    assert.equal(blocked.prevented, 0);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
+defineTest("keydown core shortcuts bypass stale overlay flags when target is main view", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+    globalThis.document = { activeElement: null };
+    const zipEntry = { path: "C:\\Users\\toshi\\a.zip", name: "a.zip", ext: ".zip", type: "file" };
+    const base = createKeydownParams({
+      entries: [zipEntry],
+      params: {
+        getRenameOpen: () => true, // stale state (dialog is not actually on target DOM)
+      },
+    });
+    const onKeyDown = createPageKeydownHandler(base.params);
+
+    const ctrlF = createCtrlEvent("F", 70);
+    ctrlF.event.target = { closest: () => null };
+    onKeyDown(ctrlF.event);
+    assert.equal(ctrlF.prevented, 1);
+    assert.equal(base.calls.searchSet.at(-1), true);
+
+    const f2 = {
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      key: "F2",
+      code: "F2",
+      keyCode: 113,
+      which: 113,
+      getModifierState: () => false,
+      target: { closest: () => null },
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(f2);
+    assert.equal(f2._prevented, 1);
+    assert.equal(base.calls.rename, 1);
+
+    const ctrlAltZ = createKeyEvent({ ctrlKey: true, altKey: true, letter: "Z", keyCode: 90 });
+    ctrlAltZ.event.target = { closest: () => null };
+    onKeyDown(ctrlAltZ.event);
+    assert.equal(ctrlAltZ.prevented, 1);
+    assert.equal(base.calls.zipCreate, 1);
+
+    const blockedByOverlayTarget = createCtrlEvent("F", 70);
+    blockedByOverlayTarget.event.target = {
+      closest: (sel) => (sel.includes(".modal") ? {} : null),
+    };
+    onKeyDown(blockedByOverlayTarget.event);
+    // Overlay-originated events should not trigger the main-view fallback.
+    assert.equal(blockedByOverlayTarget.prevented, 0);
   } finally {
     globalThis.document = prevDocument;
     globalThis.window = prevWindow;

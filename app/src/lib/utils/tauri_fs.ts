@@ -85,6 +85,14 @@ export function zipExtract(
   return invoke("zip_extract", { path, destination, password });
 }
 
+export function zipExtractListConflicts(
+  path: string,
+  destination: string,
+  password: string | null
+): Promise<string[]> {
+  return invoke("zip_extract_list_conflicts", { path, destination, password });
+}
+
 export function opCancel(): Promise<void> {
   return invoke("op_cancel");
 }

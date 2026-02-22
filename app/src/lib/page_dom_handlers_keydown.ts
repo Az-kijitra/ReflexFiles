@@ -3,11 +3,42 @@ import type { PageKeydownParams } from "$lib/page_dom_handlers_keydown_types";
 export function createPageKeydownHandler(params: PageKeydownParams) {
   const devKeyDebug = Boolean((import.meta as any)?.env?.DEV);
   return function onKeyDown(event) {
+    try {
     if (typeof window !== "undefined" && (window as any).__rf_settings_open === true) {
-      return;
+      const target = (event as any)?.target;
+      const inSettingsModal =
+        !!target &&
+        typeof target.closest === "function" &&
+        Boolean(target.closest(".settings-modal"));
+      if (inSettingsModal) {
+        return;
+      }
     }
     const activeElement = document.activeElement;
+    const eventTarget = (event as any)?.target;
+    const targetClosest =
+      eventTarget && typeof (eventTarget as any).closest === "function"
+        ? (selector: string) => (eventTarget as any).closest(selector)
+        : () => null;
     const pathInputEl = params.getPathInputEl();
+    const focusSearchInputSoon = () => {
+      const focusNow = () => {
+        const searchInputEl = params.getSearchInputEl?.();
+        searchInputEl?.focus?.({ preventScroll: true });
+      };
+      focusNow();
+      if (typeof queueMicrotask === "function") {
+        queueMicrotask(focusNow);
+      }
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(focusNow);
+      }
+      if (typeof setTimeout === "function") {
+        setTimeout(focusNow, 0);
+        setTimeout(focusNow, 30);
+        setTimeout(focusNow, 120);
+      }
+    };
     const ctrlPressed = event.ctrlKey || event.getModifierState?.("Control");
     const altPressed = event.altKey || event.getModifierState?.("Alt");
     const shiftPressed = event.shiftKey || event.getModifierState?.("Shift");
@@ -34,6 +65,11 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
       !altPressed &&
       !metaPressed &&
       (event.key === "F1" || event.code === "F1" || event.keyCode === 112 || event.which === 112);
+    const isF2 =
+      !ctrlPressed &&
+      !altPressed &&
+      !metaPressed &&
+      (event.key === "F2" || event.code === "F2" || event.keyCode === 113 || event.which === 113);
     const isAltLetter = (letter: string, code: number) =>
       isAltOnly &&
       (event.code === `Key${letter}` ||
@@ -42,9 +78,35 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         event.key === letter.toUpperCase() ||
         event.keyCode === code ||
         event.which === code);
+    const isCtrlAltLetter = (letter: string, code: number) =>
+      ctrlPressed &&
+      altPressed &&
+      !metaPressed &&
+      (event.code === `Key${letter}` ||
+        event.key === letter ||
+        event.key === letter.toLowerCase() ||
+        event.key === letter.toUpperCase() ||
+        event.keyCode === code ||
+        event.which === code);
+    const matchesActionSafe = (actionId: string) => {
+      try {
+        return !!params.matchesAction?.(event, actionId as any);
+      } catch {
+        return false;
+      }
+    };
     const hasOperationTargets =
       params.getSelectedPaths().length > 0 || Boolean(params.getEntries()[params.getFocusedIndex()]);
     const isAnyInputActive = Boolean(activeElement && (activeElement as any).tagName === "INPUT");
+    const searchInputEl = params.getSearchInputEl?.();
+    const isSearchInputActive =
+      Boolean(searchInputEl && activeElement === searchInputEl) ||
+      Boolean(
+        searchInputEl &&
+          activeElement &&
+          typeof (searchInputEl as any).contains === "function" &&
+          (searchInputEl as any).contains(activeElement)
+      );
     const isPathInputActive =
       Boolean(pathInputEl && activeElement === pathInputEl) ||
       Boolean(
@@ -53,6 +115,11 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
           typeof (pathInputEl as any).contains === "function" &&
           (pathInputEl as any).contains(activeElement)
       );
+    const isHiddenSearchInputActive = isSearchInputActive && !params.getSearchActive();
+    const isBlockingTextInputActive = isAnyInputActive && !isHiddenSearchInputActive;
+    const isOverlayDomTarget = Boolean(
+      targetClosest(".modal, .modal-backdrop, .context-menu, .dropdown, .menu-dropdown, .sort-menu")
+    );
     const hasBlockingOverlay =
       params.getPasteConfirmOpen() ||
       params.getDeleteConfirmOpen() ||
@@ -65,6 +132,126 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
       params.getCreateOpen() ||
       params.getPropertiesOpen() ||
       params.getContextMenuOpen();
+
+    if (devKeyDebug) {
+      const isDebugTargetKey =
+        isCtrlLetter("F", 70) ||
+        isF2 ||
+        (!shiftPressed && isCtrlAltLetter("Z", 90)) ||
+        (!shiftPressed && isCtrlAltLetter("X", 88));
+      if (isDebugTargetKey) {
+        const activeTag = (activeElement as any)?.tagName || "-";
+        const targetTag = (eventTarget as any)?.tagName || (eventTarget as any)?.constructor?.name || "-";
+        params.setStatusMessage(
+          `DBG key=${String(event.key)} code=${String(event.code)} active=${activeTag} target=${targetTag} overlay=${hasBlockingOverlay ? 1 : 0} overlayDom=${isOverlayDomTarget ? 1 : 0}`
+        );
+      }
+    }
+
+    // These shortcuts are core file-list operations. Let them bypass stale overlay flags,
+    // but still avoid firing when the event actually originates inside overlay UI.
+    if (!isOverlayDomTarget) {
+      if (isCtrlLetter("F", 70)) {
+        event.preventDefault();
+        params.setSearchActive(true);
+        focusSearchInputSoon();
+        return;
+      }
+      if (matchesActionSafe("search")) {
+        event.preventDefault();
+        params.setSearchActive(true);
+        focusSearchInputSoon();
+        return;
+      }
+      if (isF2) {
+        if (isBlockingTextInputActive) return;
+        event.preventDefault();
+        const entry = params.getEntries()[params.getFocusedIndex()];
+        if (!entry) {
+          params.setStatusMessage(params.t("no_items"));
+          return;
+        }
+        params.openRename(entry);
+        return;
+      }
+      if (matchesActionSafe("rename")) {
+        if (isBlockingTextInputActive) return;
+        event.preventDefault();
+        const entry = params.getEntries()[params.getFocusedIndex()];
+        if (!entry) {
+          params.setStatusMessage(params.t("no_items"));
+          return;
+        }
+        if (typeof params.canRenameFocused === "function" && !params.canRenameFocused()) {
+          params.setStatusMessage(params.t("capability.not_available"));
+          return;
+        }
+        params.openRename(entry);
+        return;
+      }
+      if (!shiftPressed && isCtrlAltLetter("Z", 90)) {
+        if (isBlockingTextInputActive) return;
+        event.preventDefault();
+        const entry = params.getEntries()[params.getFocusedIndex()];
+        if (
+          params.getSelectedPaths().length === 0 &&
+          entry?.path
+        ) {
+          params.setSelected([entry.path]);
+          params.setAnchorIndex(params.getFocusedIndex());
+        }
+        params.openZipCreate();
+        return;
+      }
+      if (matchesActionSafe("zip_create")) {
+        if (isBlockingTextInputActive) return;
+        event.preventDefault();
+        if (
+          params.getSelectedPaths().length > 0 &&
+          typeof params.canZipCreateSelection === "function" &&
+          !params.canZipCreateSelection()
+        ) {
+          params.setStatusMessage(params.t("capability.not_available"));
+          return;
+        }
+        params.openZipCreate();
+        return;
+      }
+      if (!shiftPressed && isCtrlAltLetter("X", 88)) {
+        if (isBlockingTextInputActive) return;
+        event.preventDefault();
+        const entry = params.getEntries()[params.getFocusedIndex()];
+        if (!entry || entry.ext?.toLowerCase() !== ".zip") {
+          params.setStatusMessage(params.t("no_items"));
+          return;
+        }
+        if (params.getSelectedPaths().length !== 1 || params.getSelectedPaths()[0] !== entry.path) {
+          params.setSelected([entry.path]);
+          params.setAnchorIndex(params.getFocusedIndex());
+        }
+        params.openZipExtract();
+        return;
+      }
+      if (matchesActionSafe("zip_extract")) {
+        if (isBlockingTextInputActive) return;
+        event.preventDefault();
+        const entry = params.getEntries()[params.getFocusedIndex()];
+        if (!entry || entry.ext?.toLowerCase() !== ".zip") {
+          params.setStatusMessage(params.t("no_items"));
+          return;
+        }
+        if (typeof params.canZipExtractFocused === "function" && !params.canZipExtractFocused()) {
+          params.setStatusMessage(params.t("capability.not_available"));
+          return;
+        }
+        if (params.getSelectedPaths().length !== 1 || params.getSelectedPaths()[0] !== entry.path) {
+          params.setSelected([entry.path]);
+          params.setAnchorIndex(params.getFocusedIndex());
+        }
+        params.openZipExtract();
+        return;
+      }
+    }
 
     // WebView/IME differences occasionally break keymap matching for these basic shortcuts.
     // Keep a direct fallback at the top-level keydown entry.
@@ -129,18 +316,13 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         params.openSortMenu();
         return;
       }
-      if (isCtrlLetter("F", 70)) {
-        if (isPathInputActive) return;
-        event.preventDefault();
-        params.setSearchActive(true);
-        return;
-      }
       if (isCtrlLetter("N", 78)) {
+        if (isAnyInputActive && !isPathInputActive) return;
         event.preventDefault();
         if (devKeyDebug) {
-          params.setStatusMessage("DBG Ctrl+N");
+          params.setStatusMessage(shiftPressed ? "DBG Ctrl+Shift+N" : "DBG Ctrl+N");
         }
-        params.openCreate("file");
+        params.openCreate(shiftPressed ? "folder" : "file");
         return;
       }
       if (isCtrlLetter("C", 67)) {
@@ -304,6 +486,17 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
       getTargetEntry: params.getTargetEntry,
     });
     if (handled) return;
+    } catch (err) {
+      try {
+        const message = err instanceof Error ? err.message : String(err);
+        params.setStatusMessage(`DBG keydown error: ${message}`, 5000);
+      } catch {
+        // ignore
+      }
+      if (devKeyDebug && typeof console !== "undefined") {
+        console.error("[rf] keydown handler error", err);
+      }
+    }
   };
 }
 

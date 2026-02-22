@@ -79,6 +79,7 @@ dependencies = [
  "toml 0.8.2",
  "trash",
  "url",
+ "webview2-com",
  "windows 0.61.3",
  "zip",
 ]

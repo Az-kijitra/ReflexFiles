@@ -201,15 +201,28 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       return provider === "local" || !String(entry?.path || "").startsWith("gdrive://");
     });
   const canDuplicateTargets = () => canCopyTargets() && areOperationEntriesLocal();
+  const isLocalLikeEntry = (entry: any) => {
+    const provider = String(entry?.ref?.provider || "").toLowerCase();
+    const path = String(entry?.path || "");
+    return provider === "local" || (!provider && !path.startsWith("gdrive://")) || !path.startsWith("gdrive://");
+  };
   const canPrefixDateTargets = () => allEntriesSupport(getOperationEntries(), "can_rename");
   const canCutTargets = () => allEntriesSupport(getOperationEntries(), "can_move");
   const canRenameFocused = () => {
     const focused = getFocusedEntry();
-    return !!focused && supportsCapability(focused, "can_rename");
+    if (!focused) return false;
+    if (supportsCapability(focused, "can_rename")) return true;
+    // Local items may temporarily carry stale/missing capability flags; let the rename action validate later.
+    return isLocalLikeEntry(focused);
   };
   const canDeleteSelection = () => allEntriesSupport(getSelectedEntries(), "can_delete");
   const canOpenPropertiesSelection = () => hasSelection();
-  const canZipCreateSelection = () => allEntriesSupport(getSelectedEntries(), "can_archive_create");
+  const canZipCreateSelection = () => {
+    const selectedEntries = getSelectedEntries();
+    if (selectedEntries.length === 0) return false;
+    if (allEntriesSupport(selectedEntries, "can_archive_create")) return true;
+    return selectedEntries.every((entry) => isLocalLikeEntry(entry));
+  };
   const canZipExtractSelection = () => {
     const selectedEntries = getSelectedEntries();
     if (selectedEntries.length !== 1) return false;
@@ -219,7 +232,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const canZipExtractFocused = () => {
     const focused = getFocusedEntry();
     if (!focused || focused.ext?.toLowerCase() !== ".zip") return false;
-    return supportsCapability(focused, "can_archive_extract");
+    if (supportsCapability(focused, "can_archive_extract")) return true;
+    return isLocalLikeEntry(focused);
   };
 
   const canDeleteTargets = () => {

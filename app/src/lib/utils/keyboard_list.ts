@@ -312,6 +312,18 @@ export function handleListKey(event, ctx) {
     ctx.openCreate("file");
     return true;
   }
+  if (ctx.matchesAction(event, "new_folder")) {
+    event.preventDefault();
+    if (
+      typeof ctx.canCreateCurrentPath === "function" &&
+      !ctx.canCreateCurrentPath()
+    ) {
+      reportCapabilityUnavailable();
+      return true;
+    }
+    ctx.openCreate("folder");
+    return true;
+  }
   if (ctx.matchesAction(event, "go_parent")) {
     event.preventDefault();
     if (!ctx.currentPath) return true;

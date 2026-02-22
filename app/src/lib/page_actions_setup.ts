@@ -36,6 +36,7 @@ import {
   fsRename,
   zipCreate,
   zipExtract,
+  zipExtractListConflicts,
 } from "./utils/tauri_fs";
 import {
   clearSelectionState,
@@ -99,6 +100,7 @@ export function setupPageActionsBundle(params) {
         clipboardGetFiles,
         zipCreate,
         zipExtract,
+        zipExtractListConflicts,
         fsDeleteWithUndo,
         fsRename,
         fsCreate,
