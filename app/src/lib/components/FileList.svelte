@@ -107,18 +107,23 @@
     try {
       event.dataTransfer?.setData("text/plain", decision.acceptedPaths.join("\r\n"));
       if (event.dataTransfer) {
-        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.effectAllowed = "copyMove";
       }
     } catch {
       // Best-effort only; Explorer transfer depends on native shell integration.
     }
+    // True file drag-out to Explorer cannot be completed reliably from the DOM dragstart path.
+    // Keep phase2 as a safe probe + clipboard handoff until a dedicated native drag source path exists.
     clipboardSetFiles(decision.acceptedPaths, false, "copy")
       .then(() => {
-        emitDndExperimentStatus(`D&D export probe ready (experimental): ${decision.acceptedPaths.length} item(s)`);
+        emitDndExperimentStatus(
+          `D&D export probe ready (clipboard handoff only): ${decision.acceptedPaths.length} item(s)`,
+          4000
+        );
       })
       .catch((err) => {
         const msg = typeof err === "string" ? err : err?.message || "clipboard_set_files failed";
-        emitDndExperimentStatus(`D&D export probe failed (${msg})`, 4000);
+        emitDndExperimentStatus(`D&D export probe failed (${msg})`, 5000);
       });
   }
 </script>

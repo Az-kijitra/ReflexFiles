@@ -78,6 +78,8 @@ pub fn run() {
             crate::config_cmds::set_window_theme,
             crate::clipboard_cmds::clipboard_set_files,
             crate::clipboard_cmds::clipboard_get_files,
+            crate::dragdrop_cmds::shell_start_file_drag,
+            crate::dragdrop_cmds::shell_start_file_drag_debug,
             crate::external_apps_cmds::external_open_with_app,
             crate::external_apps_cmds::external_open_explorer,
             crate::external_apps_cmds::external_open_cmd,

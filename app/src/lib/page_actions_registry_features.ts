@@ -10,6 +10,10 @@ import {
   buildSelectionFeature,
   buildUndoFeature,
 } from "$lib/page_actions_registry_feature_builders";
+import {
+  evaluateOutboundAppDragCandidate,
+  readDragDropExperimentPolicyFromStorage,
+} from "$lib/utils/drag_drop_experiment";
 import type { PageActionsRegistryContext } from "$lib/page_actions_registry_features_types";
 
 export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
@@ -114,6 +118,74 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     pushUndoEntry,
   });
 
+  const startExplorerDragExperimental = async () => {
+    const entries = ctx.getEntries();
+    const selectedPaths = ctx.getSelectedPaths();
+    const focusedIndex = ctx.getFocusedIndex();
+    const selectedEntries =
+      Array.isArray(selectedPaths) && selectedPaths.length > 0
+        ? selectedPaths
+            .map((path) => entries.find((entry) => entry?.path === path))
+            .filter((entry) => Boolean(entry))
+        : [];
+    const operationEntries =
+      selectedEntries.length > 0
+        ? selectedEntries
+        : focusedIndex >= 0 && focusedIndex < entries.length && entries[focusedIndex]
+          ? [entries[focusedIndex]]
+          : [];
+    const policy =
+      typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+        ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
+        : null;
+    const decision = evaluateOutboundAppDragCandidate({
+      policy,
+      selectedEntries: operationEntries.map((entry: any) => ({
+        path: String(entry?.path || ""),
+        provider: entry?.provider ?? entry?.ref?.provider ?? "local",
+      })),
+    });
+    const dndExportReasonLabel = (reason: string) => {
+      switch (String(reason || "")) {
+        case "disabled":
+        case "phase_not_supported":
+          return ctx.t("dnd.export_experimental_disabled");
+        case "no_items":
+          return ctx.t("status.no_selection");
+        case "source_not_local":
+          return ctx.t("dnd.export_local_only");
+        case "mixed_or_invalid_sources":
+          return ctx.t("dnd.export_mixed_selection_not_supported");
+        default:
+          return ctx.t("capability.not_available");
+      }
+    };
+    if (!decision.allowed) {
+      setStatusMessage(
+        ctx.t("status.dnd_export_blocked", { reason: dndExportReasonLabel(decision.reason) }),
+        3500,
+      );
+      return;
+    }
+    setStatusMessage(
+      ctx.t("status.dnd_export_native_ready", { count: decision.acceptedPaths.length }),
+      6000,
+    );
+    try {
+      const result = await ctx.invoke("shell_start_file_drag_debug", {
+        paths: decision.acceptedPaths,
+      });
+      const resultText = String(result || "");
+      if (resultText === "none") {
+        setStatusMessage(ctx.t("status.dnd_export_native_canceled"), 3000);
+      } else {
+        setStatusMessage(ctx.t("status.dnd_export_native_finished", { result: resultText }), 4000);
+      }
+    } catch (err) {
+      showError(err);
+    }
+  };
+
   const { zipActions, contextMenuActions } = buildContextMenuFeature(ctx, {
     openCreate,
     openEntry,
@@ -135,6 +207,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     runExternalApp,
     getExternalApps,
     syncGdriveWorkcopyForEntry,
+    startExplorerDragExperimental,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {

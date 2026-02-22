@@ -60,6 +60,19 @@ import { getPasteConflicts } from "$lib/utils/file_ops";
  * @param {(key: string, vars?: Record<string, string | number>) => string} ctx.t
  */
 export async function setupPageLifecycle(ctx) {
+  if (typeof window !== "undefined" && import.meta.env?.DEV) {
+    const debugWindow = window as Window & {
+      __rf_debug?: {
+        shellStartFileDrag?: (paths: string[]) => Promise<string>;
+        shellStartFileDragDebug?: (paths: string[]) => Promise<string>;
+      };
+    };
+    const debugApi = debugWindow.__rf_debug || {};
+    debugApi.shellStartFileDrag = (paths) => ctx.invoke("shell_start_file_drag", { paths });
+    debugApi.shellStartFileDragDebug = (paths) =>
+      ctx.invoke("shell_start_file_drag_debug", { paths });
+    debugWindow.__rf_debug = debugApi;
+  }
   const home = await ctx.homeDir();
   let config = null;
   try {
