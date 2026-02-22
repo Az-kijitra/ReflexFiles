@@ -1137,12 +1137,15 @@ try {
     }
   }
   await setInputValue(extractDestination, extractDir);
-  const overwriteCheckbox = await driver.findElement(
+  const overwriteCheckboxes = await driver.findElements(
     By.css('.modal-inline input[type="checkbox"]')
   );
-  const checked = await overwriteCheckbox.isSelected();
-  if (!checked) {
-    await overwriteCheckbox.click();
+  if (overwriteCheckboxes.length > 0) {
+    const overwriteCheckbox = overwriteCheckboxes[0];
+    const checked = await overwriteCheckbox.isSelected();
+    if (!checked) {
+      await overwriteCheckbox.click();
+    }
   }
   const extractButton = await withTimeout(
     driver.wait(
@@ -1504,11 +1507,15 @@ try {
     const pathInput = await getPathInput();
     await pathInput.click();
     await triggerShortcut({ key: 'f', code: 'KeyF', ctrl: true });
-    await driver.sleep(200);
-    const searchOpen = await isSearchBarOpen();
-    if (searchOpen) {
-      throw new Error('path Ctrl+F unexpectedly opened search');
-    }
+    await waitForSearchBarOpen(true, 'path Ctrl+F should open search');
+    await waitForFocusKind('search', 'path Ctrl+F should focus search');
+    const searchInput2 = await withTimeout(
+      driver.wait(until.elementLocated(By.css('.search-bar input')), timeoutMs),
+      timeoutMs,
+      'wait search input after path Ctrl+F'
+    );
+    await searchInput2.sendKeys(Key.ESCAPE);
+    await waitForSearchBarOpen(false, 'close search after path Ctrl+F');
   };
 
   console.log('[smoke] verify keyboard focus boundary (PATH Ctrl+A/Delete / list Ctrl+A)...');
