@@ -11,7 +11,6 @@ export function buildViewPropsInputsActions(params) {
     closeMenu: actions.menu.closeMenu,
     loadDir: actions.navigation.loadDir,
     focusList: actions.navigation.focusList,
-    focusTreeTop: actions.navigation.focusTreeTop,
     handlePathTabCompletion: actions.navigation.handlePathTabCompletion,
     handlePathCompletionSeparator: actions.navigation.handlePathCompletionSeparator,
     handlePathCompletionInputChange: actions.navigation.handlePathCompletionInputChange,

@@ -1,6 +1,7 @@
 import type { PageKeydownParams } from "$lib/page_dom_handlers_keydown_types";
 
 export function createPageKeydownHandler(params: PageKeydownParams) {
+  const devKeyDebug = Boolean((import.meta as any)?.env?.DEV);
   return function onKeyDown(event) {
     if (typeof window !== "undefined" && (window as any).__rf_settings_open === true) {
       return;
@@ -9,8 +10,10 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
     const pathInputEl = params.getPathInputEl();
     const ctrlPressed = event.ctrlKey || event.getModifierState?.("Control");
     const altPressed = event.altKey || event.getModifierState?.("Alt");
+    const shiftPressed = event.shiftKey || event.getModifierState?.("Shift");
     const metaPressed = event.metaKey || event.getModifierState?.("Meta");
     const isCtrlOnly = ctrlPressed && !altPressed && !metaPressed;
+    const isAltOnly = altPressed && !ctrlPressed && !metaPressed;
     const isCtrlLetter = (letter: string, code: number) =>
       isCtrlOnly &&
       (event.code === `Key${letter}` ||
@@ -19,8 +22,29 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         event.key === letter.toUpperCase() ||
         event.keyCode === code ||
         event.which === code);
+    const isCtrlComma =
+      isCtrlOnly &&
+      (event.code === "Comma" ||
+        event.key === "," ||
+        event.key === "、" ||
+        event.keyCode === 188 ||
+        event.which === 188);
+    const isF1 =
+      !ctrlPressed &&
+      !altPressed &&
+      !metaPressed &&
+      (event.key === "F1" || event.code === "F1" || event.keyCode === 112 || event.which === 112);
+    const isAltLetter = (letter: string, code: number) =>
+      isAltOnly &&
+      (event.code === `Key${letter}` ||
+        event.key === letter ||
+        event.key === letter.toLowerCase() ||
+        event.key === letter.toUpperCase() ||
+        event.keyCode === code ||
+        event.which === code);
     const hasOperationTargets =
       params.getSelectedPaths().length > 0 || Boolean(params.getEntries()[params.getFocusedIndex()]);
+    const isAnyInputActive = Boolean(activeElement && (activeElement as any).tagName === "INPUT");
     const isPathInputActive =
       Boolean(pathInputEl && activeElement === pathInputEl) ||
       Boolean(
@@ -44,12 +68,46 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
 
     // WebView/IME differences occasionally break keymap matching for these basic shortcuts.
     // Keep a direct fallback at the top-level keydown entry.
-    // Ctrl+J must be captured here as well to avoid WebView2 default downloads popup.
     if (!hasBlockingOverlay) {
-      if (isCtrlLetter("J", 74)) {
+      if (isCtrlComma) {
+        event.preventDefault();
+        params.openConfigFile();
+        return;
+      }
+      if (isF1) {
+        event.preventDefault();
+        params.openKeymapHelp();
+        return;
+      }
+      if (isCtrlLetter("D", 68)) {
+        if (shiftPressed) {
+          if (isAnyInputActive && !isPathInputActive) return;
+          event.preventDefault();
+          params.openJumpUrlModal();
+          return;
+        }
+        if (isAnyInputActive) return;
+        event.preventDefault();
+        params.addJumpCurrent();
+        return;
+      }
+      if (!shiftPressed && isCtrlLetter("H", 72)) {
+        if (isAnyInputActive && !isPathInputActive) return;
+        event.preventDefault();
+        const pathHistory = params.getPathHistory();
+        if (!pathHistory || pathHistory.length === 0) {
+          params.setStatusMessage(params.t("no_items"));
+          return;
+        }
+        params.setDropdownMode("history");
+        params.setDropdownOpen(true);
+        return;
+      }
+      if (shiftPressed && isCtrlLetter("O", 79)) {
+        if (isAnyInputActive && !isPathInputActive) return;
         event.preventDefault();
         const jumpList = params.getJumpList();
-        if (!Array.isArray(jumpList) || jumpList.length === 0) {
+        if (!jumpList || jumpList.length === 0) {
           params.setStatusMessage(params.t("no_items"));
           return;
         }
@@ -57,9 +115,29 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         params.setDropdownOpen(true);
         return;
       }
+      if (!shiftPressed && isAltLetter("D", 68)) {
+        event.preventDefault();
+        params.setSearchActive(false);
+        params.setDropdownOpen(false);
+        params.setPathInput(params.getCurrentPath());
+        params.focusPathInput();
+        return;
+      }
+      if (!shiftPressed && isAltLetter("S", 83)) {
+        if (isAnyInputActive) return;
+        event.preventDefault();
+        params.openSortMenu();
+        return;
+      }
+      if (isCtrlLetter("F", 70)) {
+        if (isPathInputActive) return;
+        event.preventDefault();
+        params.setSearchActive(true);
+        return;
+      }
       if (isCtrlLetter("N", 78)) {
         event.preventDefault();
-        if (import.meta.env.DEV) {
+        if (devKeyDebug) {
           params.setStatusMessage("DBG Ctrl+N");
         }
         params.openCreate("file");
@@ -72,7 +150,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
           params.setStatusMessage(params.t("status.no_selection"));
           return;
         }
-        if (import.meta.env.DEV) {
+        if (devKeyDebug) {
           params.setStatusMessage("DBG Ctrl+C");
         }
         params.copySelected();
@@ -85,7 +163,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
           params.setStatusMessage(params.t("status.no_selection"));
           return;
         }
-        if (import.meta.env.DEV) {
+        if (devKeyDebug) {
           params.setStatusMessage("DBG Ctrl+X");
         }
         params.cutSelected();
@@ -94,7 +172,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
       if (isCtrlLetter("V", 86)) {
         if (isPathInputActive) return;
         event.preventDefault();
-        if (import.meta.env.DEV) {
+        if (devKeyDebug) {
           params.setStatusMessage("DBG Ctrl+V");
         }
         params.pasteItems();

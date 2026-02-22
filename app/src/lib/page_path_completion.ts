@@ -218,10 +218,19 @@ export function createPathCompletionHelpers(params) {
     return completionSession.matches[idx];
   }
 
-  function advanceCompletionSession() {
+  /**
+   * @param {1 | -1} direction
+   */
+  function advanceCompletionSession(direction) {
     if (!completionSession || !completionSession.matches.length) return false;
     const total = completionSession.matches.length;
-    const next = completionSession.index < 0 ? 0 : (completionSession.index + 1) % total;
+    const step = direction === -1 ? -1 : 1;
+    const next =
+      completionSession.index < 0
+        ? step === -1
+          ? total - 1
+          : 0
+        : (completionSession.index + step + total) % total;
     completionSession.index = next;
     const nextEntry = completionSession.matches[next];
     applyPathInput(nextEntry.path);
@@ -277,8 +286,13 @@ export function createPathCompletionHelpers(params) {
     }
   }
 
-  async function handlePathTabCompletion(pathInput) {
-    if (advanceCompletionSession()) return;
+  /**
+   * @param {string} pathInput
+   * @param {1 | -1} [direction]
+   */
+  async function handlePathTabCompletion(pathInput, direction = 1) {
+    const normalizedDirection = direction === -1 ? -1 : 1;
+    if (advanceCompletionSession(normalizedDirection)) return;
     const rawInput = String(pathInput || "");
     const trimmed = rawInput.trim();
     if (isGdrivePath(trimmed) || (!isAbsolutePath(trimmed) && isGdrivePath(getCurrentPath()))) {
@@ -308,7 +322,8 @@ export function createPathCompletionHelpers(params) {
         applyPathInput(matches[0].path);
         return;
       }
-      startCompletionSession(rawInput, context, matches, { selectFirst: true });
+      startCompletionSession(rawInput, context, matches, { selectFirst: false });
+      advanceCompletionSession(normalizedDirection);
     } catch (err) {
       clearCompletionSession();
       getShowError()(err);
@@ -366,8 +381,9 @@ export function createPathCompletionHelpers(params) {
   }
 
   function clearPathCompletionPreview() {
-    if (!completionSession) return;
+    if (!completionSession) return false;
     clearCompletionSession();
+    return true;
   }
 
   return {

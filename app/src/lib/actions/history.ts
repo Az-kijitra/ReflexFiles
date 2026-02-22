@@ -8,13 +8,6 @@ import { STATUS_DEFAULT_MS } from "$lib/ui_durations";
 export function createHistoryActions(ctx, helpers) {
   const { setStatusMessage } = helpers;
 
-  async function readClipboardText() {
-    if (navigator?.clipboard?.readText) {
-      return await navigator.clipboard.readText();
-    }
-    return null;
-  }
-
   async function openJumpUrlModalFocus() {
     await ctx.tick();
     const inputEl = ctx.getJumpUrlInputEl();
@@ -47,14 +40,6 @@ export function createHistoryActions(ctx, helpers) {
     ctx.setJumpUrlOpen(true);
     ctx.setJumpUrlError("");
     ctx.setJumpUrlValue("");
-    try {
-      const text = await readClipboardText();
-      if (text && ctx.isLikelyUrl(text)) {
-        ctx.setJumpUrlValue(ctx.normalizeUrl(text));
-      }
-    } catch {
-      // ignore clipboard errors
-    }
     await openJumpUrlModalFocus();
   }
 

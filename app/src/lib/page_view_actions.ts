@@ -6,7 +6,6 @@
  *   closeMenu: () => void;
  *   loadDir: (path: string) => Promise<void>;
  *   focusList: () => void;
- *   focusTreeTop: () => void;
  *   handlePathTabCompletion: () => Promise<void>;
  *   handlePathCompletionSeparator: (pathInput: string, key: string) => Promise<boolean>;
  *   handlePathCompletionInputChange: (pathInput: string) => void;
@@ -41,7 +40,6 @@ export function buildViewActions(params) {
     closeMenu: params.closeMenu,
     loadDir: params.loadDir,
     focusList: params.focusList,
-    focusTreeTop: params.focusTreeTop,
     handlePathTabCompletion: params.handlePathTabCompletion,
     handlePathCompletionSeparator: params.handlePathCompletionSeparator,
     handlePathCompletionInputChange: params.handlePathCompletionInputChange,

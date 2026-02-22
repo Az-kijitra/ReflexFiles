@@ -10,6 +10,10 @@ export function normalizeKeyPart(part) {
   if (lower === "del") return "Delete";
   if (lower === "pgup") return "PageUp";
   if (lower === "pgdn") return "PageDown";
+  if (lower === "up") return "ArrowUp";
+  if (lower === "down") return "ArrowDown";
+  if (lower === "left") return "ArrowLeft";
+  if (lower === "right") return "ArrowRight";
   if (part === "," || part === "、" || part === "，" || lower === "comma") return ",";
   if (part === "." || part === "。" || part === "．" || lower === "period") return ".";
   if (part === " " || lower === "space" || lower === "spacebar") return "Space";
