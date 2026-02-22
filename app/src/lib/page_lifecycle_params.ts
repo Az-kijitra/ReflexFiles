@@ -12,6 +12,8 @@ export function buildLifecycleParams(params) {
     showError: params.showError,
     loadDir: params.loadDir,
     getCurrentPath: params.getCurrentPath,
+    getEntries: params.getEntries,
+    getCurrentPathCapabilities: params.getCurrentPathCapabilities,
     getWatchRefreshTimer: params.getWatchRefreshTimer,
     setWatchRefreshTimer: params.setWatchRefreshTimer,
     setDirStatsTimeoutMs: params.setDirStatsTimeoutMs,
@@ -44,6 +46,12 @@ export function buildLifecycleParams(params) {
     onClick: params.onClick,
     recomputeStatusItems: params.recomputeStatusItems,
     setUpdateWindowBounds: params.setUpdateWindowBounds,
+    setPasteConfirmOpen: params.setPasteConfirmOpen,
+    setPastePendingPaths: params.setPastePendingPaths,
+    setPasteConflicts: params.setPasteConflicts,
+    setPasteMode: params.setPasteMode,
+    setPasteApplyAll: params.setPasteApplyAll,
+    setPasteConfirmIndex: params.setPasteConfirmIndex,
     t: params.t,
   };
 }

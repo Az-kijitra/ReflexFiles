@@ -16,7 +16,7 @@ import { buildPageMountStateFromVars } from "./page_mount_state_from_vars";
 export function buildPageMountStateFromState(params) {
   const { state } = params;
 
-  return buildPageMountStateFromVars({
+  const mountedState = buildPageMountStateFromVars({
     get: {
       currentPath: () => state.currentPath,
       watchRefreshTimer: params.get.watchRefreshTimer,
@@ -93,4 +93,29 @@ export function buildPageMountStateFromState(params) {
       updateWindowBounds: params.set.updateWindowBounds,
     },
   });
+
+  // Extra state accessors needed by page lifecycle experimental features (e.g. D&D phase1)
+  return {
+    ...mountedState,
+    getEntries: () => state.entries,
+    getCurrentPathCapabilities: () => state.currentPathCapabilities,
+    setPasteConfirmOpen: (value) => {
+      state.pasteConfirmOpen = value;
+    },
+    setPastePendingPaths: (value) => {
+      state.pastePendingPaths = value;
+    },
+    setPasteConflicts: (value) => {
+      state.pasteConflicts = value;
+    },
+    setPasteMode: (value) => {
+      state.pasteMode = value;
+    },
+    setPasteApplyAll: (value) => {
+      state.pasteApplyAll = value;
+    },
+    setPasteConfirmIndex: (value) => {
+      state.pasteConfirmIndex = value;
+    },
+  };
 }

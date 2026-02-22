@@ -12,6 +12,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "test:keys": "node --experimental-strip-types scripts/tests/run-key-tests.mjs",
+    "test:dnd": "node --experimental-strip-types scripts/tests/run-dnd-foundation-tests.mjs",
     "audit:npm": "npm audit --audit-level=high",
     "audit:npm:prod": "npm audit --omit=dev --audit-level=high",
     "audit:cargo": "cargo audit --file src-tauri/Cargo.lock",
