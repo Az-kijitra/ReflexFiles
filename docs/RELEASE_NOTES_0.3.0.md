@@ -44,3 +44,39 @@ This release builds on v0.2.0 (viewer integration) and focuses on Google Drive s
 ## Build Artifact (NSIS)
 - File: `TBD during release build`
 - SHA256: `TBD during release build`
+
+## RELEASE_NOTE_BODY
+```md
+ReflexFiles v0.3.0 focuses on Google Drive staged support, keyboard usability recovery/improvements, and release-process hardening.
+
+### Highlights
+- Google Drive (staged implementation)
+  - User-owned Google Cloud / OAuth setup flow
+  - Real/Stub backend mode distinction
+  - `gdrive://` listing and supported file viewing
+  - Local workcopy based external-open flow
+  - Manual write-back to Google Drive (with conflict-aware guidance)
+- Keyboard / usability improvements
+  - `Ctrl+N` = New file, `Ctrl+Shift+N` = New folder
+  - Restored/improved shortcuts: `Ctrl+F`, `F2`, `Ctrl+Alt+Z`, `Ctrl+Alt+X`
+  - Improved PATH completion cycling/confirmation behavior
+  - Better keyboard-first ZIP extract UX (confirm only when conflicts exist)
+- Quality / process
+  - Added lightweight keyboard regression tests (`npm run test:keys`)
+  - CI `quality` now includes keyboard regression checks
+  - `e2e:full` kept as manual regression (not a PR-required blocker)
+
+### Documentation / Release Policy
+- Public docs (`docs/`) and internal work records (`development_documents/`) are separated.
+- ADRs / threat models / setup notes / generated keyboard behavior reference are internal (release-excluded).
+- User-facing Google Drive setup and usage guidance is now included in the user manuals (EN/JA).
+
+### Security / Credential Handling
+- Public repository remains credential-free (placeholders only for OAuth examples).
+- Google Drive client secret / tokens are local-only and excluded from public docs.
+- Local npm cache (`app/.npm-cache`) is excluded from version control.
+
+### Build Artifact (NSIS)
+- File: `TBD`
+- SHA256: `TBD`
+```
