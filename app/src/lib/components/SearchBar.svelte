@@ -1,4 +1,6 @@
 <script>
+  import { onMount, tick } from "svelte";
+
   /** @type {HTMLInputElement | null} */
   export let searchInputEl = null;
   export let t;
@@ -8,6 +10,34 @@
   export let onSearchKeydown;
   export let applySearch;
   export let clearSearch;
+
+  /** @type {ReturnType<typeof setTimeout>[]} */
+  let focusTimers = [];
+
+  function focusSearchInput() {
+    searchInputEl?.focus?.({ preventScroll: true });
+  }
+
+  onMount(async () => {
+    focusSearchInput();
+    await tick();
+    focusSearchInput();
+    if (typeof queueMicrotask === "function") {
+      queueMicrotask(focusSearchInput);
+    }
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(focusSearchInput);
+    }
+    focusTimers = [
+      setTimeout(focusSearchInput, 0),
+      setTimeout(focusSearchInput, 30),
+      setTimeout(focusSearchInput, 120),
+    ];
+    return () => {
+      for (const timer of focusTimers) clearTimeout(timer);
+      focusTimers = [];
+    };
+  });
 </script>
 
 <form

@@ -20,5 +20,11 @@ app/src-tauri/resources/docs/
 msedgedriver.exe
 docs/msedgedriver.exe
 
+# Local credential/env files (never publish secrets)
+.env
+.env.*
+app/.env
+app/.env.*
+
 # Generated local large-file test data
 testdata/generated/

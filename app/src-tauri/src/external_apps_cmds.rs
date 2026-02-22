@@ -1,8 +1,8 @@
 use crate::external_apps::{
     external_list_terminal_profiles_impl, external_open_cmd_impl, external_open_custom_impl,
     external_open_explorer_impl, external_open_git_client_impl, external_open_terminal_kind_impl,
-    external_open_terminal_profile_impl,
-    external_open_vscode_impl, external_open_with_app_impl, TerminalProfileInfo,
+    external_open_terminal_profile_impl, external_open_vscode_impl, external_open_with_app_impl,
+    TerminalProfileInfo,
 };
 
 #[tauri::command]

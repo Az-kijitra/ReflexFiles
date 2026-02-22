@@ -19,6 +19,7 @@ export function buildPageActionsStateVarsFromState(params) {
     pathHistory: state.pathHistory,
     searchQuery: state.searchQuery,
     searchHistory: state.searchHistory,
+    ui_language: state.ui_language,
     externalAppAssociations: state.externalAppAssociations,
     externalApps: state.externalApps,
     contextMenuOpen: state.contextMenuOpen,

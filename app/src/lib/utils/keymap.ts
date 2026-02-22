@@ -10,6 +10,10 @@ export function normalizeKeyPart(part) {
   if (lower === "del") return "Delete";
   if (lower === "pgup") return "PageUp";
   if (lower === "pgdn") return "PageDown";
+  if (lower === "up") return "ArrowUp";
+  if (lower === "down") return "ArrowDown";
+  if (lower === "left") return "ArrowLeft";
+  if (lower === "right") return "ArrowRight";
   if (part === "," || part === "、" || part === "，" || lower === "comma") return ",";
   if (part === "." || part === "。" || part === "．" || lower === "period") return ".";
   if (part === " " || lower === "space" || lower === "spacebar") return "Space";
@@ -38,15 +42,28 @@ export function normalizeKeyString(value) {
 
 /** @param {KeyboardEvent} event */
 export function eventToKeyString(event) {
+  const ctrlPressed = event.ctrlKey || event.getModifierState?.("Control");
+  const altPressed = event.altKey || event.getModifierState?.("Alt");
+  const shiftPressed = event.shiftKey || event.getModifierState?.("Shift");
+  const metaPressed = event.metaKey || event.getModifierState?.("Meta");
   const mods = [];
-  if (event.ctrlKey) mods.push("Ctrl");
-  if (event.altKey) mods.push("Alt");
-  if (event.shiftKey) mods.push("Shift");
-  if (event.metaKey) mods.push("Meta");
+  if (ctrlPressed) mods.push("Ctrl");
+  if (altPressed) mods.push("Alt");
+  if (shiftPressed) mods.push("Shift");
+  if (metaPressed) mods.push("Meta");
+
+  const hasShortcutModifier = ctrlPressed || altPressed || metaPressed;
   let key = event.key === " " ? "Space" : event.key;
   if (event.code === "Space") key = "Space";
   if (event.code === "Comma") key = ",";
   if (event.code === "Period") key = ".";
+  if (hasShortcutModifier) {
+    if (/^Key[A-Z]$/.test(event.code)) {
+      key = event.code.slice(3);
+    } else if (/^Digit[0-9]$/.test(event.code)) {
+      key = event.code.slice(5);
+    }
+  }
   const normalizedKey = normalizeKeyPart(key);
   return [...mods, normalizedKey].join("+");
 }

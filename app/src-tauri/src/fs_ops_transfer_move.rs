@@ -38,7 +38,12 @@ pub fn fs_move(
         let resolved = match resolve_legacy_path_for(item, ProviderCapability::Move) {
             Ok(path) => path,
             Err(err) => {
-                crate::log_error("move", item, &destination, &format!("code={}; {}", err.code(), err));
+                crate::log_error(
+                    "move",
+                    item,
+                    &destination,
+                    &format!("code={}; {}", err.code(), err),
+                );
                 return Err(format!("code={}; {}", err.code(), err));
             }
         };
@@ -121,7 +126,12 @@ pub fn fs_move(
             Ok(_) => Ok(()),
             Err(err) => {
                 if let Err(copy_err) = copy_recursively(&from, &to) {
-                    crate::log_error("move", &raw_item, &to.to_string_lossy(), &copy_err.to_string());
+                    crate::log_error(
+                        "move",
+                        &raw_item,
+                        &to.to_string_lossy(),
+                        &copy_err.to_string(),
+                    );
                     Err(copy_err)
                 } else if let Err(remove_err) = remove_recursively(&from) {
                     crate::log_error(

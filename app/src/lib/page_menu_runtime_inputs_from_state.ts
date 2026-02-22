@@ -15,9 +15,15 @@ export function buildMenuRuntimeInputsFromState(params) {
     state: params.state,
     pageActions: params.pageActions,
     openSearch: async () => {
+      const focusSearch = () => {
+        params.overlayRefs.searchInputEl?.focus?.({ preventScroll: true });
+      };
       params.state.searchActive = true;
+      focusSearch();
       await params.tick();
-      params.overlayRefs.searchInputEl?.focus();
+      focusSearch();
+      if (typeof queueMicrotask === "function") queueMicrotask(focusSearch);
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(focusSearch);
     },
     openSortMenu: params.actions.openSortMenu,
     toggleHidden: params.actions.toggleHidden,

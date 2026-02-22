@@ -252,6 +252,8 @@ try {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       try {
+        const list = await getListElement();
+        await list.click();
         const focused = await driver.executeScript(() => {
           const list = document.querySelector(".list");
           if (!list) return false;
@@ -344,17 +346,29 @@ try {
     throw new Error(`wait for visible name timeout: ${name}`);
   };
 
-  const waitForNameGone = async (name) => {
-    return waitForNameGoneWithin(name, timeoutMs);
-  };
-
   const waitForNameGoneWithin = async (name, maxWaitMs) => {
     const candidates = displayCandidates(name);
     const deadline = Date.now() + maxWaitMs;
+    const filePath = resolve(workDir, name);
+    let refreshed = false;
     while (Date.now() < deadline) {
       try {
         const visible = await collectVisibleNames();
-        if (!visible.some((v) => candidates.includes(v))) {
+        const goneFromList = !visible.some((v) => candidates.includes(v));
+        if (goneFromList) {
+          return;
+        }
+        if (!existsSync(filePath)) {
+          if (!refreshed) {
+            refreshed = true;
+            try {
+              await triggerShortcut({ key: "F5", code: "F5" });
+            } catch {
+              // Ignore refresh failures and continue polling.
+            }
+            await sleep(250);
+            continue;
+          }
           return;
         }
       } catch (error) {
@@ -363,6 +377,10 @@ try {
       await sleep(200);
     }
     throw new Error(`wait for name gone timeout: ${name}`);
+  };
+
+  const waitForNameGone = async (name) => {
+    return waitForNameGoneWithin(name, timeoutMs);
   };
 
   const clickRedoFromEditMenu = async () => {

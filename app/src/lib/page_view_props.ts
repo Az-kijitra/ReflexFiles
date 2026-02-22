@@ -14,12 +14,12 @@ export function buildPathBarProps(params) {
     t: params.t,
     currentPath: params.currentPath,
     pathHistory: params.pathHistory,
-    showTree: params.showTree,
-    treeEl: params.treeEl,
     loadDir: params.loadDir,
     focusList: params.focusList,
-    focusTreeTop: params.focusTreeTop,
     handlePathTabCompletion: params.handlePathTabCompletion,
+    handlePathCompletionSeparator: params.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: params.handlePathCompletionInputChange,
+    clearPathCompletionPreview: params.clearPathCompletionPreview,
     setStatusMessage: params.setStatusMessage,
   };
 }
@@ -40,11 +40,13 @@ export function buildTreeProps(params) {
 
 export function buildFileListProps(params) {
   return {
+    currentPath: params.currentPath,
     showSize: params.showSize,
     showTime: params.showTime,
     uiFileIconMode: params.uiFileIconMode,
     loading: params.loading,
     filteredEntries: params.filteredEntries,
+    pathCompletionPreviewActive: params.pathCompletionPreviewActive,
     entries: params.entries,
     overflowLeft: params.overflowLeft,
     overflowRight: params.overflowRight,
@@ -58,6 +60,7 @@ export function buildFileListProps(params) {
     toggleSelection: params.toggleSelection,
     setSelected: params.setSelected,
     openEntry: params.openEntry,
+    resolveGdriveWorkcopyBadge: params.resolveGdriveWorkcopyBadge,
     formatName: params.formatName,
     formatSize: params.formatSize,
     formatModified: params.formatModified,
@@ -96,8 +99,10 @@ export function buildOverlayProps(params) {
     cancelDelete: params.cancelDelete,
     pasteConfirmOpen: params.pasteConfirmOpen,
     pasteConflicts: params.pasteConflicts,
+    allowPasteKeepBoth: params.allowPasteKeepBoth,
     confirmPasteOverwrite: params.confirmPasteOverwrite,
     confirmPasteSkip: params.confirmPasteSkip,
+    confirmPasteKeepBoth: params.confirmPasteKeepBoth,
     cancelPasteConfirm: params.cancelPasteConfirm,
     createOpen: params.createOpen,
     createError: params.createError,

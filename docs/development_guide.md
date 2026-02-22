@@ -1,11 +1,29 @@
 # Development Guide
-Updated: 2026-02-20
+Updated: 2026-02-22
 
 ## Scope
 This guide is for day-to-day development contributors.
 It defines local setup, coding workflow, quality gates, and documentation update rules.
 
 For maintainer operations (release pipeline, CI/E2E operations, troubleshooting), see `docs/maintenance_guide.md`.
+
+## Changes Since v0.2.0
+v0.2.0 focused on ReflexViewer integration and viewer UX improvements. Since then, development workflow and scope have expanded in the following ways:
+
+- Google Drive support is being developed in phases (provider boundary + security baseline + staged capabilities).
+- Public docs and internal working records are now explicitly separated:
+  - `docs/` = public, release-maintained documentation
+  - `development_documents/` = internal work logs / design notes (release-excluded)
+- ADR / threat-model / Google Drive self-setup reference documents are treated as internal records and are stored under `development_documents/`.
+- User-facing Google Drive setup and usage guidance is summarized in the user manuals (`user_manual.md`, `docs/ja/user_manual.ja.md`) instead of pointing users to internal setup notes.
+- CI policy was tightened around stable gates:
+  - required PR checks remain `quality` and `e2e_pr_quick`
+  - `e2e:full` is manual regression only (not a merge blocker)
+- Keyboard changes now require a lightweight regression-first workflow before heavy E2E:
+  - `npm run test:keys`
+  - `npm run docs:keymap-main` (internal generated reference)
+  - `npm run build`
+  - targeted E2E only for impacted areas
 
 ## Prerequisites
 - Windows 10/11
@@ -54,11 +72,34 @@ The following checks must pass before merge:
 
 `e2e:full` is manual-only and is not a required PR status check.
 
+## Test Role Split
+- PR merge blockers are limited to stable quality gates (`quality`, `e2e_pr_quick`).
+- `e2e:full` is a manual regression check and is not used as a merge blocker.
+- When tests fail, evaluate product-quality risk first. If risk is low and test flakiness is suspected, switch to an agreed alternative validation path instead of prolonged test-only debugging.
+
+## Gate 1 Experimental Flag
+- Google Drive read-only backend skeleton is controlled by Rust feature flag `gdrive-readonly-stub`.
+- Default build keeps this flag disabled (local-provider behavior unchanged).
+- To validate Gate 1 code path locally:
+```bash
+cd app
+cargo check --manifest-path src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+cargo test --manifest-path src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+```
+
+## Google Cloud Ownership Policy (Google Drive)
+- Development is based on maintainer personal Google Cloud usage.
+- Public GitHub content must never expose real Google API credentials.
+- The repository must keep credential-empty defaults and placeholder examples only.
+- End users configure their own Google Cloud OAuth client (`client_id`) following:
+  - Internal self-setup guide (release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+  - Internal self-setup guide JA (release-excluded): `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+
 ## Google Drive Gate 0 DoD (Definition of Done)
 Use this checklist before starting Google Drive implementation work.
 References:
-- `docs/ADR-0001-storage-provider-boundary.md`
-- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
+- Internal ADR (release-excluded): `development_documents/ADR-0001-storage-provider-boundary.md`
+- Internal threat model (release-excluded): `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
 
 Mandatory:
 1. Architecture boundary is fixed by ADR.
@@ -73,6 +114,7 @@ Mandatory:
 - `e2e:capability` passes.
 5. Secret handling rules are documented and enforceable.
 - OAuth/token handling policy is documented (no token/plain secret logging, protected storage target defined).
+ - Public repository contains no real credential values.
 6. Public docs are synchronized.
 - Related EN docs in `docs/` and JA docs in `docs/ja/` are updated together.
 
@@ -93,17 +135,20 @@ Recommended:
 - User manual (JA): `docs/ja/user_manual.ja.md`
 - Development guide: `docs/development_guide.md`
 - Maintenance guide: `docs/maintenance_guide.md`
-- Viewer spec: `docs/VIEWER_SPEC.md`
-- ADR-0001 (Storage Provider boundary, EN): `docs/ADR-0001-storage-provider-boundary.md`
-- ADR-0001 (Storage Provider boundary, JA): `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
-- Google Drive Gate 0 threat model (EN): `docs/THREAT_MODEL_GDRIVE_GATE0.md`
-- Google Drive Gate 0 threat model (JA): `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Viewer spec (internal/release-excluded): `development_documents/VIEWER_SPEC.md`
+- ADR-0001 (Storage Provider boundary, EN, internal/release-excluded): `development_documents/ADR-0001-storage-provider-boundary.md`
+- ADR-0001 (Storage Provider boundary, JA, internal/release-excluded): `development_documents/ja/ADR-0001-storage-provider-boundary.ja.md`
+- Google Drive Gate 0 threat model (EN, internal/release-excluded): `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
+- Google Drive Gate 0 threat model (JA, internal/release-excluded): `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Google Drive self-setup (EN, internal/release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+- Google Drive self-setup (JA, internal/release-excluded): `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 
 ## EN/JA Mapping
 - User manual: `user_manual.md` <-> `docs/ja/user_manual.ja.md`
 - Maintenance guide: `docs/maintenance_guide.md` <-> `docs/ja/maintenance_guide.ja.md`
 - Security policy: `docs/SECURITY.md` <-> `docs/ja/SECURITY.ja.md`
-- Google Drive Gate 0 threat model: `docs/THREAT_MODEL_GDRIVE_GATE0.md` <-> `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Google Drive Gate 0 threat model (internal/release-excluded): `development_documents/THREAT_MODEL_GDRIVE_GATE0.md` <-> `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Google Drive self-setup (internal/release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md` <-> `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - Contributing guide: `docs/CONTRIBUTING.md` <-> `docs/ja/CONTRIBUTING.ja.md`
 - Release notes 0.2.0: `docs/RELEASE_NOTES_0.2.0.md` <-> `docs/ja/RELEASE_NOTES_0.2.0.ja.md`
 

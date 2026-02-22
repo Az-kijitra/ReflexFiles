@@ -4,13 +4,19 @@ export function buildDomHandlersSetupInputsFromVars(params: DomHandlersInputsFro
   const getState = typeof params.state === "function" ? params.state : () => params.state;
   const getActions = typeof params.actions === "function" ? params.actions : () => params.actions;
   const getHelpers = typeof params.helpers === "function" ? params.helpers : () => params.helpers;
-  const action = (key) => (...args) => getActions()[key](...args);
+  const action = (key, fallback = undefined) => (...args) => {
+    const actions = getActions();
+    const fn = actions?.[key];
+    if (typeof fn !== "function") return fallback;
+    return fn(...args);
+  };
   const readState = (key) => () => getState()[key];
 
   return {
     state: {
       getListEl: readState("listEl"),
       getPathInputEl: readState("pathInputEl"),
+      getSearchInputEl: readState("searchInputEl"),
       getTreeEl: readState("treeEl"),
       getDropdownEl: readState("dropdownEl"),
       getContextMenuEl: readState("contextMenuEl"),
@@ -42,7 +48,7 @@ export function buildDomHandlersSetupInputsFromVars(params: DomHandlersInputsFro
       getMenuBarEl: readState("menuBarEl"),
     },
     actions: {
-      matchesAction: action("matchesAction"),
+      matchesAction: action("matchesAction", false),
       handleSortMenuKey: action("handleSortMenuKey"),
       focusTreeTop: action("focusTreeTop"),
       focusList: action("focusList"),
@@ -56,7 +62,7 @@ export function buildDomHandlersSetupInputsFromVars(params: DomHandlersInputsFro
       handleContextMenuKey: action("handleContextMenuKey"),
       openConfigFile: action("openConfigFile"),
       openKeymapHelp: action("openKeymapHelp"),
-      handleTreeKey: action("handleTreeKey"),
+      handleTreeKey: action("handleTreeKey", false),
       performUndo: action("performUndo"),
       performRedo: action("performRedo"),
       clearDirStatsCache: action("clearDirStatsCache"),
@@ -91,26 +97,26 @@ export function buildDomHandlersSetupInputsFromVars(params: DomHandlersInputsFro
       prefixDateSelected: action("prefixDateSelected"),
       cutSelected: action("cutSelected"),
       pasteItems: action("pasteItems"),
-      hasOperationTargets: action("hasOperationTargets"),
-      hasSelection: action("hasSelection"),
-      canCreateCurrentPath: action("canCreateCurrentPath"),
-      canPasteCurrentPath: action("canPasteCurrentPath"),
-      canCopyTargets: action("canCopyTargets"),
-      canDuplicateTargets: action("canDuplicateTargets"),
-      canPrefixDateTargets: action("canPrefixDateTargets"),
-      canCutTargets: action("canCutTargets"),
-      canRenameFocused: action("canRenameFocused"),
-      canDeleteSelection: action("canDeleteSelection"),
-      canDeleteTargets: action("canDeleteTargets"),
-      canOpenPropertiesSelection: action("canOpenPropertiesSelection"),
-      canZipCreateSelection: action("canZipCreateSelection"),
-      canZipExtractSelection: action("canZipExtractSelection"),
-      canZipExtractFocused: action("canZipExtractFocused"),
+      hasOperationTargets: action("hasOperationTargets", false),
+      hasSelection: action("hasSelection", false),
+      canCreateCurrentPath: action("canCreateCurrentPath", false),
+      canPasteCurrentPath: action("canPasteCurrentPath", false),
+      canCopyTargets: action("canCopyTargets", false),
+      canDuplicateTargets: action("canDuplicateTargets", false),
+      canPrefixDateTargets: action("canPrefixDateTargets", false),
+      canCutTargets: action("canCutTargets", false),
+      canRenameFocused: action("canRenameFocused", false),
+      canDeleteSelection: action("canDeleteSelection", false),
+      canDeleteTargets: action("canDeleteTargets", false),
+      canOpenPropertiesSelection: action("canOpenPropertiesSelection", false),
+      canZipCreateSelection: action("canZipCreateSelection", false),
+      canZipExtractSelection: action("canZipExtractSelection", false),
+      canZipExtractFocused: action("canZipExtractFocused", false),
       addJumpCurrent: action("addJumpCurrent"),
       openJumpUrlModal: action("openJumpUrlModal"),
       openSortMenu: action("openSortMenu"),
       closeSortMenu: action("closeSortMenu"),
-      getExternalApps: action("getExternalApps"),
+      getExternalApps: action("getExternalApps", []),
       runExternalApp: action("runExternalApp"),
       setDropdownMode: action("setDropdownMode"),
       setDropdownOpen: action("setDropdownOpen"),
@@ -127,16 +133,16 @@ export function buildDomHandlersSetupInputsFromVars(params: DomHandlersInputsFro
       setPathHistory: action("setPathHistory"),
       exitApp: action("exitApp"),
       focusPathInput: action("focusPathInput"),
-      getTargetEntry: action("getTargetEntry"),
+      getTargetEntry: action("getTargetEntry", null),
       closeContextMenu: action("closeContextMenu"),
       closeMenu: action("closeMenu"),
     },
     helpers: {
-      handleGlobalKey: (...args) => getHelpers().handleGlobalKey(...args),
-      t: (...args) => getHelpers().t(...args),
-      confirm: (...args) => getHelpers().confirm(...args),
-      eventToKeyString: (...args) => getHelpers().eventToKeyString(...args),
-      normalizeKeyString: (...args) => getHelpers().normalizeKeyString(...args),
+      handleGlobalKey: (...args) => getHelpers()?.handleGlobalKey?.(...args) ?? false,
+      t: (...args) => getHelpers()?.t?.(...args) ?? String(args[0] ?? ""),
+      confirm: (...args) => getHelpers()?.confirm?.(...args) ?? false,
+      eventToKeyString: (...args) => getHelpers()?.eventToKeyString?.(...args) ?? "",
+      normalizeKeyString: (...args) => getHelpers()?.normalizeKeyString?.(...args) ?? "",
     },
     constants: params.constants,
   };

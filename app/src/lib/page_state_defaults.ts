@@ -47,6 +47,7 @@ export function createPageStateDefaults() {
     searchError: "",
     searchHistory: [],
     filteredEntries: [],
+    pathCompletionPreviewActive: false,
     jumpList: [],
     jumpUrlOpen: false,
     jumpUrlValue: "",

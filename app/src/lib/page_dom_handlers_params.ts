@@ -5,6 +5,7 @@ export function buildPageKeydownParams({ state, actions, helpers, constants }: P
     handleGlobalKey: helpers.handleGlobalKey,
     getListEl: state.getListEl,
     getPathInputEl: state.getPathInputEl,
+    getSearchInputEl: state.getSearchInputEl,
     getTreeEl: state.getTreeEl,
     getDropdownEl: state.getDropdownEl,
     getContextMenuEl: state.getContextMenuEl,

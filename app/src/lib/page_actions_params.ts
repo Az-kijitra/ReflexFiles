@@ -173,6 +173,7 @@ export function buildPageActionsParams({ deps, properties, page, helpers }: Page
       zipPasswordMaxAttempts: page.zipPasswordMaxAttempts,
       zipCreate: deps.zipCreate,
       zipExtract: deps.zipExtract,
+      zipExtractListConflicts: deps.zipExtractListConflicts,
       t: deps.t,
     },
   };

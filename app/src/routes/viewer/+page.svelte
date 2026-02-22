@@ -2,6 +2,7 @@
   import { onMount, tick } from "svelte";
   import MarkdownIt from "markdown-it";
   import { invoke, listen, convertFileSrc } from "$lib/tauri_client";
+  import { toGdriveResourceRef } from "$lib/utils/resource_ref";
 
   const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
   const MAX_TEXT_BYTES = 2 * 1024 * 1024;
@@ -475,11 +476,18 @@
     }
 
     const token = ++virtualTextRequestToken;
-    const chunk = await invoke("fs_read_text_viewport_lines", {
-      path: currentPath,
-      startLine: requestStart,
-      lineCount: requestCount,
-    });
+    const currentRef = toGdriveResourceRef(currentPath);
+    const chunk = currentRef
+      ? await invoke("fs_read_text_viewport_lines_by_ref", {
+          resourceRef: currentRef,
+          startLine: requestStart,
+          lineCount: requestCount,
+        })
+      : await invoke("fs_read_text_viewport_lines", {
+          path: currentPath,
+          startLine: requestStart,
+          lineCount: requestCount,
+        });
     if (token !== virtualTextRequestToken) {
       return;
     }
@@ -678,12 +686,20 @@
     }
 
     try {
-      const entries = await invoke("fs_list_dir", {
-        path: dirPath,
-        showHidden: true,
-        sortKey: "name",
-        sortOrder: "asc",
-      });
+      const gdriveRef = toGdriveResourceRef(dirPath);
+      const entries = gdriveRef
+        ? await invoke("fs_list_dir_by_ref", {
+            resourceRef: gdriveRef,
+            showHidden: true,
+            sortKey: "name",
+            sortOrder: "asc",
+          })
+        : await invoke("fs_list_dir", {
+            path: dirPath,
+            showHidden: true,
+            sortKey: "name",
+            sortOrder: "asc",
+          });
       if (token !== siblingRefreshToken) {
         return;
       }
@@ -770,13 +786,38 @@
     moveSiblingFile(1);
   }
 
-  function syncTitle(path) {
+  function syncTitle(path, displayName = "") {
     const base = "ReflexViewer";
     if (!path) {
       document.title = base;
       return;
     }
-    document.title = `${base} - ${fileTail(path)}`;
+    const tail = String(displayName || "").trim() || fileTail(path);
+    document.title = `${base} - ${tail}`;
+  }
+
+  /**
+   * @param {string} path
+   * @param {{ provider: "local" | "gdrive", resource_id: string } | null} resourceRef
+   */
+  async function resolveViewerKind(path, resourceRef = null) {
+    const byPath = detectKind(path);
+    if (!resourceRef || resourceRef.provider !== "gdrive" || byPath !== "text") {
+      return { kind: byPath, nameHint: "" };
+    }
+    try {
+      const props = await invoke("fs_get_properties_by_ref", { resourceRef });
+      const name = String(props?.name || "").trim();
+      const ext = String(props?.ext || "").trim();
+      const lowerName = name.toLowerCase();
+      const lowerExt = ext.toLowerCase();
+      const kindProbe =
+        name && ext && lowerExt && !lowerName.endsWith(lowerExt) ? `${name}${ext}` : name;
+      const resolvedKind = detectKind(kindProbe || path);
+      return { kind: resolvedKind, nameHint: name };
+    } catch {
+      return { kind: byPath, nameHint: "" };
+    }
   }
 
   function resetView() {
@@ -831,13 +872,15 @@
         if (
           normalized.includes("keymap") ||
           normalized.includes("keyboard") ||
+          normalized.includes("key binding") ||
+          normalized.includes("shortcut") ||
           heading.includes("\u30ad\u30fc\u64cd\u4f5c") ||
           heading.includes("\u30ad\u30fc\u4e00\u89a7")
         ) {
           return heading;
         }
       }
-      return "\u30ad\u30fc\u64cd\u4f5c";
+      return "keymap";
     }
 
     return hint;
@@ -859,6 +902,14 @@
     }
 
     const targetNorm = normalizeMatchText(heading);
+    if (targetNorm === "keymap") {
+      const anchored = root.querySelector("#keymap");
+      if (anchored) {
+        anchored.scrollIntoView({ block: "start", inline: "nearest" });
+        return true;
+      }
+    }
+
     const elements = root.querySelectorAll("h1, h2, h3, h4, h5, h6");
     for (const element of elements) {
       const currentNorm = normalizeMatchText(element.textContent || "");
@@ -871,6 +922,25 @@
       }
     }
 
+    return false;
+  }
+
+  /**
+   * @param {string} headingText
+   */
+  async function focusMarkdownHeadingWithRetry(headingText) {
+    const heading = String(headingText || "").trim();
+    if (!heading) {
+      return false;
+    }
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      if (await focusMarkdownHeading(heading)) {
+        return true;
+      }
+      await tick();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
     return false;
   }
 
@@ -1127,6 +1197,34 @@
     return String(cached.src || "");
   }
 
+  async function readImageDataUrl(path, normalize) {
+    const targetPath = String(path || "");
+    const gdriveRef = toGdriveResourceRef(targetPath);
+    if (gdriveRef) {
+      return await invoke("fs_read_image_data_url_by_ref", {
+        resourceRef: gdriveRef,
+        normalize,
+      });
+    }
+    return await invoke("fs_read_image_data_url", {
+      path: targetPath,
+      normalize,
+    });
+  }
+
+  async function readImageNormalizedTempPath(path) {
+    const targetPath = String(path || "");
+    const gdriveRef = toGdriveResourceRef(targetPath);
+    if (gdriveRef) {
+      return await invoke("fs_read_image_normalized_temp_path_by_ref", {
+        resourceRef: gdriveRef,
+      });
+    }
+    return await invoke("fs_read_image_normalized_temp_path", {
+      path: targetPath,
+    });
+  }
+
   async function resolveNormalizedPreviewSrc(path) {
     const targetPath = String(path || "");
     if (!targetPath) {
@@ -1136,7 +1234,7 @@
     if (cached) {
       return cached;
     }
-    const normalizedPath = await invoke("fs_read_image_normalized_temp_path", { path: targetPath });
+    const normalizedPath = await readImageNormalizedTempPath(targetPath);
     const previewSrc = toViewerImageSrc(String(normalizedPath || ""));
     if (previewSrc) {
       cacheImagePreview(targetPath, previewSrc);
@@ -1264,10 +1362,7 @@
       }
 
       try {
-        const rawDataUrl = await invoke("fs_read_image_data_url", {
-          path: targetPath,
-          normalize: false,
-        });
+        const rawDataUrl = await readImageDataUrl(targetPath, false);
         const rawSrc = String(rawDataUrl || "");
         if (rawSrc && (await canLoadImageSource(rawSrc))) {
           cacheImageSource(targetPath, rawSrc, "raw");
@@ -1278,10 +1373,7 @@
       }
 
       try {
-        const normalizedDataUrl = await invoke("fs_read_image_data_url", {
-          path: targetPath,
-          normalize: true,
-        });
+        const normalizedDataUrl = await readImageDataUrl(targetPath, true);
         const normalizedSrc = String(normalizedDataUrl || "");
         if (normalizedSrc && (await canLoadImageSource(normalizedSrc))) {
           cacheImageSource(targetPath, normalizedSrc, "normalized");
@@ -1576,7 +1668,7 @@
     if (imageLoadFallbackStage === 0) {
       imageLoadFallbackStage = 1;
       try {
-        const dataUrl = await invoke("fs_read_image_data_url", { path: currentPath, normalize: false });
+        const dataUrl = await readImageDataUrl(currentPath, false);
         setImageSource(String(dataUrl || ""), "raw");
         imageLoadError = "";
         return;
@@ -1588,10 +1680,7 @@
     if (imageLoadFallbackStage <= 1) {
       imageLoadFallbackStage = 2;
       try {
-        const normalizedDataUrl = await invoke("fs_read_image_data_url", {
-          path: currentPath,
-          normalize: true,
-        });
+        const normalizedDataUrl = await readImageDataUrl(currentPath, true);
         setImageSource(String(normalizedDataUrl || ""), "normalized");
         imageLoadError = "";
         return;
@@ -1721,6 +1810,13 @@
     pendingMarkdownJumpHeading = "";
 
     try {
+      const currentRef = toGdriveResourceRef(currentPath);
+      const kindResolved = await resolveViewerKind(currentPath, currentRef);
+      currentKind = kindResolved.kind;
+      if (kindResolved.nameHint) {
+        syncTitle(currentPath, kindResolved.nameHint);
+      }
+
       if (currentKind === "image") {
         const cached = getCachedImageSource(currentPath);
         if (cached) {
@@ -1739,15 +1835,20 @@
         void prefetchNeighborImages();
         return;
       }
-      const viewportInfoRaw = await invoke("fs_text_viewport_info", {
-        path: currentPath,
-      });
+      const viewportInfoRaw = currentRef
+        ? await invoke("fs_text_viewport_info_by_ref", {
+            resourceRef: currentRef,
+          })
+        : await invoke("fs_text_viewport_info", {
+            path: currentPath,
+          });
       const viewportFileSize = Math.max(0, Number(viewportInfoRaw?.fileSize ?? 0) || 0);
       const viewportTotalLines = Math.max(1, Number(viewportInfoRaw?.totalLines ?? 1) || 1);
       const useVirtualText =
         viewportFileSize >= LARGE_TEXT_THRESHOLD_BYTES || viewportTotalLines >= LARGE_TEXT_LINE_THRESHOLD;
 
-      textLanguage = currentKind === "markdown" ? "markdown" : detectTextLanguage(currentPath);
+      const languagePathHint = kindResolved.nameHint || currentPath;
+      textLanguage = currentKind === "markdown" ? "markdown" : detectTextLanguage(languagePathHint);
 
       if (useVirtualText) {
         virtualTextMode = true;
@@ -1771,10 +1872,15 @@
         return;
       }
 
-      const rawText = await invoke("fs_read_text", {
-        path: currentPath,
-        maxBytes: MAX_TEXT_BYTES,
-      });
+      const rawText = currentRef
+        ? await invoke("fs_read_text_by_ref", {
+            resourceRef: currentRef,
+            maxBytes: MAX_TEXT_BYTES,
+          })
+        : await invoke("fs_read_text", {
+            path: currentPath,
+            maxBytes: MAX_TEXT_BYTES,
+          });
       textContent = String(rawText ?? "");
       rebuildTextLines();
       refreshSyntaxHighlight();
@@ -1794,7 +1900,7 @@
         pendingMarkdownJumpHeading = "";
         // Ensure markdown DOM is rendered after Loading... is dismissed.
         await tick();
-        await focusMarkdownHeading(heading);
+        await focusMarkdownHeadingWithRetry(heading);
       }
     }
   }

@@ -38,6 +38,7 @@ import { getParentPath } from "$lib/utils/path";
  * @param {(err: unknown) => void} actions.showError
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
+ * @param {(entry: import("$lib/types").Entry | null) => void} [actions.syncGdriveWorkcopyForEntry]
  * @param {() => void} closeContextMenu
  */
 export function createContextMenuItems(ctx, actions, closeContextMenu) {
@@ -60,6 +61,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     showError,
     runExternalApp,
     getExternalApps,
+    syncGdriveWorkcopyForEntry,
   } = actions;
 
   function onContextOpen() {
@@ -88,6 +90,18 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
 
   function onContextOpenGitClient() {
     openInGitClient();
+    closeContextMenu();
+  }
+
+  function onContextGdriveWriteBack() {
+    const selected = ctx.getSelectedPaths();
+    if (selected.length !== 1) return;
+    const target = ctx.getEntries().find((e) => e.path === selected[0]);
+    if (!target || target.type === "dir") {
+      closeContextMenu();
+      return;
+    }
+    syncGdriveWorkcopyForEntry?.(target);
     closeContextMenu();
   }
 
@@ -222,6 +236,10 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canCreateInCurrentPath = currentPathSupports("can_create");
     const canPasteIntoCurrentPath =
       currentPathSupports("can_copy") || currentPathSupports("can_move");
+    const currentPath = String(ctx.getCurrentPath?.() || "").trim().toLowerCase();
+    const pasteCapabilityReason = currentPath.startsWith("gdrive://")
+      ? ctx.t("paste.destination_not_writable")
+      : capabilityReason;
     const allSelectedSupport = (capabilityKey) =>
       hasSelection &&
       hasAllSelectedEntries &&
@@ -231,7 +249,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const clipboard = ctx.getLastClipboard ? ctx.getLastClipboard() : { paths: [] };
     const canPaste = canPasteIntoCurrentPath && ctx.getContextMenuCanPaste();
     const pasteReason = !canPasteIntoCurrentPath
-      ? capabilityReason
+      ? pasteCapabilityReason
       : canPaste
         ? ""
         : clipboard?.paths?.length
@@ -240,6 +258,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     if (ctx.getContextMenuMode() === "blank") {
       return normalizeMenuItems([
         {
+          id: "ctx-new",
           label: ctx.t("context.new"),
           enabled: canCreateInCurrentPath,
           reason: canCreateInCurrentPath ? "" : capabilityReason,
@@ -251,6 +270,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         },
         { label: "-", enabled: false },
         {
+          id: "ctx-paste",
           label: ctx.t("context.paste"),
           enabled: canPaste,
           reason: pasteReason,
@@ -265,6 +285,12 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         ? !!getParentPath(selected[0])
         : !!getParentPath(ctx.getCurrentPath()));
     const selectedEntry = isSingle ? entries.find((e) => e.path === selected[0]) : null;
+    const isGdriveFile =
+      isSingle &&
+      !!selectedEntry &&
+      selectedEntry.type === "file" &&
+      (selectedEntry?.ref?.provider === "gdrive" ||
+        String(selectedEntry?.path || "").startsWith("gdrive://"));
     const isZip = !!selectedEntry && selectedEntry.ext?.toLowerCase() === ".zip";
     const canCopySelection = allSelectedSupport("can_copy");
     const canMoveSelection = allSelectedSupport("can_move");
@@ -275,30 +301,35 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const extApps = getExternalApps ? getExternalApps() : [];
     return normalizeMenuItems([
       {
+        id: "ctx-open",
         label: ctx.t("context.open"),
         enabled: isSingle,
         visible: isSingle,
         action: onContextOpen,
       },
       {
+        id: "ctx-open-explorer",
         label: ctx.t("context.open_explorer"),
         enabled: isSingle,
         visible: isSingle,
         action: onContextOpenExplorer,
       },
       {
+        id: "ctx-open-cmd",
         label: ctx.t("context.open_cmd"),
         enabled: isSingle,
         visible: isSingle,
         action: onContextOpenCmd,
       },
       {
+        id: "ctx-open-vscode",
         label: ctx.t("context.open_vscode"),
         enabled: isSingle,
         visible: isSingle,
         action: onContextOpenVSCode,
       },
       {
+        id: "ctx-open-git-client",
         label: ctx.t("context.open_git_client"),
         enabled: isSingle,
         visible: isSingle,
@@ -311,6 +342,14 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: () => onContextOpenExternalApp(app),
       })),
       {
+        id: "ctx-gdrive-write-back",
+        label: ctx.t("context.gdrive_write_back"),
+        enabled: isGdriveFile,
+        visible: isGdriveFile,
+        action: onContextGdriveWriteBack,
+      },
+      {
+        id: "ctx-open-parent",
         label: ctx.t("context.open_parent"),
         enabled: openParentEnabled,
         visible: openParentEnabled,
@@ -318,6 +357,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       },
       { label: "-", enabled: false },
       {
+        id: "ctx-copy",
         label: ctx.t("context.copy"),
         enabled: canCopySelection,
         reason: hasSelection && !canCopySelection ? capabilityReason : "",
@@ -325,6 +365,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: onContextCopy,
       },
       {
+        id: "ctx-duplicate",
         label: ctx.t("context.duplicate"),
         enabled: canCopySelection,
         reason: hasSelection && !canCopySelection ? capabilityReason : "",
@@ -332,6 +373,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: onContextDuplicate,
       },
       {
+        id: "ctx-prefix-date",
         label: ctx.t("context.prefix_date"),
         enabled: allSelectedSupport("can_rename"),
         reason: hasSelection && !allSelectedSupport("can_rename") ? capabilityReason : "",
@@ -339,6 +381,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: onContextPrefixDate,
       },
       {
+        id: "ctx-cut",
         label: ctx.t("context.cut"),
         enabled: canMoveSelection,
         reason: hasSelection && !canMoveSelection ? capabilityReason : "",
@@ -346,6 +389,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: onContextCut,
       },
       {
+        id: "ctx-paste",
         label: ctx.t("context.paste"),
         enabled: canPaste,
         reason: pasteReason,
@@ -354,6 +398,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       },
       { label: "-", enabled: false },
       {
+        id: "ctx-delete",
         label: ctx.t("context.delete"),
         enabled: canDeleteSelection,
         reason: hasSelection && !canDeleteSelection ? capabilityReason : "",
@@ -361,6 +406,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: onContextDelete,
       },
       {
+        id: "ctx-rename",
         label: ctx.t("context.rename"),
         enabled: canRenameSingle,
         reason: isSingle && !canRenameSingle ? capabilityReason : "",
@@ -368,6 +414,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: onContextRename,
       },
       {
+        id: "ctx-properties",
         label: ctx.t("context.properties"),
         enabled: hasSelection,
         visible: hasSelection,
@@ -375,6 +422,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
       },
       { label: "-", enabled: false },
       {
+        id: "ctx-compress",
         label: ctx.t("context.compress"),
         enabled: canArchiveCreateSelection,
         reason: hasSelection && !canArchiveCreateSelection ? capabilityReason : "",
@@ -382,6 +430,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         action: openZipCreate,
       },
       {
+        id: "ctx-extract",
         label: ctx.t("context.extract"),
         enabled: canExtractZip,
         reason: isZip && !canExtractZip ? capabilityReason : "",

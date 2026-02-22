@@ -161,7 +161,42 @@ export async function setupPageLifecycle(ctx) {
     }
   });
 
-  window.addEventListener("keydown", ctx.onKeyDown, { capture: true });
+  const onWindowKeydownCapture = (event) => {
+    if ((import.meta as any)?.env?.DEV) {
+      const ctrl = !!(event.ctrlKey || event.getModifierState?.("Control"));
+      const alt = !!(event.altKey || event.getModifierState?.("Alt"));
+      const shift = !!(event.shiftKey || event.getModifierState?.("Shift"));
+      const meta = !!(event.metaKey || event.getModifierState?.("Meta"));
+      const code = String(event.code || "");
+      const key = String(event.key || "");
+      const keyLower = key.toLowerCase();
+      const isTargetCode =
+        code === "F2" ||
+        code === "KeyF" ||
+        code === "KeyZ" ||
+        code === "KeyX" ||
+        keyLower === "f2" ||
+        keyLower === "f" ||
+        keyLower === "z" ||
+        keyLower === "x";
+      const isTarget =
+        isTargetCode ||
+        (!ctrl && !alt && !meta && code === "F2") ||
+        (ctrl && !alt && !meta && (code === "KeyF" || keyLower === "f")) ||
+        (ctrl && alt && !meta && !shift && (code === "KeyZ" || keyLower === "z")) ||
+        (ctrl && alt && !meta && !shift && (code === "KeyX" || keyLower === "x"));
+      if (isTarget) {
+        const active = document.activeElement;
+        const activeTag = active?.tagName || "-";
+        ctx.setStatusMessage(
+          `DBG L0 key=${key} code=${code} c=${ctrl ? 1 : 0} a=${alt ? 1 : 0} s=${shift ? 1 : 0} m=${meta ? 1 : 0} active=${activeTag}`,
+          5000
+        );
+      }
+    }
+    ctx.onKeyDown(event);
+  };
+  window.addEventListener("keydown", onWindowKeydownCapture, { capture: true });
   window.addEventListener("click", ctx.onClick, { capture: true });
   window.addEventListener("beforeunload", ctx.onBeforeUnload);
   const onFocusIn = () => {
@@ -206,7 +241,7 @@ export async function setupPageLifecycle(ctx) {
       unlistenOpProgress();
     }
     ctx.invoke("fs_watch_stop").catch(() => {});
-    window.removeEventListener("keydown", ctx.onKeyDown, { capture: true });
+    window.removeEventListener("keydown", onWindowKeydownCapture, { capture: true });
     window.removeEventListener("click", ctx.onClick, { capture: true });
     window.removeEventListener("beforeunload", ctx.onBeforeUnload);
     window.removeEventListener("focusin", onFocusIn, { capture: true });

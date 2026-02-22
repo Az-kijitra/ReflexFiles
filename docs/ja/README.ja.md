@@ -51,7 +51,7 @@ npm run audit:cargo
 - 開発ガイド（英語）: `/docs/development_guide.md`
 - メンテナンスガイド（日本語）: `/docs/ja/maintenance_guide.ja.md`
 - メンテナンスガイド（英語）: `/docs/maintenance_guide.md`
-- Viewer仕様（英語）: `/docs/VIEWER_SPEC.md`
+- Viewer仕様（内部管理・リリース対象外）: `/development_documents/VIEWER_SPEC.md`
 - ターミナル固定プロファイル（`Ctrl+Alt+1/2/3`）の設定手順は `/docs/ja/user_manual.ja.md` を参照してください。
 
 ## コントリビュート

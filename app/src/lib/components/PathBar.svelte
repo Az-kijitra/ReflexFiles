@@ -9,13 +9,12 @@
   export let pathHistory = [];
   export let dropdownMode = "history";
   export let dropdownOpen = false;
-  export let showTree = false;
-  /** @type {HTMLElement | null} */
-  export let treeEl = null;
   export let loadDir;
   export let focusList;
-  export let focusTreeTop;
   export let handlePathTabCompletion;
+  export let handlePathCompletionSeparator;
+  export let handlePathCompletionInputChange;
+  export let clearPathCompletionPreview;
   export let setStatusMessage;
 </script>
 
@@ -25,6 +24,7 @@
     class="path-input"
     onsubmit={async (event) => {
       event.preventDefault();
+      clearPathCompletionPreview?.();
       await loadDir(pathInput);
       await tick();
       focusList();
@@ -36,11 +36,31 @@
       spellcheck="false"
       bind:this={pathInputEl}
       aria-label={t("label.path")}
-      onkeydown={(event) => {
+      oninput={() => {
+        handlePathCompletionInputChange?.(pathInput);
+      }}
+      onblur={() => {
+        clearPathCompletionPreview?.();
+      }}
+      onkeydown={async (event) => {
+        const ctrlPressed = event.ctrlKey || event.getModifierState?.("Control");
+        const altPressed = event.altKey || event.getModifierState?.("Alt");
+        const metaPressed = event.metaKey || event.getModifierState?.("Meta");
+        const isCtrlSpace =
+          ctrlPressed &&
+          !altPressed &&
+          !metaPressed &&
+          (event.code === "Space" || event.key === " " || event.key === "Spacebar");
+
         if (event.key === "Escape") {
           event.preventDefault();
+          const completionCanceled = clearPathCompletionPreview?.();
+          if (completionCanceled) {
+            return;
+          }
           pathInput = currentPath;
           focusList();
+          return;
         }
         if (event.key === "ArrowDown") {
           event.preventDefault();
@@ -50,19 +70,31 @@
           }
           dropdownMode = "history";
           dropdownOpen = true;
+          return;
         }
-        if (event.key === "Tab") {
+        if (isCtrlSpace) {
           event.preventDefault();
           event.stopPropagation();
-          if (event.shiftKey) {
-            if (showTree && treeEl) {
-              focusTreeTop();
-            } else {
-              focusList();
-            }
-          } else {
-            handlePathTabCompletion();
+          const direction = event.shiftKey ? -1 : 1;
+          await handlePathTabCompletion(pathInput, direction);
+          return;
+        }
+        if (event.key === "\\" || event.key === "¥" || event.code === "Backslash") {
+          event.preventDefault();
+          event.stopPropagation();
+          const keyForSeparator = event.key === "¥" ? "¥" : "\\";
+          const consumed = await handlePathCompletionSeparator?.(pathInput, keyForSeparator);
+          if (!consumed) {
+            const inputEl = pathInputEl;
+            const insertAt = inputEl?.selectionStart ?? pathInput.length;
+            const replaceTo = inputEl?.selectionEnd ?? insertAt;
+            pathInput = `${pathInput.slice(0, insertAt)}\\${pathInput.slice(replaceTo)}`;
+            handlePathCompletionInputChange?.(pathInput);
+            await tick();
+            const cursor = insertAt + 1;
+            inputEl?.setSelectionRange(cursor, cursor);
           }
+          return;
         }
       }}
     />

@@ -33,6 +33,7 @@ export function buildPageActionsState(params: PageActionsContextParams) {
     pathHistory: jump.pathHistory,
     searchQuery: search.searchQuery,
     searchHistory: search.searchHistory,
+    ui_language: external.ui_language,
     externalAppAssociations: external.externalAppAssociations,
     externalApps: external.externalApps,
     contextMenuOpen: contextMenu.contextMenuOpen,
@@ -97,6 +98,7 @@ export function buildPageActionsStateFromVars(
       searchHistory: getter("searchHistory"),
     },
     external: {
+      ui_language: getter("ui_language"),
       externalAppAssociations: getter("externalAppAssociations"),
       externalApps: getter("externalApps"),
     },

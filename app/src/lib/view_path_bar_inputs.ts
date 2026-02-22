@@ -9,12 +9,12 @@ export function buildPathBarViewInputs({ state, actions, helpers }) {
     t: helpers.t,
     currentPath: state.currentPath,
     pathHistory: state.pathHistory,
-    showTree: state.showTree,
-    treeEl: state.treeEl,
     loadDir: actions.loadDir,
     focusList: actions.focusList,
-    focusTreeTop: actions.focusTreeTop,
     handlePathTabCompletion: actions.handlePathTabCompletion,
+    handlePathCompletionSeparator: actions.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: actions.handlePathCompletionInputChange,
+    clearPathCompletionPreview: actions.clearPathCompletionPreview,
     setStatusMessage: actions.setStatusMessage,
   };
 }

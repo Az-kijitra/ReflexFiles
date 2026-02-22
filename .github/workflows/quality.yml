@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: app/package-lock.json
 
@@ -35,6 +35,10 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Keyboard regression gate
+        working-directory: app
+        run: npm run test:keys
+
       - name: Frontend type/check gate
         working-directory: app
         run: npm run check
@@ -44,6 +48,25 @@ jobs:
 
       - name: Rust test gate
         run: cargo test --manifest-path app/src-tauri/Cargo.toml --locked
+
+  gdrive_stub_probe:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Gate 1 stub check (non-blocking)
+        run: cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+
+      - name: Gate 1 stub test (non-blocking)
+        run: cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
 
   audit_nightly:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -57,7 +80,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: app/package-lock.json
 
@@ -69,8 +92,12 @@ jobs:
         run: npm ci
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        run: cargo install cargo-audit --locked --version 0.22.1
 
-      - name: Dependency audit gate
+      - name: npm audit gate
         working-directory: app
-        run: npm run audit:deps
+        run: npm run audit:npm
+
+      - name: cargo audit gate
+        working-directory: app
+        run: npm run audit:cargo

@@ -56,79 +56,202 @@
 <h1>ReflexFiles User Manual</h1>
 <h2>Overview</h2>
 <p>ReflexFiles is a keyboard-first file manager for Windows.
-It provides a multi-column file list, tree navigation, fast search, and integrated file operations.</p>
+It combines a multi-column file list and tree view so you can navigate, search,
+copy, and archive files quickly.</p>
 <hr>
 <h2>Install / Uninstall</h2>
 <h3>Install</h3>
+<p>Installation steps depend on the distribution type.</p>
 <ul>
-<li><strong>ZIP distribution</strong>: Extract to any folder and run <code>ReflexFiles.exe</code>.</li>
-<li><strong>Installer distribution</strong>: Run the installer and follow the setup wizard.</li>
+<li><strong>ZIP distribution</strong>: Extract the ZIP to any folder and run <code>ReflexFiles.exe</code>.</li>
+<li><strong>Installer distribution</strong>: Run setup and follow the on-screen steps.</li>
 </ul>
 <h3>Uninstall</h3>
 <ul>
-<li><strong>ZIP distribution</strong>: Exit the app and remove the extracted folder.</li>
-<li><strong>Installer distribution</strong>: Uninstall from Windows Apps settings.</li>
-<li>To remove app data too, delete <code>%APPDATA%\\ReflexFIles\\</code>.</li>
+<li><strong>ZIP distribution</strong>: Exit the app and delete the extracted folder.</li>
+<li><strong>Installer distribution</strong>: Uninstall from Windows &quot;Apps &amp; features&quot;.</li>
+<li>To remove settings and history too, delete <code>%APPDATA%\\ReflexFIles\\</code>.</li>
 </ul>
 <hr>
 <h2>Screen Layout</h2>
 <ol>
-<li>Menu bar</li>
-<li>Path bar</li>
-<li>Tree view (left panel)</li>
-<li>File list (multi-column)</li>
-<li>Status bar</li>
+<li><strong>Menu bar</strong></li>
+<li><strong>PATH bar</strong></li>
+<li><strong>Tree view (left pane)</strong></li>
+<li><strong>File list (multi-column)</strong></li>
+<li><strong>Status bar</strong></li>
 </ol>
 <hr>
-<h2>Quick Start</h2>
+<h2>Quick Start (3 Minutes)</h2>
 <ol>
-<li>Launch <code>ReflexFiles.exe</code>.</li>
-<li>Use arrow keys to move focus.</li>
-<li>Press <code>Enter</code> on a directory to open it.</li>
-<li>Press <code>/</code> to open search.</li>
-<li>Use <code>Ctrl+C</code> and <code>Ctrl+V</code> for copy/paste.</li>
-<li>Use <code>Ctrl+J</code> for jump list and <code>Ctrl+Y</code> for history.</li>
+<li><strong>Launch</strong>
+<ul>
+<li>Run <code>ReflexFiles.exe</code>.</li>
+</ul>
+</li>
+<li><strong>Navigate</strong>
+<ul>
+<li>Move with arrow keys, press <strong>Enter</strong> to open a folder.</li>
+</ul>
+</li>
+<li><strong>Navigate by PATH</strong>
+<ul>
+<li>Enter a path in PATH bar and press <strong>Enter</strong>.</li>
+</ul>
+</li>
+<li><strong>Search</strong>
+<ul>
+<li>Press <code>/</code> to show Search bar and type a query.</li>
+</ul>
+</li>
+<li><strong>Copy / Paste</strong>
+<ul>
+<li>Use <strong>Ctrl+C</strong> and <strong>Ctrl+V</strong>.</li>
+</ul>
+</li>
+<li><strong>Bookmark frequently used locations</strong>
+<ul>
+<li>Press <strong>Ctrl+Shift+J</strong> to add to Jump List, <strong>Ctrl+J</strong> to open it.</li>
+</ul>
+</li>
+<li><strong>Open folder history</strong>
+<ul>
+<li>Press <strong>Ctrl+Shift+Y</strong>.</li>
+</ul>
+</li>
 </ol>
 <hr>
-<h2>Open Behavior (<code>Enter</code> / <code>Shift+Enter</code>)</h2>
-<p>When focus is on a file and you press <code>Enter</code>:</p>
+<h2>Basic Usage</h2>
+<h3>Navigate and Open</h3>
 <ul>
-<li>If the file extension is supported by ReflexViewer, it opens in ReflexViewer.</li>
-<li>If the extension is not supported but file content looks like text, it opens in ReflexViewer.</li>
-<li>Otherwise, it opens with the OS associated application.</li>
+<li>Use <strong>Up/Down/Left/Right</strong> to move focus.</li>
+<li><strong>Enter</strong> opens the focused item:
+<ul>
+<li>Folder: enter that folder</li>
+<li>File: open in ReflexViewer when extension is supported, or when content is detected as text</li>
+<li>Otherwise: open with OS associated app</li>
 </ul>
-<p><code>Shift+Enter</code> always opens with the OS associated application.</p>
+</li>
+<li><strong>Shift+Enter</strong> always opens file with OS associated app.</li>
+<li><strong>Backspace</strong> goes to parent folder.</li>
+</ul>
+<h3>Selection</h3>
+<ul>
+<li><strong>Space</strong> toggles selection (then moves to next row)</li>
+<li><strong>Ctrl+A</strong> selects all</li>
+<li><strong>Esc</strong> clears selection</li>
+</ul>
+<h3>PATH Bar</h3>
+<ul>
+<li>Type directly and press <strong>Enter</strong> to navigate</li>
+<li><strong>Esc</strong> cancels editing and returns focus to list</li>
+<li><strong>Tab</strong> performs path completion while editing PATH</li>
+<li><strong>Tab / Shift+Tab</strong> cycles focus (list -&gt; PATH -&gt; tree -&gt; list)</li>
+<li><strong>Ctrl+J / Ctrl+Y</strong> opens Jump List / History</li>
+<li>PATH completion and candidate preview are supported for <strong>local filesystem paths only</strong>.</li>
+<li><code>gdrive://</code> paths are out of scope for PATH completion/candidate preview.</li>
+<li>For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.</li>
+</ul>
 <hr>
-<h2>ReflexViewer (Preview / Source / Image)</h2>
-<p>ReflexViewer is integrated into ReflexFiles and opens compatible files in a dedicated viewer window.</p>
-<h3>Supported modes</h3>
+<h2>ReflexViewer (Preview / Source)</h2>
+<p>Supported files open in ReflexViewer.</p>
 <ul>
-<li><strong>Markdown Preview</strong>: Render markdown as HTML</li>
-<li><strong>Markdown Text</strong>: Show markdown source with syntax highlight</li>
-<li><strong>Text / Source Code</strong>: Fixed-width text view with syntax highlight and line numbers</li>
-<li><strong>Image</strong>: PNG / JPEG / BMP with zoom and pan</li>
+<li>Viewer title includes the opened file name.</li>
+<li>If a file is unsupported or unreadable, the viewer shows an error state instead of crashing.</li>
 </ul>
-<h3>Viewer shortcuts</h3>
+<h3>Main View Modes</h3>
 <ul>
-<li><code>Esc</code>: Close viewer</li>
-<li><code>Ctrl+Q</code>: Close viewer</li>
-<li><code>Alt+Left</code> / <code>Alt+Right</code>: Previous/next file in the same folder</li>
-<li><code>Ctrl+PageUp</code> / <code>Ctrl+PageDown</code>: Previous/next file in the same folder</li>
-<li><code>Prev</code> / <code>Next</code> buttons: Previous/next file in the same folder</li>
-<li><code>Ctrl+O</code>: Open file chooser</li>
-<li><code>Ctrl+F</code>: Open search panel (text/markdown)</li>
-<li>Arrow keys / <code>PageUp</code> / <code>PageDown</code>: Scroll</li>
-<li><code>Ctrl+Wheel</code>, <code>Ctrl++</code>, <code>Ctrl+-</code>, <code>Ctrl+0</code>: Zoom (image and markdown HTML)</li>
+<li><strong>Markdown Preview</strong>: Render Markdown as formatted HTML</li>
+<li><strong>Text (Markdown Source)</strong>: Markdown source with syntax highlighting</li>
+<li><strong>Source Code Highlight</strong>: Syntax coloring for C/C++/Rust/JavaScript/TypeScript/Python/JSON and more</li>
+<li><strong>Image Viewer</strong>: PNG/JPEG/BMP with zoom and pan
+<ul>
+<li>Zoom presets include <strong>Fit / 100% / 200%</strong></li>
+<li>Zoom indicator shows current zoom mode/ratio</li>
+</ul>
+</li>
+</ul>
+<h3>Basic Viewer Shortcuts</h3>
+<ul>
+<li><strong>Esc</strong>: Close viewer</li>
+<li><strong>Ctrl+Q</strong>: Close viewer</li>
+<li><strong>Alt+Left / Alt+Right</strong>: Previous/next file in same folder</li>
+<li><strong>Ctrl+PageUp / Ctrl+PageDown</strong>: Previous/next file in same folder</li>
+<li><strong>Prev / Next buttons</strong>: Previous/next file in same folder</li>
+<li><strong>Position indicator</strong>: Shows current file index / total (for example <code>2 / 3</code>)</li>
+<li><strong>Ctrl+O</strong>: Open file picker</li>
+<li><strong>Ctrl+F</strong>: Open search panel (text/Markdown)</li>
+<li><strong>Ctrl + wheel / Ctrl+Plus / Ctrl+Minus / Ctrl+0</strong>: Zoom (image or Markdown HTML)</li>
+<li><strong>Ctrl+Shift+1 / Ctrl+Shift+2 / Ctrl+Shift+3</strong>: Large-text prefetch profile (Fast / Balanced / Memory)</li>
 </ul>
 <hr>
-<h2>Search</h2>
+<h2>Feature List (Detailed)</h2>
 <ul>
-<li>Press <code>/</code> to open search bar</li>
-<li>Supports substring and regex search</li>
+<li><strong>Tree View</strong>
+<ul>
+<li>Expand/move by mouse or keyboard</li>
+<li>Linked with file list</li>
+<li>Show/hide toggle (View menu / Ctrl+Shift+B)</li>
+</ul>
+</li>
+<li><strong>Search</strong>
+<ul>
+<li>Press <code>/</code> to open Search bar</li>
+<li>Substring and regex search</li>
+</ul>
+</li>
+<li><strong>History / Jump List</strong>
+<ul>
+<li>History: previously visited paths</li>
+<li>Jump List: manually registered paths</li>
+<li>URLs can also be added to Jump List</li>
+</ul>
+</li>
+<li><strong>File Operations</strong>
+<ul>
+<li>Copy / Cut / Paste</li>
+<li>Delete (to trash)</li>
+<li>Rename</li>
+<li>Create file/folder</li>
+<li>Duplicate</li>
+<li>Prefix date to names</li>
+</ul>
+</li>
+<li><strong>ZIP</strong>
+<ul>
+<li>Create ZIP</li>
+<li>Extract ZIP</li>
+</ul>
+</li>
+<li><strong>Sorting</strong>
+<ul>
+<li>Choose from sort menu</li>
+</ul>
+</li>
+<li><strong>External Apps</strong>
+<ul>
+<li>Explorer / Terminal / VS Code / Git client</li>
+<li>User-defined external apps</li>
+</ul>
+</li>
+<li><strong>Undo / Redo</strong>
+<ul>
+<li>Undo or redo previous supported operations</li>
+</ul>
+</li>
+<li><strong>Help</strong>
+<ul>
+<li>Keymap (opens in ReflexViewer and jumps to key section)</li>
+<li>User manual (opens in ReflexViewer)</li>
+<li>About (URL / license / logo)</li>
+</ul>
+</li>
 </ul>
 <hr>
 <h2 id="keymap">Default Key Bindings</h2>
-<p>The default profile is <code>windows</code>.</p>
+<p>Key bindings are controlled by <code>input_keymap_profile</code>.
+The table below is the default <strong>Windows-like</strong> profile.</p>
+<h3>Windows-like (Default)</h3>
 <table>
 <thead>
 <tr>
@@ -139,186 +262,727 @@ It provides a multi-column file list, tree navigation, fast search, and integrat
 </thead>
 <tbody>
 <tr>
-<td>Move</td>
+<td>Navigation</td>
+<td>Up/Down/Left/Right</td>
 <td>Up / Down / Left / Right</td>
-<td>Arrow keys</td>
-</tr>
-<tr>
-<td>Move</td>
-<td>Page up / down</td>
-<td><code>PageUp</code> / <code>PageDown</code></td>
-</tr>
-<tr>
-<td>Open</td>
-<td>Open focused item</td>
-<td><code>Enter</code></td>
-</tr>
-<tr>
-<td>Open</td>
-<td>Open with associated app</td>
-<td><code>Shift+Enter</code></td>
 </tr>
 <tr>
 <td>Navigation</td>
-<td>Go to parent folder</td>
-<td><code>Backspace</code></td>
+<td>Page move</td>
+<td>PageUp / PageDown</td>
 </tr>
 <tr>
-<td>Search</td>
-<td>Open search</td>
-<td><code>/</code></td>
+<td>Action</td>
+<td>Undo</td>
+<td>Ctrl+Z</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Redo</td>
+<td>Ctrl+Shift+Z</td>
 </tr>
 <tr>
 <td>Selection</td>
-<td>Toggle select</td>
-<td><code>Space</code></td>
+<td>Toggle selection</td>
+<td>Space</td>
 </tr>
 <tr>
 <td>Selection</td>
 <td>Select all</td>
-<td><code>Ctrl+A</code></td>
+<td>Ctrl+A</td>
 </tr>
 <tr>
 <td>Selection</td>
 <td>Clear selection</td>
-<td><code>Esc</code></td>
+<td>Esc</td>
 </tr>
 <tr>
-<td>Clipboard</td>
-<td>Copy / Cut / Paste</td>
-<td><code>Ctrl+C</code> / <code>Ctrl+X</code> / <code>Ctrl+V</code></td>
+<td>Action</td>
+<td>Open</td>
+<td>Enter</td>
 </tr>
 <tr>
-<td>Edit</td>
-<td>Rename</td>
-<td><code>F2</code></td>
+<td>Action</td>
+<td>Force open with associated app</td>
+<td>Shift+Enter</td>
 </tr>
 <tr>
-<td>Edit</td>
-<td>Delete to recycle bin</td>
-<td><code>Delete</code></td>
+<td>Action</td>
+<td>Parent folder</td>
+<td>Backspace</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Search</td>
+<td>/</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Refresh</td>
+<td>F5</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Properties</td>
+<td>Alt+Enter</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Open config file</td>
+<td>Ctrl+,</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Exit</td>
+<td>Ctrl+Q</td>
 </tr>
 <tr>
 <td>View</td>
-<td>Toggle tree</td>
-<td><code>Ctrl+Shift+B</code></td>
+<td>Toggle tree view</td>
+<td>Ctrl+Shift+B</td>
 </tr>
 <tr>
-<td>External</td>
+<td>View</td>
+<td>Toggle hidden files</td>
+<td>Ctrl+H</td>
+</tr>
+<tr>
+<td>View</td>
+<td>Toggle size column</td>
+<td>Ctrl+Shift+S</td>
+</tr>
+<tr>
+<td>View</td>
+<td>Toggle time column</td>
+<td>Ctrl+Shift+T</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Sort menu</td>
+<td>S</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Focus PATH</td>
+<td>Ctrl+L</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Focus cycle (list/PATH/tree)</td>
+<td>Tab / Shift+Tab</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>PATH completion</td>
+<td>Tab</td>
+</tr>
+<tr>
+<td>Action</td>
+<td>Keymap</td>
+<td>F1</td>
+</tr>
+<tr>
+<td>History</td>
+<td>Open history</td>
+<td>Ctrl+Y</td>
+</tr>
+<tr>
+<td>Jump List</td>
+<td>Open jump list</td>
+<td>Ctrl+J</td>
+</tr>
+<tr>
+<td>Jump List</td>
+<td>Add current path to jump list</td>
+<td>Ctrl+Shift+J</td>
+</tr>
+<tr>
+<td>Jump List</td>
+<td>Add URL to jump list</td>
+<td>Ctrl+Shift+U</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Copy</td>
+<td>Ctrl+C</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Cut</td>
+<td>Ctrl+X</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Paste</td>
+<td>Ctrl+V</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Delete</td>
+<td>Delete</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Rename</td>
+<td>F2</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Create new</td>
+<td>Ctrl+N</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Duplicate</td>
+<td>Ctrl+D</td>
+</tr>
+<tr>
+<td>File</td>
+<td>Add date prefix</td>
+<td>Ctrl+Shift+D</td>
+</tr>
+<tr>
+<td>ZIP</td>
+<td>Create ZIP</td>
+<td>Ctrl+Alt+Z</td>
+</tr>
+<tr>
+<td>ZIP</td>
+<td>Extract ZIP</td>
+<td>Ctrl+Alt+X</td>
+</tr>
+<tr>
+<td>External app</td>
 <td>Open in Explorer</td>
-<td><code>Ctrl+Alt+E</code></td>
+<td>Ctrl+Alt+E</td>
 </tr>
 <tr>
-<td>External</td>
-<td>Open terminal (default profile)</td>
-<td><code>Ctrl+Alt+C</code></td>
+<td>External app</td>
+<td>Open in terminal (default profile)</td>
+<td>Ctrl+Alt+C</td>
 </tr>
 <tr>
-<td>External</td>
-<td>Open CMD terminal profile</td>
-<td><code>Ctrl+Alt+1</code></td>
+<td>External app</td>
+<td>Open in CMD profile</td>
+<td>Ctrl+Alt+1</td>
 </tr>
 <tr>
-<td>External</td>
-<td>Open PowerShell terminal profile</td>
-<td><code>Ctrl+Alt+2</code></td>
+<td>External app</td>
+<td>Open in PowerShell profile</td>
+<td>Ctrl+Alt+2</td>
 </tr>
 <tr>
-<td>External</td>
-<td>Open WSL terminal profile</td>
-<td><code>Ctrl+Alt+3</code></td>
+<td>External app</td>
+<td>Open in WSL profile</td>
+<td>Ctrl+Alt+3</td>
 </tr>
 <tr>
-<td>External</td>
+<td>External app</td>
 <td>Open in VS Code</td>
-<td><code>Ctrl+Alt+V</code></td>
+<td>Ctrl+Alt+V</td>
 </tr>
 <tr>
-<td>External</td>
+<td>External app</td>
 <td>Open in Git client</td>
-<td><code>Ctrl+Alt+Shift+G</code></td>
-</tr>
-<tr>
-<td>Help</td>
-<td>Keymap help</td>
-<td><code>F1</code></td>
-</tr>
-<tr>
-<td>App</td>
-<td>Exit</td>
-<td><code>Ctrl+Q</code></td>
+<td>Ctrl+Alt+Shift+G</td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p>You can customize key bindings in config.</p>
+</blockquote>
 <hr>
-<h2>Configuration File</h2>
-<p>ReflexFiles uses <code>config.toml</code>.</p>
-<ul>
-<li>Open settings from menu or with <code>Ctrl+,</code></li>
-<li>The config is opened by the default text editor</li>
-<li>Path: <code>%APPDATA%\\ReflexFIles\\config.toml</code></li>
-</ul>
-<p>Related files:</p>
+<h2>Editing the Config File</h2>
+<p>Settings are managed by <strong>editing config files</strong>, not by direct UI toggles.
+Open <code>config.toml</code> from File menu -&gt; Settings, or press <strong>Ctrl+,</strong>.
+<code>config.toml</code> opens with your OS default text editor.</p>
+<h3>Config File Location</h3>
+<p><code>%APPDATA%\\ReflexFIles\\config.toml</code></p>
+<h3>History / Jump List Files</h3>
 <ul>
 <li>History: <code>%APPDATA%\\ReflexFIles\\history.toml</code></li>
-<li>Jump list: <code>%APPDATA%\\ReflexFIles\\jump_list.toml</code></li>
+<li>Jump List: <code>%APPDATA%\\ReflexFIles\\jump_list.toml</code></li>
 </ul>
-<h3>Fixed terminal profiles for <code>Ctrl+Alt+1/2/3</code></h3>
-<p>You can assign fixed Windows Terminal profile names:</p>
+<h3>Fixed Terminal Profiles for <code>Ctrl+Alt+1/2/3</code></h3>
+<p>You can pin Windows Terminal profile names:</p>
 <ul>
-<li><code>external_terminal_profile_cmd</code> for <code>Ctrl+Alt+1</code></li>
-<li><code>external_terminal_profile_powershell</code> for <code>Ctrl+Alt+2</code></li>
-<li><code>external_terminal_profile_wsl</code> for <code>Ctrl+Alt+3</code></li>
+<li><code>external_terminal_profile_cmd</code>: used by <code>Ctrl+Alt+1</code> (CMD)</li>
+<li><code>external_terminal_profile_powershell</code>: used by <code>Ctrl+Alt+2</code> (PowerShell)</li>
+<li><code>external_terminal_profile_wsl</code>: used by <code>Ctrl+Alt+3</code> (WSL)</li>
 </ul>
 <p>Fallback behavior:</p>
 <ul>
-<li>If a per-key setting is empty, <code>external_terminal_profile</code> is used.</li>
-<li>If that is also empty, Windows Terminal default profile is used.</li>
-<li>If Windows Terminal is unavailable, it falls back to <code>cmd.exe</code>.</li>
+<li>If a per-key profile is empty, <code>external_terminal_profile</code> is used</li>
+<li>If it is also empty, Windows Terminal default profile is used</li>
+<li>If Windows Terminal is unavailable, fallback to <code>cmd.exe</code></li>
 </ul>
-<p><code>config.toml</code> also includes a comment section:</p>
+<p>On save, <code>config.toml</code> also includes this comment section:</p>
 <ul>
-<li><code>Detected Windows Terminal profiles at save time</code></li>
+<li><code># Windows Terminal profiles detected at save time</code></li>
 </ul>
-<p>Use those names exactly when setting profile keys.</p>
-<h3>Settings Backup / Restore (Settings)</h3>
+<p>Copy profile names from that list as-is.</p>
+<h3>Config Backup / Restore (Settings Screen)</h3>
 <p>In <strong>Settings &gt; Advanced</strong>:</p>
 <ul>
-<li><strong>Create Config Backup</strong> writes a timestamped backup of config.toml</li>
-<li><strong>Restore Latest Backup</strong> replaces current settings with the newest backup</li>
+<li><strong>Create Config Backup</strong>: save current config with timestamp</li>
+<li><strong>Restore Latest Backup</strong>: overwrite current config with newest backup</li>
 </ul>
-<p>Backup files are stored in:</p>
+<p>Backup location:</p>
 <ul>
-<li>%APPDATA%\ReflexFIles\backups\config-YYYYMMDD-HHMMSS.toml</li>
+<li><code>%APPDATA%\\ReflexFIles\\backups\\config-YYYYMMDD-HHMMSS.toml</code></li>
 </ul>
-<h3>Diagnostic Report Options (Settings)</h3>
-<p>In <strong>Settings &gt; Advanced &gt; Export Diagnostic Report</strong>, you can choose:</p>
+<h3>Diagnostic Report Options (Settings Screen)</h3>
+<p>In <strong>Settings &gt; Advanced &gt; Export Diagnostic Report</strong>:</p>
 <ul>
 <li><strong>Mask sensitive paths</strong> (recommended)</li>
 <li><strong>Save as ZIP</strong></li>
 <li><strong>Copy output path to clipboard</strong></li>
-<li><strong>Open after export</strong></li>
+<li><strong>Auto-open output after export</strong></li>
 </ul>
-<p>Diagnostic reports are stored in:</p>
+<p>Diagnostic output folder:</p>
 <ul>
-<li>%APPDATA%\ReflexFIles\diagnostics\</li>
+<li><code>%APPDATA%\\ReflexFIles\\diagnostics\\</code></li>
 </ul>
-<h3>Shortcut Conflict Warnings (Settings)</h3>
-<p>In <strong>Settings &gt; Advanced</strong>, ReflexFiles shows shortcut conflict warnings for:</p>
+<h3>Google Drive (Personal Google Cloud Setup and Usage)</h3>
+<p>ReflexFiles does not distribute shared Google API credentials in the public repository.
+Each user configures and owns their own Google Cloud project and OAuth client.</p>
+<p>Current Google Drive support is intentionally limited.</p>
 <ul>
-<li>Known global shortcuts (example: <code>Ctrl+Alt+G</code> with Google Drive)</li>
-<li>Internal duplicates (same key assigned to multiple actions)</li>
+<li><code>gdrive://root/my-drive</code> lists real Drive data only when backend mode is <code>Real Google Drive API</code></li>
+<li>if backend mode is <code>Stub (virtual test data)</code>, <code>gdrive://</code> shows test data</li>
+<li>viewing is available for viewer-supported formats (text / markdown / image)</li>
+<li>write-back to Google Drive is manual (<code>Write Back to Google Drive</code> from context menu)</li>
+<li>opening a Google Drive file in an external app uses a local workcopy (no automatic upload-back)</li>
+<li>PATH completion/candidate preview does not target <code>gdrive://</code> paths</li>
+<li>for heavy Google Drive workflows, use Google Drive local sync and work on the synced local folder</li>
 </ul>
+<h4>Security Rules (Mandatory)</h4>
+<ul>
+<li>Do not publish API keys, OAuth client secrets, or tokens in GitHub.</li>
+<li>Do not commit <code>.env</code> files containing credential values.</li>
+<li>Keep credentials only in your own local environment / Google Cloud project.</li>
+</ul>
+<h4>Cost (Important)</h4>
+<ul>
+<li>Google Drive API usage itself is documented by Google as no additional cost.</li>
+<li>Exceeding Drive API request quotas does not create extra billing by itself.</li>
+<li>Charges can still occur if you enable other paid Google Cloud services in the same project.</li>
+<li>Recommended: use a dedicated Google Cloud project for ReflexFiles and enable only <code>Google Drive API</code>.</li>
+</ul>
+<h4>No-Charge Operating Rules (Recommended)</h4>
+<ol>
+<li>Create a dedicated Google Cloud project only for ReflexFiles.</li>
+<li>Enable only <code>Google Drive API</code>.</li>
+<li>Do not request quota increases.</li>
+<li>If billing is linked, configure budget alerts.</li>
+<li>Check monthly Billing report and keep it at <code>¥0</code> / <code>$0</code>.</li>
+<li>If you require strict no-charge operation, unlink billing from that project (some features may become unavailable).</li>
+</ol>
+<h4>Google Cloud Setup (User-Owned)</h4>
+<ol>
+<li>Open Google Cloud Console and create/select a project (for example <code>ReflexFiles Personal</code>).</li>
+<li>Open <code>Google Auth Platform</code> and fill required app information.</li>
+<li>Enable <code>Google Drive API</code> in <code>APIs &amp; Services</code> -&gt; <code>Library</code>.</li>
+<li>Configure OAuth consent screen.
+<ul>
+<li>If your Gmail appears as &quot;ineligible&quot; in Test users, project Owner/Editor accounts may already be usable without explicit test-user registration.</li>
+</ul>
+</li>
+<li>Create OAuth client (<code>Desktop app</code>) and save:
+<ul>
+<li>Client ID (required)</li>
+<li>Client secret (optional; use only if needed)</li>
+</ul>
+</li>
+</ol>
+<h4>ReflexFiles Setup (Settings)</h4>
+<ol>
+<li>Open <strong>Settings &gt; Advanced</strong> and open the Google Drive auth block.</li>
+<li>Fill:
+<ul>
+<li><code>OAuth Client ID</code> (required)</li>
+<li><code>OAuth Client Secret (optional)</code> (normally blank; used only when Google requires it)</li>
+<li><code>OAuth Redirect URI</code> (default <code>http://127.0.0.1:45123/oauth2/callback</code>, must match exactly)</li>
+</ul>
+</li>
+<li>Click <strong>Start Sign-In</strong> and complete Google login/consent in browser.</li>
+<li>ReflexFiles auto-fills Callback URL after consent.
+<ul>
+<li>If auto-capture fails, paste the full browser URL including both <code>state</code> and <code>code</code>.</li>
+</ul>
+</li>
+<li>Enter Account ID (email) and click <strong>Complete Sign-In</strong>.</li>
+<li>Confirm:
+<ul>
+<li>success message</li>
+<li>auth phase becomes Authorized</li>
+</ul>
+</li>
+<li>After one successful sign-in, saved credentials are reused on next launch and ReflexFiles reconnects automatically on <code>gdrive://</code> access.</li>
+<li>On sign-out, saved refresh token is cleared and Google Drive read-cache files are removed from local temp.</li>
+</ol>
+<h4>Troubleshooting (Common)</h4>
+<ol>
+<li><code>Google token exchange failed: client_secret is missing.</code>
+<ul>
+<li>Fill optional client secret and retry <strong>Complete Sign-In</strong>.</li>
+</ul>
+</li>
+<li>Browser shows <code>ERR_CONNECTION_REFUSED</code>
+<ul>
+<li>Expected in this flow; copy full address-bar URL and continue.</li>
+</ul>
+</li>
+<li>callback parse error (<code>state</code>/<code>code</code> missing)
+<ul>
+<li>Paste the full callback URL, not partial text.</li>
+</ul>
+</li>
+<li><code>redirect_uri_mismatch</code>
+<ul>
+<li>Ensure exact URI match between ReflexFiles and Google Cloud config.</li>
+</ul>
+</li>
+<li>Auth succeeds but only mock files appear
+<ul>
+<li>Check backend mode. <code>Stub</code> mode shows test data, not real Drive files.</li>
+</ul>
+</li>
+<li>Write-back says no local workcopy
+<ul>
+<li>Open the target file once in an external app first.</li>
+</ul>
+</li>
+<li>Write-back conflict
+<ul>
+<li>Re-open the same Google Drive file in external app to refresh local workcopy against latest remote, then manually merge and retry write-back.</li>
+</ul>
+</li>
+<li><code>Request had insufficient authentication scopes</code> on write-back
+<ul>
+<li>Sign out, then run sign-in again so ReflexFiles obtains <code>https://www.googleapis.com/auth/drive</code>.</li>
+</ul>
+</li>
+</ol>
+<h3>Shortcut Conflict Warnings (Settings Screen)</h3>
+<p>In <strong>Settings &gt; Advanced</strong>, conflict warnings include:</p>
+<ul>
+<li>Known global shortcut conflicts (for example, <code>Ctrl+Alt+G</code> and Google Drive)</li>
+<li>In-app duplicate assignments (same key bound to multiple actions)</li>
+</ul>
+<blockquote>
+<p>Each config key has comments describing valid values and choices.</p>
+</blockquote>
 <hr>
-<h2>Known Limitations</h2>
+<h2>Typical Workflows</h2>
+<h3>Example 1: Organize many files quickly</h3>
+<ol>
+<li>Navigate to target folder from PATH bar</li>
+<li>Press <strong>Ctrl+A</strong> then <strong>Delete</strong></li>
+<li>Use <strong>Undo</strong> if needed</li>
+</ol>
+<h3>Example 2: Manage work folders with Jump List</h3>
+<ol>
+<li>Open a work folder</li>
+<li>Press <strong>Ctrl+Shift+J</strong> to add it</li>
+<li>Next time, jump instantly via <strong>Ctrl+J</strong></li>
+</ol>
+<h3>Example 3: Create and share a ZIP</h3>
+<ol>
+<li>Select target files</li>
+<li>Run <strong>Create ZIP</strong></li>
+<li>Open/send the generated ZIP</li>
+</ol>
+<hr>
+<h2>Known Issues</h2>
 <ul>
-<li>Some protected system folders may not be visible in tree view due to permissions.</li>
-<li>Drag-and-drop is not supported.</li>
-<li>External app launch requires path configuration for some tools.</li>
+<li>Some system folders may not appear in tree view due to permissions.
+<ul>
+<li>Workaround: move from an accessible folder or enter path directly in PATH bar.</li>
+</ul>
+</li>
+<li>Drag and drop is not supported yet.</li>
+<li>External apps (VS Code / Git client) cannot be opened when not configured.
+<ul>
+<li>Workaround: set <code>external_vscode_path</code> / <code>external_git_client_path</code> in <code>config.toml</code>.</li>
+</ul>
+</li>
+<li>In folders with huge numbers of items, automatic tree expansion may be limited.</li>
 </ul>
 <hr>
 <h2>License</h2>
-<p>This application is distributed under the MIT License.</p>
+<p>This application is provided under the <strong>MIT License</strong>.</p>
+<hr>
+<h2>Disclaimer</h2>
+<ul>
+<li>The author is not responsible for any damage caused by use of this software.</li>
+<li>Back up important files before critical file operations.</li>
+</ul>
+<hr>
+<h2>OSS and Licenses Used</h2>
+<p>Major OSS dependencies and licenses (see each project LICENSE for full details):</p>
+<ul>
+<li><strong>Tauri</strong>: MIT / Apache-2.0</li>
+<li><strong>tauri-plugin-opener</strong>: MIT / Apache-2.0</li>
+<li><strong>tauri-plugin-global-shortcut</strong>: MIT / Apache-2.0</li>
+<li><strong>Svelte / SvelteKit</strong>: MIT</li>
+<li><strong>Vite</strong>: MIT</li>
+<li><strong>Rust crates</strong> (serde, serde_json, toml, chrono, windows, trash, zip, notify, once_cell, etc.):
+mostly MIT or Apache-2.0</li>
+</ul>
+<hr>
+<h2>Appendix: Full <code>config.toml</code> Key List</h2>
+<h3>General / UI / Behavior</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example / Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config_version</code></td>
+<td>number</td>
+<td>Config schema version</td>
+<td>Usually auto-updated</td>
+</tr>
+<tr>
+<td><code>perf_dir_stats_timeout_ms</code></td>
+<td>number</td>
+<td>Directory stats timeout (ms)</td>
+<td>Minimum 500</td>
+</tr>
+<tr>
+<td><code>ui_show_hidden</code></td>
+<td>boolean</td>
+<td>Show hidden files</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>ui_show_size</code></td>
+<td>boolean</td>
+<td>Show size column</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>ui_show_time</code></td>
+<td>boolean</td>
+<td>Show timestamp column</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>ui_show_tree</code></td>
+<td>boolean</td>
+<td>Show tree view</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>view_sort_key</code></td>
+<td>string</td>
+<td>Default sort key</td>
+<td><code>name</code> / <code>size</code> / <code>type</code> / <code>modified</code></td>
+</tr>
+<tr>
+<td><code>view_sort_order</code></td>
+<td>string</td>
+<td>Default sort order</td>
+<td><code>asc</code> / <code>desc</code></td>
+</tr>
+<tr>
+<td><code>session_last_path</code></td>
+<td>string</td>
+<td>Last PATH on previous exit</td>
+<td>e.g. <code>C:/Users</code></td>
+</tr>
+<tr>
+<td><code>history_search</code></td>
+<td>array(string)</td>
+<td>Search history</td>
+<td>e.g. <code>[&quot;foo&quot;,&quot;bar&quot;]</code></td>
+</tr>
+<tr>
+<td><code>ui_theme</code></td>
+<td>string</td>
+<td>Theme</td>
+<td><code>light</code> / <code>dark</code></td>
+</tr>
+<tr>
+<td><code>ui_language</code></td>
+<td>string</td>
+<td>Display language</td>
+<td><code>en</code> / <code>ja</code></td>
+</tr>
+</tbody>
+</table>
+<h3>Window</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example / Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ui_window_x</code></td>
+<td>number</td>
+<td>Window X position (px)</td>
+<td><code>0</code> means no restore</td>
+</tr>
+<tr>
+<td><code>ui_window_y</code></td>
+<td>number</td>
+<td>Window Y position (px)</td>
+<td><code>0</code> means no restore</td>
+</tr>
+<tr>
+<td><code>ui_window_width</code></td>
+<td>number</td>
+<td>Window width (px)</td>
+<td><code>0</code> means no restore</td>
+</tr>
+<tr>
+<td><code>ui_window_height</code></td>
+<td>number</td>
+<td>Window height (px)</td>
+<td><code>0</code> means no restore</td>
+</tr>
+<tr>
+<td><code>ui_window_maximized</code></td>
+<td>boolean</td>
+<td>Maximized state</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<h3>Input / Keymap</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example / Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_keymap_profile</code></td>
+<td>string</td>
+<td>Keymap profile</td>
+<td><code>windows</code> / <code>vim</code></td>
+</tr>
+<tr>
+<td><code>input_keymap_custom</code></td>
+<td>table</td>
+<td>Key override mapping</td>
+<td>e.g. <code>{ open = &quot;Enter&quot;, jump_add_url = &quot;Ctrl+Shift+U&quot; }</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Action IDs for <code>input_keymap_custom</code> are shown in Help -&gt; Keymap.</p>
+</blockquote>
+<h3>External Apps</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example / Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>external_associations</code></td>
+<td>table</td>
+<td>Per-extension app association</td>
+<td>e.g. <code>{ &quot;.txt&quot; = &quot;C:\\App\\Editor.exe&quot; }</code></td>
+</tr>
+<tr>
+<td><code>external_apps</code></td>
+<td>array(table)</td>
+<td>External app list</td>
+<td><code>name</code>/<code>command</code>/<code>args</code>/<code>shortcut</code></td>
+</tr>
+<tr>
+<td><code>external_git_client_path</code></td>
+<td>string</td>
+<td>Git client executable path</td>
+<td>Empty = use default</td>
+</tr>
+<tr>
+<td><code>external_vscode_path</code></td>
+<td>string</td>
+<td>VS Code executable path</td>
+<td>Empty = try <code>code</code></td>
+</tr>
+<tr>
+<td><code>external_terminal_profile</code></td>
+<td>string</td>
+<td>Common terminal profile</td>
+<td>Empty = Windows Terminal default</td>
+</tr>
+<tr>
+<td><code>external_terminal_profile_cmd</code></td>
+<td>string</td>
+<td>Profile for <code>Ctrl+Alt+1</code></td>
+<td>Empty = <code>external_terminal_profile</code></td>
+</tr>
+<tr>
+<td><code>external_terminal_profile_powershell</code></td>
+<td>string</td>
+<td>Profile for <code>Ctrl+Alt+2</code></td>
+<td>Empty = <code>external_terminal_profile</code></td>
+</tr>
+<tr>
+<td><code>external_terminal_profile_wsl</code></td>
+<td>string</td>
+<td>Profile for <code>Ctrl+Alt+3</code></td>
+<td>Empty = <code>external_terminal_profile</code></td>
+</tr>
+</tbody>
+</table>
+<p>In <code>external_apps.args</code>, <code>{path}</code> and <code>{cwd}</code> are available.
+Example:</p>
+<pre><code class="language-toml">external_apps = [
+  { name = &quot;Everything&quot;, command = &quot;C:\\Path\\Everything.exe&quot;, args = [&quot;-path&quot;, &quot;{path}&quot;], shortcut = &quot;Ctrl+Alt+E&quot; }
+]
+</code></pre>
+<h3>Logging</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example / Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>log_path</code></td>
+<td>string</td>
+<td>Log output file</td>
+<td>e.g. <code>%APPDATA%\\ReflexFIles\\app.log</code></td>
+</tr>
+<tr>
+<td><code>log_enabled</code></td>
+<td>boolean</td>
+<td>Enable logging</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<h3>Note: Key assignment reference</h3>
+<p>Default key assignments are available in <strong>Help -&gt; Keymap</strong>.
+Default bindings are not written to <code>config.toml</code>. Use <code>input_keymap_custom</code> for overrides.</p>
 
   </body>
 </html>

@@ -1,5 +1,7 @@
 export type EntryType = "file" | "dir";
 export type StorageProvider = "local" | "gdrive";
+export type GdriveAuthPhase = "signed_out" | "pending" | "authorized";
+export type GdriveBackendMode = "stub" | "real";
 
 export interface ResourceRef {
   provider: StorageProvider;
@@ -15,6 +17,83 @@ export interface ProviderCapabilities {
   can_delete: boolean;
   can_archive_create: boolean;
   can_archive_extract: boolean;
+}
+
+export interface GdriveAuthStatus {
+  phase: GdriveAuthPhase;
+  backendMode: GdriveBackendMode;
+  accountId: string | null;
+  grantedScopes: string[];
+  hasWriteScope: boolean;
+  refreshTokenPersisted: boolean;
+  pendingStartedAtMs: number | null;
+  accessTokenExpiresAtMs: number | null;
+  lastError: string;
+  lastScopeInsufficientAtMs: number | null;
+  lastWriteConflictAtMs: number | null;
+  lastTokenRefreshError: string;
+  lastTokenRefreshErrorAtMs: number | null;
+  tokenStoreBackend: string;
+  tokenStoreAvailable: boolean;
+}
+
+export interface GdriveAuthStartPayload {
+  authorizationUrl: string;
+  issuedAtMs: number;
+  pendingExpiresInSec: number;
+}
+
+export interface GdriveAuthCallbackValidated {
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+  clientId: string;
+  scopes: string[];
+}
+
+export interface GdriveAuthCallbackCaptured {
+  callbackUrl: string;
+  state: string;
+  code: string;
+}
+
+export interface GdriveRevisionSnapshot {
+  resourceId: string;
+  fileId: string;
+  modified: string;
+  size: number;
+  md5Checksum: string | null;
+  version: string | null;
+  localSha256: string;
+}
+
+export interface GdriveEditWorkcopy {
+  localPath: string;
+  fileName: string;
+  revision: GdriveRevisionSnapshot;
+}
+
+export interface GdriveApplyEditResult {
+  uploaded: boolean;
+  unchanged: boolean;
+  conflict: boolean;
+  revision: GdriveRevisionSnapshot;
+}
+
+export interface GdriveEditWorkcopyState {
+  resourceId: string;
+  exists: boolean;
+  dirty: boolean;
+  fileName: string;
+  localPath: string;
+  revision: GdriveRevisionSnapshot | null;
+  updatedAtMs: number | null;
+  sizeBytes: number;
+}
+
+export interface GdriveEditWorkcopyCleanupResult {
+  removedFiles: number;
+  removedBytes: number;
 }
 
 export type {

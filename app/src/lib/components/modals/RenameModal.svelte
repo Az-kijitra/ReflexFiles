@@ -39,6 +39,7 @@
           handleConfirmCancelKeydown(event, {
             onConfirm: confirmRename,
             onCancel: cancelRename,
+            stopPropagation: true,
           });
         }}
       />

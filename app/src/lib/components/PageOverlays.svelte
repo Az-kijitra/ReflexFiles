@@ -63,8 +63,10 @@
   export let pasteApplyAll = false;
   export let pasteConfirmIndex = 0;
   export let pasteConflicts = [];
+  export let allowPasteKeepBoth = true;
   export let confirmPasteOverwrite;
   export let confirmPasteSkip;
+  export let confirmPasteKeepBoth;
   export let cancelPasteConfirm;
 
   export let createOpen = false;
@@ -216,8 +218,10 @@
     bind:pasteConfirmIndex
     {t}
     {pasteConflicts}
+    {allowPasteKeepBoth}
     {confirmPasteOverwrite}
     {confirmPasteSkip}
+    {confirmPasteKeepBoth}
     {cancelPasteConfirm}
     {trapModalTab}
   />

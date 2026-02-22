@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
@@ -8,6 +8,7 @@ import { ignoreTauriPatterns as defaultIgnoreTauriPatterns } from '../../e2e/log
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(scriptDir, '..', '..');
+const repoRoot = resolve(appRoot, '..');
 
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 
@@ -145,8 +146,6 @@ const killLingeringViteDevWin = (rootPath, reason) => {
 const driverPort = Number(process.env.E2E_TAURI_DRIVER_PORT ?? 4444);
 const driverCmdBase =
   process.env.E2E_TAURI_DRIVER_CMD ?? `tauri-driver --port ${driverPort}`;
-const repoRoot = resolve(appRoot, '..');
-
 const defaultDriverCandidates = [
   resolve(appRoot, 'msedgedriver.exe'),
   resolve(repoRoot, 'msedgedriver.exe'),
@@ -318,6 +317,97 @@ const forceKillPidTree = (pid) => {
   });
 };
 
+const isPidAlive = (pid) => {
+  if (!pid || !Number.isFinite(pid)) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const e2eLockPath = process.env.E2E_TAURI_RUN_LOCK_PATH ?? resolve(repoRoot, 'e2e_artifacts', '.tauri-e2e.lock.json');
+const e2eLockWaitMs = Number(process.env.E2E_TAURI_RUN_LOCK_WAIT_MS ?? 120_000);
+const e2eLockPollMs = Number(process.env.E2E_TAURI_RUN_LOCK_POLL_MS ?? 300);
+let e2eLockAcquired = false;
+
+const readLockFile = () => {
+  if (!existsSync(e2eLockPath)) return null;
+  try {
+    return JSON.parse(readFileSync(e2eLockPath, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+
+const tryReleaseLock = () => {
+  if (!e2eLockAcquired) return;
+  const lock = readLockFile();
+  if (Number(lock?.pid) !== Number(process.pid)) return;
+  try {
+    unlinkSync(e2eLockPath);
+  } catch {
+    // ignore
+  }
+  e2eLockAcquired = false;
+};
+
+const acquireE2eLock = async () => {
+  mkdirSync(dirname(e2eLockPath), { recursive: true });
+  const startedAt = Date.now();
+  let notified = false;
+
+  while (Date.now() - startedAt < e2eLockWaitMs) {
+    const current = readLockFile();
+    const currentPid = Number(current?.pid ?? 0);
+    const occupied =
+      Number.isFinite(currentPid) &&
+      currentPid > 0 &&
+      currentPid !== process.pid &&
+      isPidAlive(currentPid);
+
+    if (!occupied) {
+      try {
+        writeFileSync(
+          e2eLockPath,
+          JSON.stringify(
+            {
+              pid: process.pid,
+              command: testCmd,
+              created_at: new Date().toISOString(),
+            },
+            null,
+            2
+          ),
+          'utf8'
+        );
+      } catch {
+        await sleep(e2eLockPollMs);
+        continue;
+      }
+
+      const verified = readLockFile();
+      if (Number(verified?.pid) === Number(process.pid)) {
+        e2eLockAcquired = true;
+        return;
+      }
+      await sleep(e2eLockPollMs);
+      continue;
+    }
+
+    if (!notified) {
+      console.log(`[runner] waiting for another e2e runner (pid=${currentPid}) to finish...`);
+      notified = true;
+    }
+    await sleep(e2eLockPollMs);
+  }
+
+  throw new Error(`e2e runner lock wait timed out after ${e2eLockWaitMs}ms: ${e2eLockPath}`);
+};
+
 const stopChild = async (name, child) => {
   if (!child?.pid) {
     return;
@@ -342,6 +432,9 @@ const stopChild = async (name, child) => {
   if (exited !== null) {
     return;
   }
+  if (!isPidAlive(child.pid)) {
+    return;
+  }
 
   try {
     child.kill('SIGKILL');
@@ -350,7 +443,7 @@ const stopChild = async (name, child) => {
   }
 
   exited = await waitForChildExit(child, 600);
-  if (exited === null) {
+  if (exited === null && isPidAlive(child.pid)) {
     console.log(`[runner] forced shutdown timeout: ${name} (pid=${child.pid})`);
   } else {
     console.log(`[runner] forced shutdown: ${name}`);
@@ -396,6 +489,8 @@ if (process.platform === 'win32') {
     await ensurePortFreedWin(appReadyPort, `port ${appReadyPort} startup cleanup`);
   }
 }
+
+await acquireE2eLock();
 
 console.log(
   `[runner] app bootstrap mode: ${effectiveAppPath ? 'existing-binary + vite-dev' : 'tauri-dev build-and-run'}`
@@ -509,12 +604,15 @@ try {
   process.exitCode = 1;
 } finally {
   console.log('[runner] shutdown start...');
+  const shutdownTimeoutMs = Number(process.env.E2E_TAURI_SHUTDOWN_TIMEOUT_MS ?? 30_000);
   try {
     await withTimeout(
       (async () => {
-        await stopChild('app', app);
-        await stopChild('api', api);
-        await stopChild('driver', driver);
+        await Promise.all([
+          stopChild('app', app),
+          stopChild('api', api),
+          stopChild('driver', driver),
+        ]);
         if (process.platform === 'win32') {
           if (killViteDev) {
             killLingeringViteDevWin(appRoot, 'vite-dev shutdown cleanup');
@@ -525,7 +623,7 @@ try {
           }
         }
       })(),
-      Number(process.env.E2E_TAURI_SHUTDOWN_TIMEOUT_MS ?? 10_000),
+      shutdownTimeoutMs,
       'runner shutdown'
     );
   } catch (error) {
@@ -537,6 +635,7 @@ try {
     }
   }
   console.log('[runner] shutdown complete.');
+  tryReleaseLock();
   const finalExitCode = typeof process.exitCode === 'number' ? process.exitCode : 0;
   process.exit(finalExitCode);
 }

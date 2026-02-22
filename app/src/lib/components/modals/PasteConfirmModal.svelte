@@ -9,10 +9,21 @@
   export let pasteConflicts = [];
   export let pasteApplyAll = true;
   export let pasteConfirmIndex = 0;
+  export let allowPasteKeepBoth = true;
   export let confirmPasteOverwrite;
   export let confirmPasteSkip;
+  export let confirmPasteKeepBoth;
   export let cancelPasteConfirm;
   export let trapModalTab;
+
+  $: choices = [
+    { label: t("paste.overwrite"), onSelect: confirmPasteOverwrite },
+    ...(allowPasteKeepBoth
+      ? [{ label: t("paste.keep_both"), onSelect: confirmPasteKeepBoth }]
+      : []),
+    { label: t("paste.skip"), onSelect: confirmPasteSkip },
+    { label: t("cancel"), onSelect: cancelPasteConfirm },
+  ];
 </script>
 
 <ModalShell
@@ -21,19 +32,13 @@
   {trapModalTab}
   onKeydown={(event) => {
     handleChoiceModalKeydown(event, {
-      choiceCount: 3,
+      choiceCount: choices.length,
       selectedIndex: pasteConfirmIndex,
       setSelectedIndex: (index) => {
         pasteConfirmIndex = index;
       },
       onSubmitIndex: (index) => {
-        if (index === 0) {
-          confirmPasteOverwrite();
-        } else if (index === 1) {
-          confirmPasteSkip();
-        } else {
-          cancelPasteConfirm();
-        }
+        choices[index]?.onSelect?.();
       },
       onCancel: cancelPasteConfirm,
     });
@@ -62,10 +67,6 @@
     onChange={(index) => {
       pasteConfirmIndex = index;
     }}
-    choices={[
-      { label: t("paste.overwrite"), onSelect: confirmPasteOverwrite },
-      { label: t("paste.skip"), onSelect: confirmPasteSkip },
-      { label: t("cancel"), onSelect: cancelPasteConfirm },
-    ]}
+    {choices}
   />
 </ModalShell>

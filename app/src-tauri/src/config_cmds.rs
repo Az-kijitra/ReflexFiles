@@ -1,4 +1,5 @@
 use crate::config::{config_path, load_config, save_config, save_history, save_jump_list};
+use crate::config_defaults::DEFAULT_GDRIVE_OAUTH_REDIRECT_URI;
 use crate::error::{format_error, AppErrorKind};
 use crate::types::{AppConfig, FileIconMode, JumpItem, Language, SortKey, SortOrder, Theme};
 use chrono::Local;
@@ -184,7 +185,10 @@ fn mask_pairs(cfg_path: &Path, log_path: &str) -> Vec<(String, String)> {
     }
 
     let cfg_parent = config_base_dir(cfg_path);
-    pairs.push((cfg_parent.to_string_lossy().to_string(), "%RF_CONFIG_DIR%".to_string()));
+    pairs.push((
+        cfg_parent.to_string_lossy().to_string(),
+        "%RF_CONFIG_DIR%".to_string(),
+    ));
 
     let normalized_log = normalize_executable_path(log_path);
     if !normalized_log.is_empty() {
@@ -245,11 +249,15 @@ pub fn undo_redo_load_session(limit: Option<usize>) -> Result<UndoRedoSession, S
         return Ok(UndoRedoSession::default());
     }
 
-    let raw = std::fs::read_to_string(&session_path)
-        .map_err(|e| format_error(AppErrorKind::Io, format!("read undo/redo session failed: {e}")))?;
+    let raw = std::fs::read_to_string(&session_path).map_err(|e| {
+        format_error(
+            AppErrorKind::Io,
+            format!("read undo/redo session failed: {e}"),
+        )
+    })?;
 
-    let mut session =
-        serde_json::from_str::<UndoRedoSession>(&raw).unwrap_or_else(|_| UndoRedoSession::default());
+    let mut session = serde_json::from_str::<UndoRedoSession>(&raw)
+        .unwrap_or_else(|_| UndoRedoSession::default());
     clamp_undo_redo_entries(&mut session.undo_stack, max_entries);
     clamp_undo_redo_entries(&mut session.redo_stack, max_entries);
     Ok(session)
@@ -284,8 +292,12 @@ pub fn undo_redo_save_session(
     let serialized = serde_json::to_string(&payload)
         .map_err(|e| format_error(AppErrorKind::InvalidPath, format!("serialize failed: {e}")))?;
 
-    std::fs::write(&session_path, serialized)
-        .map_err(|e| format_error(AppErrorKind::Io, format!("write undo/redo session failed: {e}")))?;
+    std::fs::write(&session_path, serialized).map_err(|e| {
+        format_error(
+            AppErrorKind::Io,
+            format!("write undo/redo session failed: {e}"),
+        )
+    })?;
 
     Ok(())
 }
@@ -336,7 +348,10 @@ pub fn config_restore_latest_backup() -> Result<AppConfig, String> {
     let (_, cfg_path) = ensure_config()?;
     let backups_dir = config_backups_dir(&cfg_path);
     if !backups_dir.exists() {
-        return Err(format_error(AppErrorKind::NotFound, "backup directory not found"));
+        return Err(format_error(
+            AppErrorKind::NotFound,
+            "backup directory not found",
+        ));
     }
 
     let mut entries: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
@@ -361,7 +376,10 @@ pub fn config_restore_latest_backup() -> Result<AppConfig, String> {
     }
 
     if entries.is_empty() {
-        return Err(format_error(AppErrorKind::NotFound, "no backup files found"));
+        return Err(format_error(
+            AppErrorKind::NotFound,
+            "no backup files found",
+        ));
     }
 
     entries.sort_by(|a, b| b.1.cmp(&a.1));
@@ -370,8 +388,12 @@ pub fn config_restore_latest_backup() -> Result<AppConfig, String> {
         .map_err(|e| format_error(AppErrorKind::Io, format!("restore failed: {e}")))?;
 
     let restored = load_config();
-    save_config(&restored)
-        .map_err(|e| format_error(AppErrorKind::Io, format!("save restored config failed: {e}")))?;
+    save_config(&restored).map_err(|e| {
+        format_error(
+            AppErrorKind::Io,
+            format!("save restored config failed: {e}"),
+        )
+    })?;
     Ok(restored)
 }
 
@@ -387,6 +409,9 @@ pub fn config_save_preferences(
     external_terminal_profile_cmd: Option<String>,
     external_terminal_profile_powershell: Option<String>,
     external_terminal_profile_wsl: Option<String>,
+    gdrive_oauth_client_id: Option<String>,
+    gdrive_oauth_redirect_uri: Option<String>,
+    gdrive_account_id: Option<String>,
 ) -> Result<AppConfig, String> {
     let (mut config, _) = ensure_config()?;
 
@@ -419,6 +444,20 @@ pub fn config_save_preferences(
     }
     if let Some(value) = external_terminal_profile_wsl {
         config.external_terminal_profile_wsl = normalize_single_line(&value, 256);
+    }
+    if let Some(value) = gdrive_oauth_client_id {
+        config.gdrive_oauth_client_id = normalize_single_line(&value, 1024);
+    }
+    if let Some(value) = gdrive_oauth_redirect_uri {
+        let normalized = normalize_single_line(&value, 1024);
+        config.gdrive_oauth_redirect_uri = if normalized.is_empty() {
+            DEFAULT_GDRIVE_OAUTH_REDIRECT_URI.to_string()
+        } else {
+            normalized
+        };
+    }
+    if let Some(value) = gdrive_account_id {
+        config.gdrive_account_id = normalize_single_line(&value, 320);
     }
 
     persist_config(&config)?;
@@ -457,7 +496,10 @@ pub fn config_generate_diagnostic_report(
 
     report.push_str("[config]\n");
     report.push_str(&format!("config_path: {}\n", cfg_path.to_string_lossy()));
-    report.push_str(&format!("config_exists: {}\n", bool_mark(cfg_path.exists())));
+    report.push_str(&format!(
+        "config_exists: {}\n",
+        bool_mark(cfg_path.exists())
+    ));
     report.push_str(&format!("ui_theme: {}\n", config.ui_theme.as_str()));
     report.push_str(&format!("ui_language: {}\n", config.ui_language.as_str()));
     report.push_str(&format!(

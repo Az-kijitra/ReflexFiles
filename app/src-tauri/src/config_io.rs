@@ -199,6 +199,18 @@ fn localize_config_comments_to_en(mut text: String) -> String {
         ("# Git クライアントのパス。\n", "# Git client path.\n"),
         ("# VSCode のパス。\n", "# VS Code path.\n"),
         (
+            "# Google Drive OAuth クライアントID（client_secretは保存しません）。\n",
+            "# Google Drive OAuth client_id (client_secret is not stored).\n",
+        ),
+        (
+            "# Google Drive OAuth リダイレクトURI。\n",
+            "# Google Drive OAuth redirect_uri.\n",
+        ),
+        (
+            "# Google Drive 認証に使うアカウントID（メール）。\n",
+            "# Account ID (email) used for Google Drive auth.\n",
+        ),
+        (
             "# ターミナルプロファイル名。空で既定。\n",
             "# Terminal profile name (empty uses default profile).\n",
         ),
@@ -382,6 +394,21 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "external_vscode_path = {}\n\n",
         toml_string(&config.external_vscode_path)
     ));
+    out.push_str("# Google Drive OAuth クライアントID（client_secretは保存しません）。\n");
+    out.push_str(&format!(
+        "gdrive_oauth_client_id = {}\n\n",
+        toml_string(&config.gdrive_oauth_client_id)
+    ));
+    out.push_str("# Google Drive OAuth リダイレクトURI。\n");
+    out.push_str(&format!(
+        "gdrive_oauth_redirect_uri = {}\n\n",
+        toml_string(&config.gdrive_oauth_redirect_uri)
+    ));
+    out.push_str("# Google Drive 認証に使うアカウントID（メール）。\n");
+    out.push_str(&format!(
+        "gdrive_account_id = {}\n\n",
+        toml_string(&config.gdrive_account_id)
+    ));
     let terminal_profile_names = detect_terminal_profile_names();
 
     if matches!(config.ui_language, Language::Ja) {
@@ -415,7 +442,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
             out.push('\n');
         }
     } else {
-        out.push_str("# Terminal profile name (global fallback). Empty uses Windows Terminal default.\n");
+        out.push_str(
+            "# Terminal profile name (global fallback). Empty uses Windows Terminal default.\n",
+        );
         out.push_str(&format!(
             "external_terminal_profile = {}\n\n",
             toml_string(&config.external_terminal_profile)
@@ -485,5 +514,3 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     file.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
-
-

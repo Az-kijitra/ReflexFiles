@@ -24,6 +24,7 @@
     <div class="menu-group">
       <button
         class="menu-button {menuOpen === group ? 'active' : ''}"
+        data-menu-group={group}
         onclick={() => toggleMenu(group)}
       >
         {t(`menu.${group}`)}

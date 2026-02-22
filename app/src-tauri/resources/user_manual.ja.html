@@ -100,7 +100,7 @@
 </li>
 <li><strong>検索</strong>
 <ul>
-<li><code>/</code> で Search バーを表示し、文字列を入力します。</li>
+<li><strong>Ctrl+F</strong> で Search バーを表示し、文字列を入力します。</li>
 </ul>
 </li>
 <li><strong>コピー / ペースト</strong>
@@ -110,12 +110,12 @@
 </li>
 <li><strong>よく使う場所を登録</strong>
 <ul>
-<li><strong>Ctrl+Shift+J</strong> でジャンプリストに追加し、<strong>Ctrl+J</strong> で開きます。</li>
+<li><strong>Ctrl+D</strong> でジャンプリストに追加し、<strong>Ctrl+Shift+O</strong> で開きます。</li>
 </ul>
 </li>
 <li><strong>フォルダ履歴</strong>
 <ul>
-<li><strong>Ctrl+Shift+Y</strong> でフォルダの履歴を開きます。</li>
+<li><strong>Ctrl+H</strong> でフォルダの履歴を開きます。</li>
 </ul>
 </li>
 </ol>
@@ -143,20 +143,33 @@
 <h3>PATH バー</h3>
 <ul>
 <li>直接入力して <strong>Enter</strong> で移動</li>
-<li><strong>Esc</strong> で入力を破棄し一覧へ戻る</li>
-<li><strong>Tab</strong> で補完（PATH 入力時）</li>
+<li><strong>Esc</strong> で補完候補を閉じる（候補表示中）/ 入力を破棄して一覧へ戻る</li>
+<li><strong>Ctrl+Space / Ctrl+Shift+Space</strong> で補完候補を前進 / 後退（PATH 入力時）</li>
+<li>補完候補表示中に <strong>\ / ¥</strong> を入力すると、現在候補のディレクトリを確定して続けて入力できます</li>
 <li><strong>Tab / Shift+Tab</strong> でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）</li>
-<li><strong>Ctrl+J / Ctrl+Y</strong> でジャンプリスト / 履歴を表示</li>
+<li><strong>Ctrl+Shift+O / Ctrl+H</strong> でジャンプリスト / 履歴を表示</li>
+<li>PATH補完および候補表示は、<strong>ローカルファイルシステムのパスのみ</strong>を対象とします。</li>
+<li><code>gdrive://</code> パスは PATH補完/候補表示の対象外です。</li>
+<li>Google Drive で実用的に運用する場合は、Google Drive のローカル同期クライアントを併用し、同期済みローカルフォルダを ReflexFiles で操作してください。</li>
 </ul>
 <hr>
 <h2>ReflexViewer（プレビュー / コード表示）</h2>
 <p>ReflexFiles からファイルを開くと、対応ファイルは ReflexViewer で表示されます。</p>
+<ul>
+<li>ビューアーのタイトルには、開いているファイル名が表示されます。</li>
+<li>未対応形式や読み取り失敗時は、クラッシュせずにエラー表示になります。</li>
+</ul>
 <h3>主な表示モード</h3>
 <ul>
 <li><strong>Markdown Preview</strong>: Markdown を整形済み HTML として表示</li>
 <li><strong>Text（Markdown Source）</strong>: Markdown のソース表示（シンタックス色分け対応）</li>
 <li><strong>Source Code Highlight</strong>: C/C++/Rust/JavaScript/TypeScript/Python/JSON などの色分け表示</li>
-<li><strong>Image Viewer</strong>: PNG/JPEG/BMP を表示（拡大縮小・パン対応）</li>
+<li><strong>Image Viewer</strong>: PNG/JPEG/BMP を表示（拡大縮小・パン対応）
+<ul>
+<li>ズームプリセット: <strong>Fit / 100% / 200%</strong></li>
+<li>ズームインジケータで現在の倍率/モードを表示</li>
+</ul>
+</li>
 </ul>
 <h3>基本操作（ビューアー）</h3>
 <ul>
@@ -165,6 +178,7 @@
 <li><strong>Alt+Left / Alt+Right</strong>: 同じフォルダ内の前/次ファイルへ移動</li>
 <li><strong>Ctrl+PageUp / Ctrl+PageDown</strong>: 同じフォルダ内の前/次ファイルへ移動</li>
 <li><strong>Prev / Next ボタン</strong>: 同じフォルダ内の前/次ファイルへ移動</li>
+<li><strong>位置表示</strong>: 現在位置 / 総数（例: <code>2 / 3</code>）を表示</li>
 <li><strong>Ctrl+O</strong>: ファイルを選択して開く</li>
 <li><strong>Ctrl+F</strong>: 検索パネルを開く（テキスト/Markdown）</li>
 <li><strong>Ctrl + ホイール / Ctrl+Plus / Ctrl+Minus / Ctrl+0</strong>: 拡大縮小（画像表示、または Markdown HTML 表示）</li>
@@ -182,7 +196,7 @@
 </li>
 <li><strong>検索</strong>
 <ul>
-<li><code>/</code> で Search バーを表示</li>
+<li><strong>Ctrl+F</strong> で Search バーを表示</li>
 <li>部分一致 / 正規表現（Regex）</li>
 </ul>
 </li>
@@ -265,7 +279,7 @@
 <tr>
 <td>操作</td>
 <td>やり直し</td>
-<td>Ctrl+Shift+Z</td>
+<td>Ctrl+Y</td>
 </tr>
 <tr>
 <td>選択</td>
@@ -295,12 +309,12 @@
 <tr>
 <td>操作</td>
 <td>親フォルダへ</td>
-<td>Backspace</td>
+<td>Alt+Up / Backspace</td>
 </tr>
 <tr>
 <td>操作</td>
 <td>検索</td>
-<td>/</td>
+<td>Ctrl+F</td>
 </tr>
 <tr>
 <td>操作</td>
@@ -330,7 +344,7 @@
 <tr>
 <td>表示</td>
 <td>隠しファイル切替</td>
-<td>Ctrl+H</td>
+<td>Ctrl+Shift+H</td>
 </tr>
 <tr>
 <td>表示</td>
@@ -345,12 +359,12 @@
 <tr>
 <td>操作</td>
 <td>ソートメニュー</td>
-<td>S</td>
+<td>Alt+S</td>
 </tr>
 <tr>
 <td>操作</td>
 <td>PATHへフォーカス</td>
-<td>Ctrl+L</td>
+<td>Alt+D</td>
 </tr>
 <tr>
 <td>操作</td>
@@ -360,7 +374,7 @@
 <tr>
 <td>操作</td>
 <td>PATH補完</td>
-<td>Tab</td>
+<td>Ctrl+Space / Ctrl+Shift+Space</td>
 </tr>
 <tr>
 <td>操作</td>
@@ -370,22 +384,22 @@
 <tr>
 <td>履歴</td>
 <td>履歴を表示</td>
-<td>Ctrl+Y</td>
+<td>Ctrl+H</td>
 </tr>
 <tr>
 <td>ジャンプリスト</td>
 <td>ジャンプリストを表示</td>
-<td>Ctrl+J</td>
+<td>Ctrl+Shift+O</td>
 </tr>
 <tr>
 <td>ジャンプリスト</td>
 <td>ジャンプリストに追加</td>
-<td>Ctrl+Shift+J</td>
+<td>Ctrl+D</td>
 </tr>
 <tr>
 <td>ジャンプリスト</td>
 <td>URLをジャンプリストに追加</td>
-<td>Ctrl+Shift+U</td>
+<td>Ctrl+Shift+D</td>
 </tr>
 <tr>
 <td>ファイル</td>
@@ -414,18 +428,23 @@
 </tr>
 <tr>
 <td>ファイル</td>
-<td>新規作成</td>
+<td>新規ファイル作成</td>
 <td>Ctrl+N</td>
 </tr>
 <tr>
 <td>ファイル</td>
+<td>新規フォルダ作成</td>
+<td>Ctrl+Shift+N</td>
+</tr>
+<tr>
+<td>ファイル</td>
 <td>複製</td>
-<td>Ctrl+D</td>
+<td>Ctrl+Shift+C</td>
 </tr>
 <tr>
 <td>ファイル</td>
 <td>日付プレフィックス</td>
-<td>Ctrl+Shift+D</td>
+<td>Ctrl+Alt+D</td>
 </tr>
 <tr>
 <td>ZIP</td>
@@ -529,6 +548,122 @@
 <ul>
 <li>%APPDATA%\ReflexFIles\diagnostics\</li>
 </ul>
+<h3>Google Drive（個人Google Cloudでの設定と利用）</h3>
+<p>ReflexFiles は公開GitHubリポジトリのため、共通の Google API 資格情報は配布しません。<br>
+各ユーザーが自分の Google Cloud プロジェクトと OAuth クライアントを設定して利用します。</p>
+<p>ReflexFiles の Google Drive サポートは、意図的に限定範囲です。</p>
+<ul>
+<li><code>バックエンド種別</code> が <code>実 Google Drive API</code> のときだけ、<code>gdrive://root/my-drive</code> の実データを表示します</li>
+<li><code>バックエンド種別</code> が <code>スタブ（テスト用仮想データ）</code> の場合、<code>gdrive://</code> はテストデータ表示です</li>
+<li>閲覧はビューア対応形式（テキスト / Markdown / 画像）に対応</li>
+<li>Google Drive への書き戻しは手動（コンテキストメニュー <code>Google Driveへ書き戻し</code>）</li>
+<li>外部アプリで開くときはローカル作業コピーを開きます（自動書き戻しなし）</li>
+<li>PATH補完/候補表示は <code>gdrive://</code> を対象にしません</li>
+<li>常時補完や大量操作を重視する場合は、Google Drive のローカル同期を利用し、ローカルミラーパス上で作業してください</li>
+</ul>
+<h4>セキュリティルール（必須）</h4>
+<ul>
+<li>APIキー、OAuth クライアントシークレット、トークンを GitHub に公開しない</li>
+<li>資格情報入りの <code>.env</code> をコミットしない</li>
+<li>実資格情報は自分のローカル環境 / 自分の Google Cloud プロジェクトだけで管理する</li>
+</ul>
+<h4>料金（重要）</h4>
+<ul>
+<li>Google の公式説明では、Google Drive API 利用自体は追加料金なしです</li>
+<li>Drive API のリクエスト上限超過が、そのまま追加課金になるわけではありません</li>
+<li>ただし、同じ Google Cloud プロジェクトで別の有料サービスを有効化すると料金が発生し得ます</li>
+<li>推奨: ReflexFiles 専用プロジェクトを作成し、<code>Google Drive API</code> のみ有効化する</li>
+</ul>
+<h4>無課金運用の実践ルール（推奨）</h4>
+<ol>
+<li>ReflexFiles 専用の Google Cloud プロジェクトを作る</li>
+<li><code>Google Drive API</code> 以外を有効化しない</li>
+<li>クォータ増加申請を行わない</li>
+<li>請求先をリンクしている場合は予算アラートを設定する</li>
+<li>Billing レポートを定期確認し、当月コストを <code>¥0</code> / <code>$0</code> に保つ</li>
+<li>絶対に課金されたくない場合は請求先リンク解除を検討する（使えない機能が出る場合あり）</li>
+</ol>
+<h4>Google Cloud 側の設定（ユーザー自身）</h4>
+<ol>
+<li>Google Cloud Console を開き、プロジェクトを作成または選択する（例: <code>ReflexFiles Personal</code>）</li>
+<li><code>Google Auth Platform</code> を開き、必須のアプリ情報を入力する</li>
+<li><code>API とサービス</code> -&gt; <code>ライブラリ</code> で <code>Google Drive API</code> を有効化する</li>
+<li>OAuth 同意画面を設定する
+<ul>
+<li>Gmail がテストユーザーで「不適格」と出ても、プロジェクトのオーナー/編集者は追加不要で使える場合があります</li>
+</ul>
+</li>
+<li>OAuth クライアントID（<code>デスクトップアプリ</code>）を作成し、以下を控える
+<ul>
+<li>クライアントID（必須）</li>
+<li>クライアントシークレット（任意・必要時のみ）</li>
+</ul>
+</li>
+</ol>
+<h4>ReflexFiles 側の設定（設定画面）</h4>
+<ol>
+<li><strong>設定 &gt; 詳細</strong> の Google Drive 認証ブロックを開く</li>
+<li>以下を入力する
+<ul>
+<li><code>OAuth クライアント ID</code>（必須）</li>
+<li><code>OAuth クライアント シークレット（任意）</code>（通常は空欄、必要時のみ）</li>
+<li><code>OAuth リダイレクト URI</code>（既定値 <code>http://127.0.0.1:45123/oauth2/callback</code>、完全一致必須）</li>
+</ul>
+</li>
+<li><strong>サインイン開始</strong> を押し、ブラウザで Google ログイン/同意を完了する</li>
+<li>同意後、ReflexFiles が <code>コールバック URL</code> を自動入力する
+<ul>
+<li>自動取得に失敗した場合だけ、<code>state</code> と <code>code</code> を含むURL全文を貼り付ける</li>
+</ul>
+</li>
+<li><code>アカウント ID（メールアドレス）</code> を入力し、<strong>サインイン完了</strong> を押す</li>
+<li>成功メッセージと <code>認証フェーズ = 認証済み</code> を確認する</li>
+<li>一度成功すると、次回起動後は保存済み資格情報を再利用して <code>gdrive://</code> アクセス時に自動再接続します</li>
+<li>サインアウト時は refresh token と閲覧キャッシュを削除します</li>
+</ol>
+<h4>よくあるエラーと対処</h4>
+<ol>
+<li><code>Google token 交換に失敗しました: client_secret is missing.</code>
+<ul>
+<li><code>OAuth クライアント シークレット（任意）</code> を入力して再実行</li>
+</ul>
+</li>
+<li>ブラウザで <code>ERR_CONNECTION_REFUSED</code>
+<ul>
+<li>想定動作です。アドレスバーURL全文を使って続行してください</li>
+</ul>
+</li>
+<li><code>state</code> / <code>code</code> 不足のコールバック解析エラー
+<ul>
+<li>URLの一部ではなく全文を貼り付けてください</li>
+</ul>
+</li>
+<li><code>redirect_uri_mismatch</code>
+<ul>
+<li>ReflexFiles の URI と Google Cloud 設定値を完全一致させてください</li>
+</ul>
+</li>
+<li>認証成功後も実ファイルが見えない
+<ul>
+<li><code>バックエンド種別</code> が <code>スタブ</code> だとテストデータ表示です</li>
+</ul>
+</li>
+<li>「ローカル作業コピーがありません」
+<ul>
+<li>先に対象ファイルを外部アプリで1回開いてください</li>
+</ul>
+</li>
+<li>書き戻し競合
+<ul>
+<li>同じ Google Drive ファイルを外部アプリで開き直して最新リモート基準の作業コピーを作成/更新し、手動マージ後に再度 <code>Google Driveへ書き戻し</code> を実行してください</li>
+</ul>
+</li>
+<li>書き戻し時に <code>Request had insufficient authentication scopes</code>
+<ul>
+<li><code>サインアウト</code> 後、再サインインして <code>https://www.googleapis.com/auth/drive</code> を取得し直してください</li>
+</ul>
+</li>
+</ol>
 <h3>ショートカット競合警告（設定画面）</h3>
 <p><strong>設定 &gt; 詳細</strong> に、ショートカット競合の警告一覧を表示します。</p>
 <ul>
@@ -549,8 +684,8 @@
 <h3>例2: 作業フォルダをジャンプリストで管理</h3>
 <ol>
 <li>作業フォルダを開く</li>
-<li><strong>Ctrl+Shift+J</strong> でジャンプリストに追加</li>
-<li>次回以降は <strong>Ctrl+J</strong> から即移動</li>
+<li><strong>Ctrl+D</strong> でジャンプリストに追加</li>
+<li>次回以降は <strong>Ctrl+Shift+O</strong> から即移動</li>
 </ol>
 <h3>例3: ZIP を作成して共有する</h3>
 <ol>
@@ -746,7 +881,7 @@
 <td><code>input_keymap_custom</code></td>
 <td>table</td>
 <td>キーの上書き設定</td>
-<td>例: <code>{ open = &quot;Enter&quot;, jump_add_url = &quot;Ctrl+Shift+U&quot; }</code></td>
+<td>例: <code>{ open = &quot;Enter&quot;, jump_add_url = &quot;Ctrl+Shift+D&quot; }</code></td>
 </tr>
 </tbody>
 </table>

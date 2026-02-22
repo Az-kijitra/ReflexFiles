@@ -51,10 +51,6 @@ export function createZipActions(ctx, helpers) {
       ctx.setZipError(ctx.t("zip.error_password_attempts_exceeded"));
       return;
     }
-    if (ctx.getZipMode() === "extract" && !ctx.getZipOverwriteConfirmed()) {
-      ctx.setZipError(ctx.t("zip.error_overwrite_confirm"));
-      return;
-    }
     try {
       const targets = ctx.getZipTargets();
       if (ctx.getZipMode() === "create") {
@@ -64,6 +60,28 @@ export function createZipActions(ctx, helpers) {
           ctx.getZipPassword() ? ctx.getZipPassword() : null
         );
       } else {
+        const conflicts =
+          typeof ctx.zipExtractListConflicts === "function"
+            ? await ctx.zipExtractListConflicts(
+                targets[0],
+                destination,
+                ctx.getZipPassword() ? ctx.getZipPassword() : null
+              )
+            : [];
+        if (Array.isArray(conflicts) && conflicts.length > 0) {
+          const preview = conflicts.slice(0, 5).join("\n");
+          const more =
+            conflicts.length > 5 ? `\n... (+${conflicts.length - 5})` : "";
+          const message = `${ctx.t("zip.confirm_overwrite_conflicts", {
+            count: conflicts.length,
+          })}\n\n${preview}${more}`;
+          const confirmed =
+            typeof globalThis.confirm === "function" ? globalThis.confirm(message) : false;
+          if (!confirmed) {
+            ctx.setZipError(ctx.t("zip.error_overwrite_confirm"));
+            return;
+          }
+        }
         await ctx.zipExtract(
           targets[0],
           destination,

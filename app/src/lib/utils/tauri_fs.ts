@@ -1,4 +1,11 @@
-import type { DeleteSummary, OpSummary, ProviderCapabilities } from "$lib/types";
+import type {
+  DeleteSummary,
+  Entry,
+  OpSummary,
+  Properties,
+  ProviderCapabilities,
+  ResourceRef,
+} from "$lib/types";
 import { invoke } from "$lib/tauri_client";
 
 export function clipboardSetFiles(paths: string[], cut: boolean, effect: string | null = null) {
@@ -13,8 +20,12 @@ export function fsCopyPairs(pairs: { from: string; to: string }[]): Promise<OpSu
   return invoke("fs_copy_pairs", { pairs });
 }
 
-export function fsCopy(items: string[], destination: string): Promise<OpSummary> {
-  return invoke("fs_copy", { items, destination });
+export function fsCopy(
+  items: string[],
+  destination: string,
+  nameOverrides: Record<string, string> | null = null
+): Promise<OpSummary> {
+  return invoke("fs_copy", { items, destination, name_overrides: nameOverrides });
 }
 
 export function fsMove(items: string[], destination: string): Promise<OpSummary> {
@@ -41,6 +52,23 @@ export function fsGetCapabilities(path: string): Promise<ProviderCapabilities> {
   return invoke("fs_get_capabilities", { path });
 }
 
+export function fsGetCapabilitiesByRef(resourceRef: ResourceRef): Promise<ProviderCapabilities> {
+  return invoke("fs_get_capabilities_by_ref", { resourceRef });
+}
+
+export function fsListDirByRef(
+  resourceRef: ResourceRef,
+  showHidden: boolean,
+  sortKey: string,
+  sortOrder: string
+): Promise<Entry[]> {
+  return invoke("fs_list_dir_by_ref", { resourceRef, showHidden, sortKey, sortOrder });
+}
+
+export function fsGetPropertiesByRef(resourceRef: ResourceRef): Promise<Properties> {
+  return invoke("fs_get_properties_by_ref", { resourceRef });
+}
+
 export function zipCreate(
   items: string[],
   destination: string,
@@ -55,6 +83,14 @@ export function zipExtract(
   password: string | null
 ): Promise<void> {
   return invoke("zip_extract", { path, destination, password });
+}
+
+export function zipExtractListConflicts(
+  path: string,
+  destination: string,
+  password: string | null
+): Promise<string[]> {
+  return invoke("zip_extract_list_conflicts", { path, destination, password });
 }
 
 export function opCancel(): Promise<void> {

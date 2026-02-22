@@ -14,6 +14,7 @@
  *   uiFileIconMode: "by_type" | "simple" | "none";
  *   loading: boolean;
  *   filteredEntries: any[];
+ *   pathCompletionPreviewActive: boolean;
  *   entries: any[];
  *   overflowLeft: boolean;
  *   overflowRight: boolean;
@@ -70,6 +71,7 @@ export function buildViewState(params) {
     uiFileIconMode: params.uiFileIconMode,
     loading: params.loading,
     filteredEntries: params.filteredEntries,
+    pathCompletionPreviewActive: params.pathCompletionPreviewActive,
     entries: params.entries,
     overflowLeft: params.overflowLeft,
     overflowRight: params.overflowRight,

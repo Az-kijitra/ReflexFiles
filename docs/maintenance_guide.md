@@ -1,5 +1,5 @@
 # Maintenance Guide
-Updated: 2026-02-20
+Updated: 2026-02-21
 
 ## Scope
 This document is for maintainers of ReflexFiles (not end users).
@@ -114,8 +114,10 @@ npm run tauri build
 
 ## Automated E2E Strategy
 ### Test layers
-- `e2e:tauri` -> smoke flow (file operations baseline)
+- `e2e:tauri` -> smoke flow (file operations baseline + keyboard regression guard: `Ctrl+N`, `Ctrl+C/X/V`, PATH completion)
 - `e2e:capability` -> provider capability guard flow (menu/context/action gating)
+  - Also verifies Google Drive paste-disabled reason text (`paste.destination_not_writable`) on both context menu and Edit menu.
+  - Also verifies `rf:open-settings` event routing opens Settings at `advanced` section and can switch section while Settings is already open.
 - `e2e:viewer` -> viewer behavior flow
 - `e2e:settings` -> settings persistence, backup/report, undo/redo checks
 - `e2e:full` -> sequential suite (`smoke` -> `capability_guard` -> `viewer_flow` -> `settings_session`)
@@ -136,19 +138,94 @@ npm run e2e:full
 - Chooses bootstrap mode:
   - `existing-binary + vite-dev` when debug EXE exists
   - fallback to `tauri dev` otherwise
+- Acquires cross-process lock (`e2e_artifacts/.tauri-e2e.lock.json`) before startup and serializes concurrent E2E runs.
 - On Windows, proactively terminates lingering `vite dev` node processes in this repo before app startup
 - Waits for app readiness on `localhost:1422` equivalents
 - Executes Selenium scenario
 - Performs aggressive child-process shutdown on Windows to avoid stale process hangs
 
+Operational rule:
+- Do not run multiple E2E commands in parallel (`e2e:tauri`, `e2e:capability`, `e2e:viewer`, `e2e:settings`, `e2e:full`).
+- Even when started accidentally in parallel, runner lock will queue/wait; still prefer explicit serial execution for deterministic logs.
+
 ## Provider Capability Enforcement
 - `fs_get_capabilities` is the backend API to fetch provider capabilities for a target path.
+- `fs_get_capabilities_by_ref` is the ResourceRef-first API for provider capability lookup (Gate 1 migration path).
+- Current UI uses `fs_get_capabilities_by_ref` for `gdrive://` paths and falls back to `fs_get_capabilities(path)` for local paths.
+- Current UI also uses ResourceRef-first commands for gdrive path handling:
+  - `fs_list_dir_by_ref`
+  - `fs_get_properties_by_ref`
 - Frontend stores current-path capabilities and uses them to gate:
   - blank context menu (`New...`, `Paste`)
   - Edit menu (`Paste`)
   - keyboard actions (`new_file`, `paste`)
 - Entry-level capabilities (`entry.capabilities`) remain the source for selection-based actions (`copy/move/delete/rename/zip`).
 - If an action is denied by capability, UI shows `capability.not_available` instead of executing the operation.
+- Google Drive read-only implementation has two backend modes:
+  - default: `Real Google Drive API` (real listing + viewer read via local temp cache)
+  - optional feature: `gdrive-readonly-stub` (virtual test data backend)
+- Editing-phase foundation APIs are available for Google Drive:
+  - `gdrive_prepare_edit_workcopy` (download to local workcopy + return base revision snapshot)
+  - `gdrive_check_edit_conflict` (optimistic-lock precheck against current Drive revision)
+  - `gdrive_get_edit_workcopy_state` / `gdrive_get_edit_workcopy_states` (resolve local workcopy existence + dirty state by local hash)
+  - `gdrive_list_edit_workcopies` / `gdrive_delete_edit_workcopy` / `gdrive_cleanup_edit_workcopies` (workcopy maintenance operations)
+- Current UI behavior:
+  - Opening Google Drive files in associated external apps now uses local workcopies via `gdrive_prepare_edit_workcopy`.
+  - Upload-back is explicit/manual via context menu action (`Write Back to Google Drive`).
+  - Upload-back calls `gdrive_apply_edit_workcopy` and blocks on optimistic-lock conflict.
+  - On conflict, frontend keeps previous base revision (does not auto-advance to remote latest) to prevent accidental overwrite by repeated write-back.
+  - On conflict, frontend dispatches `rf:open-settings` and opens Settings in `advanced` section (or switches to it if already open).
+  - Workcopy badge (`local` / `dirty`) is now refreshed from backend state, not only in-memory flag state.
+  - Settings > Google Drive includes workcopy maintenance UI (list / delete / age-based cleanup).
+  - Settings > Google Drive now includes conflict-recovery guidance; it is highlighted when recent write conflict timestamp exists.
+  - Conflict status message directs users to Settings (`Ctrl+,`) for recovery guidance.
+- Runtime resilience / diagnostics:
+  - `fs_get_capabilities_by_ref` now applies a Google Drive destination write probe (`canAddChildren`) and fails safe (`can_copy=false`) when probe fails.
+  - `root/shared-with-me` is treated as non-writable destination (`can_copy=false`).
+  - When paste is blocked on a Google Drive destination, UI shows a dedicated message (`paste.destination_not_writable`) instead of generic capability text.
+  - `pasteItems` performs a final runtime capability guard (not only menu/key gating) and returns the same destination-specific message.
+  - Google Drive API bridge retries transient failures (HTTP `429` / `5xx`, timeout, temporary network resolution issues) with bounded backoff.
+  - Upload-back scope-insufficient errors are normalized to `permission_denied` with actionable remediation text.
+  - Paste conflict modal supports `Keep both` for copy to Google Drive destinations (creates a non-conflicting name on destination).
+  - Copy from Google Drive to local exports Google-native docs automatically:
+    - Docs -> `.docx`
+    - Sheets -> `.xlsx`
+    - Slides -> `.pptx`
+    - Drawings -> `.png`
+  - Settings > Google Drive shows additional diagnostics:
+    - write-scope granted flag
+    - access-token expiry timestamp
+    - last scope-insufficient timestamp
+    - last write-conflict timestamp
+    - last token-refresh error + timestamp
+- Security behavior:
+  - Google Drive viewer/read cache and edit workcopy cache are stored under local temp.
+  - Sign-out clears persisted refresh token and viewer/read cache.
+- Validate both variants when touching provider-boundary logic:
+```bash
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+```
+
+## Google Cloud Credential Operations (Google Drive)
+- Development may use maintainer personal Google Cloud projects.
+- Public repository and release artifacts must not contain real Google API credentials.
+- Never store in repo:
+  - API key
+  - OAuth client secret
+  - access/refresh token
+  - credential-bearing `.env` files
+- Keep app defaults credential-empty.
+- Official user-facing setup must follow:
+  - Internal self-setup guide (release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+  - Internal self-setup guide JA (release-excluded): `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- If credential exposure is detected:
+  1. Stop merge/release immediately.
+  2. Remove leaked value from history/archives as needed.
+  3. Rotate compromised credentials.
+  4. Record incident and preventive action in maintenance notes.
 
 ### Suite summary and failure classification
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` now writes:
@@ -171,12 +248,17 @@ When running from `app/`, artifacts are written under repository root:
 Workflow file:
 - `.github/workflows/quality.yml`
 - `.github/workflows/e2e-tauri.yml`
+- `e2e-tauri.yml` trigger is `pull_request` only.
 
 Current CI split:
 - **Quality gate (PR/Push)**:
+  - `npm run test:keys` (lightweight keyboard regression gate)
   - `npm run check`
   - `cargo check`
   - `cargo test`
+- **Gate 1 stub probe (manual/nightly, non-blocking)**:
+  - `cargo check --features gdrive-readonly-stub`
+  - `cargo test --features gdrive-readonly-stub`
 - **Dependency audit (nightly/manual)**:
   - `npm run audit:deps`
 - **Pull Request** job (quick):
@@ -235,6 +317,17 @@ Output report:
 cd app
 npm run check
 ```
+1.5. If key input / focus / shortcut behavior was changed, run lightweight keyboard regression first
+```bash
+npm run test:keys
+npm run docs:keymap-main
+```
+Recommended order for key-related changes:
+- `npm run test:keys` (fast regression)
+- `npm run docs:keymap-main` (refresh internal main-screen keyboard behavior document)
+- `npm run build`
+- targeted E2E only for impacted area
+- review diff of `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` for unintended keymap/behavior changes
 2. Run targeted E2E for touched area
 - viewer changes -> `npm run e2e:viewer`
 - settings/config changes -> `npm run e2e:settings`
@@ -290,11 +383,14 @@ Actions:
 - Preserve backward compatibility for user config whenever feasible.
 
 ## Related Docs
-- `docs/VIEWER_SPEC.md`
-- `docs/ADR-0001-storage-provider-boundary.md`
-- `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
-- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
-- `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Viewer spec (internal/release-excluded): `development_documents/VIEWER_SPEC.md`
+- Internal ADR (release-excluded): `development_documents/ADR-0001-storage-provider-boundary.md`
+- Internal ADR JA (release-excluded): `development_documents/ja/ADR-0001-storage-provider-boundary.ja.md`
+- Internal keyboard behavior reference (release-excluded): `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md`
+- Internal threat model (release-excluded): `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
+- Internal threat model JA (release-excluded): `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Internal self-setup guide (release-excluded): `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+- Internal self-setup guide JA (release-excluded): `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`

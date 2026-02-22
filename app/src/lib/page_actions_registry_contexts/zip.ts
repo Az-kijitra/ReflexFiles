@@ -22,6 +22,7 @@ export interface ZipContext {
   zipPasswordMaxAttempts: number;
   zipCreate: AnyFn;
   zipExtract: AnyFn;
+  zipExtractListConflicts: AnyFn;
   loadDir: AnyFn;
   [key: string]: unknown;
 }

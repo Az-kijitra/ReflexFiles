@@ -4,6 +4,21 @@
  */
 export function handleMenuKey(event, ctx) {
   const active = ctx.activeElement;
+  const ctrlPressed = event.ctrlKey || event.getModifierState?.("Control");
+  const altPressed = event.altKey || event.getModifierState?.("Alt");
+  const metaPressed = event.metaKey || event.getModifierState?.("Meta");
+  const isCtrlOnly = ctrlPressed && !altPressed && !metaPressed;
+  const isCtrlLetter = (letter, code) =>
+    isCtrlOnly &&
+    (event.code === `Key${letter}` ||
+      event.key === letter ||
+      event.key === letter.toLowerCase() ||
+      event.key === letter.toUpperCase() ||
+      event.keyCode === code ||
+      event.which === code);
+  const shouldPassThroughListShortcut = () =>
+    isCtrlLetter("N", 78) || ctx.matchesAction(event, "new_file");
+
   if (event.key === "Escape" && ctx.menuOpen) {
     event.preventDefault();
     ctx.closeMenu?.();
@@ -21,6 +36,9 @@ export function handleMenuKey(event, ctx) {
     return true;
   }
   if (active && active.tagName === "INPUT") {
+    if (ctx.pathInputEl && active === ctx.pathInputEl && shouldPassThroughListShortcut()) {
+      return false;
+    }
     if (ctx.pathInputEl && active === ctx.pathInputEl) {
       if (ctx.matchesAction(event, "history_jump_list")) {
         event.preventDefault();

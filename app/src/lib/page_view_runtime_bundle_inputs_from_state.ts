@@ -12,6 +12,9 @@
  *     loadDir: (path: string) => Promise<void>;
  *     focusList: () => void;
  *     handlePathTabCompletion: () => Promise<void>;
+ *     handlePathCompletionSeparator: (pathInput: string, key: string) => Promise<boolean>;
+ *     handlePathCompletionInputChange: (pathInput: string) => void;
+ *     clearPathCompletionPreview: () => void;
  *     focusTree: () => void;
  *     focusTreeTop: () => void;
  *     selectTreeNode: (node: any, index: number) => void;
@@ -51,6 +54,9 @@ export function buildPageViewRuntimeBundleInputsFromState(params) {
       loadDir: params.actions.loadDir,
       focusList: params.actions.focusList,
       handlePathTabCompletion: params.actions.handlePathTabCompletion,
+      handlePathCompletionSeparator: params.actions.handlePathCompletionSeparator,
+      handlePathCompletionInputChange: params.actions.handlePathCompletionInputChange,
+      clearPathCompletionPreview: params.actions.clearPathCompletionPreview,
     },
     tree: {
       focusTree: params.actions.focusTree,

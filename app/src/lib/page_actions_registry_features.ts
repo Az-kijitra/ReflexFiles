@@ -30,6 +30,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const {
     confirmPasteOverwrite,
     confirmPasteSkip,
+    confirmPasteKeepBoth,
     cancelPasteConfirm,
     copySelected,
     cutSelected,
@@ -70,8 +71,11 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const {
     getExternalApps,
     getTargetEntry,
+    resolveGdriveWorkcopyBadge,
+    refreshGdriveWorkcopyBadges,
     runExternalApp,
     openEntry,
+    syncGdriveWorkcopyForEntry,
     openFocusedOrSelected,
     openParentForSelection,
     openInExplorer,
@@ -130,6 +134,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     showError,
     runExternalApp,
     getExternalApps,
+    syncGdriveWorkcopyForEntry,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {
@@ -190,16 +195,34 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     currentPathSupports("can_copy") || currentPathSupports("can_move");
 
   const canCopyTargets = () => allEntriesSupport(getOperationEntries(), "can_copy");
-  const canDuplicateTargets = () => canCopyTargets();
+  const areOperationEntriesLocal = () =>
+    getOperationEntries().every((entry) => {
+      const provider = String(entry?.ref?.provider || "").toLowerCase();
+      return provider === "local" || !String(entry?.path || "").startsWith("gdrive://");
+    });
+  const canDuplicateTargets = () => canCopyTargets() && areOperationEntriesLocal();
+  const isLocalLikeEntry = (entry: any) => {
+    const provider = String(entry?.ref?.provider || "").toLowerCase();
+    const path = String(entry?.path || "");
+    return provider === "local" || (!provider && !path.startsWith("gdrive://")) || !path.startsWith("gdrive://");
+  };
   const canPrefixDateTargets = () => allEntriesSupport(getOperationEntries(), "can_rename");
   const canCutTargets = () => allEntriesSupport(getOperationEntries(), "can_move");
   const canRenameFocused = () => {
     const focused = getFocusedEntry();
-    return !!focused && supportsCapability(focused, "can_rename");
+    if (!focused) return false;
+    if (supportsCapability(focused, "can_rename")) return true;
+    // Local items may temporarily carry stale/missing capability flags; let the rename action validate later.
+    return isLocalLikeEntry(focused);
   };
   const canDeleteSelection = () => allEntriesSupport(getSelectedEntries(), "can_delete");
   const canOpenPropertiesSelection = () => hasSelection();
-  const canZipCreateSelection = () => allEntriesSupport(getSelectedEntries(), "can_archive_create");
+  const canZipCreateSelection = () => {
+    const selectedEntries = getSelectedEntries();
+    if (selectedEntries.length === 0) return false;
+    if (allEntriesSupport(selectedEntries, "can_archive_create")) return true;
+    return selectedEntries.every((entry) => isLocalLikeEntry(entry));
+  };
   const canZipExtractSelection = () => {
     const selectedEntries = getSelectedEntries();
     if (selectedEntries.length !== 1) return false;
@@ -209,7 +232,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const canZipExtractFocused = () => {
     const focused = getFocusedEntry();
     if (!focused || focused.ext?.toLowerCase() !== ".zip") return false;
-    return supportsCapability(focused, "can_archive_extract");
+    if (supportsCapability(focused, "can_archive_extract")) return true;
+    return isLocalLikeEntry(focused);
   };
 
   const canDeleteTargets = () => {
@@ -230,6 +254,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   return {
     confirmPasteOverwrite,
     confirmPasteSkip,
+    confirmPasteKeepBoth,
     cancelPasteConfirm,
     confirmDelete,
     cancelDelete,
@@ -314,6 +339,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     onContextDelete,
     onContextProperties,
     getExternalApps,
+    resolveGdriveWorkcopyBadge,
+    refreshGdriveWorkcopyBadges,
     runExternalApp,
     getTargetEntry,
   };

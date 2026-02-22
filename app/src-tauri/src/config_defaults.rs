@@ -2,7 +2,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::config_io::{config_path, load_history, load_jump_list};
-use crate::config_types::{AppConfig, FileIconMode, KeymapProfile, Language, SortKey, SortOrder, Theme};
+use crate::config_types::{
+    AppConfig, FileIconMode, KeymapProfile, Language, SortKey, SortOrder, Theme,
+};
+
+pub const DEFAULT_GDRIVE_OAUTH_REDIRECT_URI: &str = "http://127.0.0.1:45123/oauth2/callback";
 
 pub fn default_app_config() -> AppConfig {
     AppConfig {
@@ -41,6 +45,9 @@ pub fn default_app_config() -> AppConfig {
         external_terminal_profile_cmd: String::new(),
         external_terminal_profile_powershell: String::new(),
         external_terminal_profile_wsl: String::new(),
+        gdrive_oauth_client_id: String::new(),
+        gdrive_oauth_redirect_uri: DEFAULT_GDRIVE_OAUTH_REDIRECT_URI.to_string(),
+        gdrive_account_id: String::new(),
         log_path: default_log_path().to_string_lossy().to_string(),
         log_enabled: true,
     }
@@ -133,13 +140,21 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
 
     config.external_vscode_path = normalize_executable_path(&config.external_vscode_path);
     config.external_git_client_path = normalize_executable_path(&config.external_git_client_path);
-    config.external_terminal_profile = normalize_single_line(&config.external_terminal_profile, 256);
+    config.external_terminal_profile =
+        normalize_single_line(&config.external_terminal_profile, 256);
     config.external_terminal_profile_cmd =
         normalize_single_line(&config.external_terminal_profile_cmd, 256);
     config.external_terminal_profile_powershell =
         normalize_single_line(&config.external_terminal_profile_powershell, 256);
     config.external_terminal_profile_wsl =
         normalize_single_line(&config.external_terminal_profile_wsl, 256);
+    config.gdrive_oauth_client_id = normalize_single_line(&config.gdrive_oauth_client_id, 1024);
+    config.gdrive_oauth_redirect_uri =
+        normalize_single_line(&config.gdrive_oauth_redirect_uri, 1024);
+    if config.gdrive_oauth_redirect_uri.is_empty() {
+        config.gdrive_oauth_redirect_uri = DEFAULT_GDRIVE_OAUTH_REDIRECT_URI.to_string();
+    }
+    config.gdrive_account_id = normalize_single_line(&config.gdrive_account_id, 320);
 
     if config.external_apps.is_empty() {
         config.external_apps = Vec::new();

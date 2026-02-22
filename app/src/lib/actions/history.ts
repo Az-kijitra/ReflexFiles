@@ -7,13 +7,7 @@ import { STATUS_DEFAULT_MS } from "$lib/ui_durations";
  */
 export function createHistoryActions(ctx, helpers) {
   const { setStatusMessage } = helpers;
-
-  async function readClipboardText() {
-    if (navigator?.clipboard?.readText) {
-      return await navigator.clipboard.readText();
-    }
-    return null;
-  }
+  let confirmingJumpUrl = false;
 
   async function openJumpUrlModalFocus() {
     await ctx.tick();
@@ -47,27 +41,25 @@ export function createHistoryActions(ctx, helpers) {
     ctx.setJumpUrlOpen(true);
     ctx.setJumpUrlError("");
     ctx.setJumpUrlValue("");
-    try {
-      const text = await readClipboardText();
-      if (text && ctx.isLikelyUrl(text)) {
-        ctx.setJumpUrlValue(ctx.normalizeUrl(text));
-      }
-    } catch {
-      // ignore clipboard errors
-    }
     await openJumpUrlModalFocus();
   }
 
   function confirmJumpUrl() {
+    if (confirmingJumpUrl) return;
     const value = ctx.getJumpUrlValue().trim();
     if (!value || !ctx.isLikelyUrl(value)) {
       ctx.setJumpUrlError(ctx.t("error.url_invalid"));
       return;
     }
-    addJumpUrl(value);
-    ctx.setJumpUrlOpen(false);
-    ctx.setJumpUrlValue("");
-    ctx.setJumpUrlError("");
+    try {
+      confirmingJumpUrl = true;
+      addJumpUrl(value);
+      ctx.setJumpUrlOpen(false);
+      ctx.setJumpUrlValue("");
+      ctx.setJumpUrlError("");
+    } finally {
+      confirmingJumpUrl = false;
+    }
   }
 
   function cancelJumpUrl() {

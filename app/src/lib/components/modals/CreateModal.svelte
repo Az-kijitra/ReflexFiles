@@ -47,6 +47,7 @@
           handleConfirmCancelKeydown(event, {
             onConfirm: confirmCreate,
             onCancel: cancelCreate,
+            stopPropagation: true,
           });
         }}
       />

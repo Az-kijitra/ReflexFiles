@@ -1,5 +1,5 @@
 # メンテナンスガイド
-更新日: 2026-02-20
+更新日: 2026-02-21
 
 ## 対象と目的
 このドキュメントは ReflexFiles の**保守担当者向け**です（エンドユーザー向けではありません）。
@@ -116,8 +116,10 @@ npm run tauri build
 
 ## 自動E2Eテスト運用
 ### テストレイヤー
-- `e2e:tauri` -> smoke（ファイル操作の基礎フロー）
+- `e2e:tauri` -> smoke（ファイル操作の基礎フロー + キーボード回帰ガード: `Ctrl+N` / `Ctrl+C/X/V` / PATH `Tab` 補完）
 - `e2e:capability` -> provider capability ガード（メニュー/コンテキスト/操作可否）
+  - Google Drive 宛て Paste 無効時の理由文言（`paste.destination_not_writable`）を、コンテキストメニューと Edit メニューの両方で検証する。
+  - `rf:open-settings` イベントで設定画面が「詳細」セクションを開くこと、および設定表示中でもセクション切替できることを検証する。
 - `e2e:viewer` -> viewer フロー
 - `e2e:settings` -> 設定保存・バックアップ/レポート・undo/redo
 - `e2e:full` -> 総合スイート（`smoke` -> `capability_guard` -> `viewer_flow` -> `settings_session`）
@@ -138,19 +140,89 @@ npm run e2e:full
 - 起動モードを選択
   - debug EXE が存在する場合: `existing-binary + vite-dev`
   - それ以外: `tauri dev`
+- 起動前にプロセス間ロック（`e2e_artifacts/.tauri-e2e.lock.json`）を取得し、E2E同時実行を直列化する
 - Windows では起動前に、このリポジトリ配下で残留した `vite dev`（node）プロセスを明示終了
 - アプリ起動待機を実施
 - Selenium シナリオを実行
 - Windows で子プロセスを強制終了してハングを回避
 
+運用ルール:
+- `e2e:tauri` / `e2e:capability` / `e2e:viewer` / `e2e:settings` / `e2e:full` を並列実行しない。
+- 誤って並列起動してもランナーロックで待機するが、ログ再現性のため常に直列実行を優先する。
+
 ## Provider Capability 制御
 - 対象パスの provider capability 取得APIは `fs_get_capabilities`。
+- ResourceRef 直受けの provider capability API として `fs_get_capabilities_by_ref` を追加（Gate 1 の移行経路）。
+- currentPath の capability 取得は、`gdrive://` パスでは `fs_get_capabilities_by_ref` を使用し、ローカルパスは `fs_get_capabilities(path)` を継続利用する。
+- `gdrive://` パスの read 系処理は ResourceRef 直受けコマンドを使用する:
+  - `fs_list_dir_by_ref`
+  - `fs_get_properties_by_ref`
 - フロントは currentPath の capability を保持し、以下を制御:
   - 空白コンテキストメニュー（`新規作成...` / `ペースト`）
   - Edit メニュー（`Paste`）
   - キーボード操作（`new_file` / `paste`）
 - 選択項目ベースの操作（`copy/move/delete/rename/zip`）は引き続き `entry.capabilities` を使用。
 - capability で拒否された操作は実行せず、`capability.not_available` を表示する。
+- Google Drive read-only バックエンドの骨格は Rust feature flag `gdrive-readonly-stub` で制御する（既定: 無効）。
+- Google Drive 編集基盤API:
+  - `gdrive_prepare_edit_workcopy`（ローカル作業コピー生成 + ベースリビジョン返却）
+  - `gdrive_check_edit_conflict`（楽観ロックの事前競合判定）
+  - `gdrive_get_edit_workcopy_state` / `gdrive_get_edit_workcopy_states`（ローカル作業コピー有無 + dirty 判定）
+  - `gdrive_list_edit_workcopies` / `gdrive_delete_edit_workcopy` / `gdrive_cleanup_edit_workcopies`（作業コピー保守）
+- 現在のUI挙動:
+  - Google Drive ファイルを外部アプリで開くときは `gdrive_prepare_edit_workcopy` を使う。
+  - 書き戻しはコンテキストメニュー（`Google Driveへ書き戻し`）で明示実行する。
+  - 書き戻しは `gdrive_apply_edit_workcopy` を呼び、楽観ロック競合なら中止する。
+  - 競合時は frontend 側で base revision を自動更新しない（再試行だけで上書きしない）運用にする。
+  - 競合時は `rf:open-settings` を発火し、設定画面を「詳細」セクションで開く（すでに開いている場合も「詳細」へ切り替える）。
+  - 設定 > Google Drive に、競合復旧ガイドを表示する（直近競合時刻がある場合は強調表示）。
+  - 競合時のステータスメッセージから、`Ctrl+,` で設定を開いて復旧ガイドへ移動できることを案内する。
+- 実行時の堅牢性 / 診断:
+  - `fs_get_capabilities_by_ref` は Google Drive 宛てコピー可否を `canAddChildren` で事前判定し、判定失敗時はフェイルセーフで `can_copy=false` にする。
+  - `root/shared-with-me` は書き込み不可の宛先として扱い、`can_copy=false` を返す。
+  - Google Drive 宛てで Paste が拒否された場合、汎用メッセージではなく専用文言（`paste.destination_not_writable`）を表示する。
+  - `pasteItems` 本体でも最終的に capability を再判定し、メニュー/キー経路を迂回しても同じ専用文言を返す。
+  - Google Drive API ブリッジは一時障害（HTTP `429` / `5xx`、timeout、名前解決の一時失敗）を上限付きバックオフで再試行する。
+  - 書き戻し時のスコープ不足は `permission_denied` に正規化し、再認証手順が分かるメッセージを返す。
+  - Google Drive 宛てコピー時の競合モーダルで `別名保存` を選択できる（宛先で重複しない名前を自動採番して保存）。
+  - Google Drive -> ローカルコピー時、Google ネイティブ形式を自動エクスポートする:
+    - Docs -> `.docx`
+    - Sheets -> `.xlsx`
+    - Slides -> `.pptx`
+    - Drawings -> `.png`
+  - 設定 > Google Drive に追加診断を表示する:
+    - 書き込みスコープ許可フラグ
+    - アクセストークン有効期限
+    - 直近のスコープ不足時刻
+    - 直近の書き戻し競合時刻
+    - 直近のトークン更新エラーと時刻
+  - 作業コピーバッジ（`local` / `dirty`）はフロントの一時状態だけでなく、バックエンド照会結果で再計算する。
+  - 設定 > Google Drive で作業コピー管理（一覧 / 個別削除 / 日数指定クリーンアップ）を実行できる。
+- provider 境界を変更した場合は、通常構成と feature 有効構成の両方で確認する:
+```bash
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked
+cargo check --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-readonly-stub
+```
+
+## Google Cloud 資格情報運用（Google Drive）
+- 開発時はメンテナ個人の Google Cloud プロジェクト利用を許可する。
+- 公開リポジトリと配布成果物には、実際の Google API 資格情報を含めない。
+- リポジトリに保存しないもの:
+  - API key
+  - OAuth client secret
+  - access/refresh token
+  - 資格情報を含む `.env` ファイル
+- アプリ既定値は資格情報なしを維持する。
+- ユーザー向け公式手順は次を参照する:
+  - 内部自己設定ガイド（リリース対象外）: `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+  - 内部自己設定ガイド日本語版（リリース対象外）: `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
+- 資格情報漏えいを検知した場合:
+  1. マージ/リリースを即時停止。
+  2. 必要に応じて履歴・成果物から漏えい値を除去。
+  3. 該当資格情報をローテーション。
+  4. 事象と再発防止策を保守記録へ残す。
 
 ### スイートサマリーと失敗分類
 `app/scripts/e2e/run-tauri-suite-selenium.mjs` は以下を出力:
@@ -173,12 +245,16 @@ npm run e2e:full
 ワークフロー:
 - `.github/workflows/quality.yml`
 - `.github/workflows/e2e-tauri.yml`
+- `e2e-tauri.yml` のトリガーは `pull_request` のみ。
 
 現行の分割運用:
 - **Quality gate（PR/Push）**:
   - `npm run check`
   - `cargo check`
   - `cargo test`
+- **Gate 1 stub probe（手動/夜間、非ブロッカー）**:
+  - `cargo check --features gdrive-readonly-stub`
+  - `cargo test --features gdrive-readonly-stub`
 - **Dependency audit（nightly/manual）**:
   - `npm run audit:deps`
 - **Pull Request**（高速セット）:
@@ -295,11 +371,13 @@ npm run check
 
 ## 関連ドキュメント
 - `docs/maintenance_guide.md`
-- `docs/VIEWER_SPEC.md`
-- `docs/ADR-0001-storage-provider-boundary.md`
-- `docs/ja/ADR-0001-storage-provider-boundary.ja.md`
-- `docs/THREAT_MODEL_GDRIVE_GATE0.md`
-- `docs/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- Viewer仕様（内部管理・リリース対象外）: `development_documents/VIEWER_SPEC.md`
+- 内部ADR（リリース対象外）: `development_documents/ADR-0001-storage-provider-boundary.md`
+- 内部ADR日本語版（リリース対象外）: `development_documents/ja/ADR-0001-storage-provider-boundary.ja.md`
+- 内部脅威モデル（リリース対象外）: `development_documents/THREAT_MODEL_GDRIVE_GATE0.md`
+- 内部脅威モデル日本語版（リリース対象外）: `development_documents/ja/THREAT_MODEL_GDRIVE_GATE0.ja.md`
+- 内部自己設定ガイド（リリース対象外）: `development_documents/GOOGLE_DRIVE_SELF_SETUP.md`
+- 内部自己設定ガイド日本語版（リリース対象外）: `development_documents/ja/GOOGLE_DRIVE_SELF_SETUP.ja.md`
 - `docs/CHANGELOG.md`
 - `docs/RELEASE_NOTES_0.2.0.md`
 - `docs/RELEASE_BODY_0.2.0.md`

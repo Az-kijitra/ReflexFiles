@@ -2,6 +2,7 @@
   import ModalShell from "$lib/components/modals/ModalShell.svelte";
 
   export let modalEl = null;
+  export let initialSection = "general";
   export let trapModalTab;
   export let autofocus;
   export let t;
@@ -16,6 +17,16 @@
   export let reportMessage = "";
   export let reportIsError = false;
   export let shortcutConflicts = [];
+  export let gdriveAuthStatus = null;
+  export let gdriveAuthLoading = false;
+  export let gdriveAuthBusy = false;
+  export let gdriveAuthError = "";
+  export let gdriveAuthMessage = "";
+  export let gdriveWorkcopyItems = [];
+  export let gdriveWorkcopyLoading = false;
+  export let gdriveWorkcopyBusy = false;
+  export let gdriveWorkcopyError = "";
+  export let gdriveWorkcopyMessage = "";
   export let error = "";
 
   export let onCancel = () => {};
@@ -25,14 +36,31 @@
   export let onRestoreConfig = () => {};
   export let onExportReport = () => {};
   export let onRunDiagnostic = () => {};
+  export let onGdriveAuthRefresh = () => {};
+  export let onGdriveAuthStart = () => {};
+  export let onGdriveAuthComplete = () => {};
+  export let onGdriveAuthSignOut = () => {};
+  export let onGdriveWorkcopyRefresh = () => {};
+  export let onGdriveWorkcopyDelete = () => {};
+  export let onGdriveWorkcopyCleanup = () => {};
 
   let activeSection = "general";
+  let lastInitialSectionApplied = "";
   let draft = {};
   let reportOptions = {
     mask_sensitive_paths: true,
     as_zip: false,
     copy_path_to_clipboard: true,
     open_after_write: true,
+  };
+  let gdriveCleanupDays = 3;
+  let gdriveDraft = {
+    client_id: "",
+    client_secret: "",
+    redirect_uri: "http://127.0.0.1:45123/oauth2/callback",
+    callback_url: "",
+    account_id: "",
+    refresh_token: "",
   };
 
   $: draft = {
@@ -49,6 +77,17 @@
     external_terminal_profile_cmd: initial.external_terminal_profile_cmd ?? "",
     external_terminal_profile_powershell: initial.external_terminal_profile_powershell ?? "",
     external_terminal_profile_wsl: initial.external_terminal_profile_wsl ?? "",
+  };
+
+  $: gdriveDraft = {
+    client_id: String(initial?.gdrive_oauth_client_id || ""),
+    client_secret: "",
+    redirect_uri:
+      String(initial?.gdrive_oauth_redirect_uri || "").trim() ||
+      "http://127.0.0.1:45123/oauth2/callback",
+    callback_url: "",
+    account_id: String(initial?.gdrive_account_id || ""),
+    refresh_token: "",
   };
 
   function clampTimeoutMs(value) {
@@ -77,9 +116,29 @@
     };
   }
 
+  function normalizeGdriveForSubmit(values) {
+    const redirectUriRaw = String(
+      values?.gdrive_oauth_redirect_uri ?? values?.redirect_uri ?? ""
+    ).trim();
+    return {
+      gdrive_oauth_client_id: String(
+        values?.gdrive_oauth_client_id ?? values?.client_id ?? ""
+      ).trim(),
+      gdrive_oauth_redirect_uri:
+        redirectUriRaw || "http://127.0.0.1:45123/oauth2/callback",
+      gdrive_account_id: String(values?.gdrive_account_id ?? values?.account_id ?? "").trim(),
+    };
+  }
+
   $: normalizedInitial = normalizeForSubmit(initial || {});
   $: normalizedDraft = normalizeForSubmit(draft || {});
-  $: hasUnsavedChanges = JSON.stringify(normalizedInitial) !== JSON.stringify(normalizedDraft);
+  $: normalizedGdriveInitial = normalizeGdriveForSubmit(initial || {});
+  $: normalizedGdriveDraft = normalizeGdriveForSubmit(gdriveDraft || {});
+  $: hasRecentGdriveWriteConflict =
+    Number(gdriveAuthStatus?.lastWriteConflictAtMs ?? Number.NaN) > 0;
+  $: hasUnsavedChanges =
+    JSON.stringify(normalizedInitial) !== JSON.stringify(normalizedDraft) ||
+    JSON.stringify(normalizedGdriveInitial) !== JSON.stringify(normalizedGdriveDraft);
 
   function getUnsavedChangesLabel() {
     return normalizedDraft.ui_language === "ja"
@@ -106,7 +165,10 @@
   }
 
   function submit() {
-    onSave?.(normalizedDraft);
+    onSave?.({
+      ...normalizedDraft,
+      ...normalizedGdriveDraft,
+    });
   }
 
   function runExportReport() {
@@ -132,6 +194,91 @@
     { id: "external", label: "settings.section.external" },
     { id: "advanced", label: "settings.section.advanced" },
   ];
+
+  function normalizeSectionId(value) {
+    const section = String(value || "").trim().toLowerCase();
+    if (section === "external" || section === "advanced") {
+      return section;
+    }
+    return "general";
+  }
+
+  $: {
+    const next = normalizeSectionId(initialSection);
+    if (next !== lastInitialSectionApplied) {
+      activeSection = next;
+      lastInitialSectionApplied = next;
+    }
+  }
+
+  function gdrivePhaseLabel(phase) {
+    if (phase === "pending") return t("settings.gdrive.phase_pending");
+    if (phase === "authorized") return t("settings.gdrive.phase_authorized");
+    return t("settings.gdrive.phase_signed_out");
+  }
+
+  function gdriveScopesText(scopes) {
+    if (!Array.isArray(scopes) || !scopes.length) return "-";
+    return scopes.join(", ");
+  }
+
+  function gdriveBooleanLabel(value) {
+    return value ? t("state.on") : t("state.off");
+  }
+
+  function gdriveBackendModeLabel(mode) {
+    if (mode === "real") return t("settings.gdrive.backend_mode_real");
+    return t("settings.gdrive.backend_mode_stub");
+  }
+
+  function gdriveTimeText(value) {
+    const ms = Number(value ?? Number.NaN);
+    if (!Number.isFinite(ms) || ms <= 0) return "-";
+    try {
+      return new Date(ms).toLocaleString();
+    } catch {
+      return String(ms);
+    }
+  }
+
+  function gdriveWorkcopyStatusLabel(item) {
+    if (!item?.exists) return t("settings.gdrive.workcopy.status_missing");
+    if (item?.dirty) return t("settings.gdrive.workcopy.status_dirty");
+    return t("settings.gdrive.workcopy.status_local");
+  }
+
+  function gdriveWorkcopyUpdatedText(item) {
+    return gdriveTimeText(item?.updatedAtMs);
+  }
+
+  function gdriveWorkcopyNameText(item) {
+    const name = String(item?.fileName || "").trim();
+    if (name) return name;
+    return String(item?.resourceId || "").trim() || "-";
+  }
+
+  function gdriveWorkcopySizeText(item) {
+    const value = Number(item?.sizeBytes ?? Number.NaN);
+    if (!Number.isFinite(value) || value < 0) return "-";
+    return `${Math.trunc(value)} B`;
+  }
+
+  function runGdriveWorkcopyCleanup() {
+    const raw = Number(gdriveCleanupDays);
+    const days = Number.isFinite(raw) ? Math.max(1, Math.min(365, Math.trunc(raw))) : 3;
+    gdriveCleanupDays = days;
+    onGdriveWorkcopyCleanup?.(days);
+  }
+
+  $: {
+    if (
+      gdriveAuthStatus?.accountId &&
+      !String(gdriveDraft.account_id || "").trim() &&
+      typeof gdriveAuthStatus.accountId === "string"
+    ) {
+      gdriveDraft.account_id = gdriveAuthStatus.accountId;
+    }
+  }
 </script>
 
 <ModalShell
@@ -147,6 +294,7 @@
       {#each sections as section}
         <button
           type="button"
+          data-settings-section={section.id}
           class:selected={activeSection === section.id}
           onclick={() => {
             activeSection = section.id;
@@ -363,6 +511,204 @@
           {:else}
             <p>{t("settings.no_shortcut_conflicts")}</p>
           {/if}
+        </div>
+
+        <div class="settings-gdrive-auth">
+          <div class="settings-profile-title">{t("settings.gdrive.title")}</div>
+          <p class="settings-help settings-help-compact">{t("settings.gdrive.help")}</p>
+          <p class="settings-help settings-help-compact">{t("settings.gdrive.persist_notice")}</p>
+
+          <div class="settings-gdrive-grid">
+            <div class="settings-gdrive-key">{t("settings.gdrive.phase")}</div>
+            <div>{gdrivePhaseLabel(gdriveAuthStatus?.phase)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.backend_mode")}</div>
+            <div>{gdriveBackendModeLabel(gdriveAuthStatus?.backendMode)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.account_id_current")}</div>
+            <div>{gdriveAuthStatus?.accountId || "-"}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.granted_scopes")}</div>
+            <div>{gdriveScopesText(gdriveAuthStatus?.grantedScopes)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.write_scope")}</div>
+            <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.hasWriteScope))}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.refresh_persisted")}</div>
+            <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.refreshTokenPersisted))}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.access_token_expires")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.accessTokenExpiresAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_scope_insufficient")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.lastScopeInsufficientAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_write_conflict")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.lastWriteConflictAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_refresh_error")}</div>
+            <div>{gdriveAuthStatus?.lastTokenRefreshError || "-"}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_refresh_error_at")}</div>
+            <div>{gdriveTimeText(gdriveAuthStatus?.lastTokenRefreshErrorAtMs)}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.token_store")}</div>
+            <div>{gdriveAuthStatus?.tokenStoreBackend || "-"}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.token_store_available")}</div>
+            <div>{gdriveBooleanLabel(Boolean(gdriveAuthStatus?.tokenStoreAvailable))}</div>
+            <div class="settings-gdrive-key">{t("settings.gdrive.last_error")}</div>
+            <div>{gdriveAuthStatus?.lastError || "-"}</div>
+          </div>
+
+          <div class="settings-gdrive-conflict-help" class:is-warning={hasRecentGdriveWriteConflict}>
+            <div class="settings-gdrive-conflict-title">{t("settings.gdrive.conflict_help_title")}</div>
+            <p class="settings-help settings-help-compact">
+              {hasRecentGdriveWriteConflict
+                ? t("settings.gdrive.conflict_help_recent")
+                : t("settings.gdrive.conflict_help")}
+            </p>
+          </div>
+
+          <div class="settings-gdrive-actions">
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthRefresh?.()}>
+              {t("settings.gdrive.refresh_status")}
+            </button>
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthSignOut?.(gdriveDraft)}>
+              {t("settings.gdrive.sign_out")}
+            </button>
+          </div>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.client_id")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.client_id}
+              placeholder={t("settings.gdrive.placeholder_client_id")}
+            />
+            <small>{t("settings.gdrive.client_id_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.client_secret_optional")}</span>
+            <input type="password" bind:value={gdriveDraft.client_secret} />
+            <small>{t("settings.gdrive.client_secret_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.redirect_uri")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.redirect_uri}
+              placeholder={t("settings.gdrive.placeholder_redirect_uri")}
+            />
+            <small>{t("settings.gdrive.redirect_uri_help")}</small>
+          </label>
+
+          <div class="settings-gdrive-actions">
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthStart?.(gdriveDraft)}>
+              {t("settings.gdrive.start_sign_in")}
+            </button>
+          </div>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.callback_url")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.callback_url}
+              placeholder={t("settings.gdrive.placeholder_callback_url")}
+            />
+            <small>{t("settings.gdrive.callback_url_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.account_id")}</span>
+            <input
+              type="text"
+              bind:value={gdriveDraft.account_id}
+              placeholder={t("settings.gdrive.placeholder_account_id")}
+            />
+            <small>{t("settings.gdrive.account_id_help")}</small>
+          </label>
+
+          <label class="settings-row">
+            <span>{t("settings.gdrive.refresh_token_optional")}</span>
+            <input type="password" bind:value={gdriveDraft.refresh_token} />
+            <small>{t("settings.gdrive.refresh_token_help")}</small>
+          </label>
+
+          <div class="settings-gdrive-actions">
+            <button type="button" disabled={gdriveAuthLoading || gdriveAuthBusy} onclick={() => onGdriveAuthComplete?.(gdriveDraft)}>
+              {t("settings.gdrive.complete_sign_in")}
+            </button>
+          </div>
+
+          {#if gdriveAuthLoading || gdriveAuthBusy}
+            <p class="settings-help settings-help-compact">{t("settings.gdrive.busy")}</p>
+          {/if}
+          {#if gdriveAuthMessage}
+            <p class="settings-test-message">{gdriveAuthMessage}</p>
+          {/if}
+          {#if gdriveAuthStatus?.backendMode === "stub"}
+            <p class="settings-help settings-help-compact">{t("settings.gdrive.stub_notice")}</p>
+          {/if}
+          {#if gdriveAuthError}
+            <p class:test-error={true} class="settings-test-message">{gdriveAuthError}</p>
+          {/if}
+
+          <div class="settings-gdrive-workcopy">
+            <div class="settings-profile-title">{t("settings.gdrive.workcopy.title")}</div>
+            <p class="settings-help settings-help-compact">{t("settings.gdrive.workcopy.help")}</p>
+
+            <div class="settings-gdrive-actions">
+              <button
+                type="button"
+                disabled={gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+                onclick={() => onGdriveWorkcopyRefresh?.()}
+              >
+                {t("settings.gdrive.workcopy.refresh")}
+              </button>
+              <input
+                type="number"
+                min="1"
+                max="365"
+                bind:value={gdriveCleanupDays}
+                class="settings-gdrive-days-input"
+              />
+              <button
+                type="button"
+                disabled={gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+                onclick={runGdriveWorkcopyCleanup}
+              >
+                {t("settings.gdrive.workcopy.cleanup")}
+              </button>
+            </div>
+
+            {#if gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+              <p class="settings-help settings-help-compact">{t("settings.gdrive.workcopy.busy")}</p>
+            {/if}
+            {#if gdriveWorkcopyMessage}
+              <p class="settings-test-message">{gdriveWorkcopyMessage}</p>
+            {/if}
+            {#if gdriveWorkcopyError}
+              <p class:test-error={true} class="settings-test-message">{gdriveWorkcopyError}</p>
+            {/if}
+
+            {#if Array.isArray(gdriveWorkcopyItems) && gdriveWorkcopyItems.length > 0}
+              <div class="settings-gdrive-workcopy-list">
+                {#each gdriveWorkcopyItems as item (item.resourceId)}
+                  <div class="settings-gdrive-workcopy-item">
+                    <div class="settings-gdrive-workcopy-main">
+                      <div class="settings-gdrive-workcopy-name">{gdriveWorkcopyNameText(item)}</div>
+                      <div class="settings-gdrive-workcopy-meta">
+                        <span>{gdriveWorkcopyStatusLabel(item)}</span>
+                        <span>{gdriveWorkcopySizeText(item)}</span>
+                        <span>{gdriveWorkcopyUpdatedText(item)}</span>
+                      </div>
+                      <div class="settings-gdrive-workcopy-path">{item.localPath || "-"}</div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={gdriveWorkcopyLoading || gdriveWorkcopyBusy}
+                      onclick={() => onGdriveWorkcopyDelete?.(item)}
+                    >
+                      {t("settings.gdrive.workcopy.delete")}
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {:else if !gdriveWorkcopyLoading}
+              <p class="settings-help settings-help-compact">{t("settings.gdrive.workcopy.empty")}</p>
+            {/if}
+          </div>
         </div>
       {/if}
 
@@ -612,6 +958,109 @@
   .settings-shortcut-conflicts li {
     margin-bottom: 4px;
     font-size: 12px;
+  }
+
+  .settings-gdrive-auth {
+    border-top: 1px solid var(--ui-border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .settings-gdrive-grid {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 4px 10px;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .settings-gdrive-key {
+    color: var(--ui-muted);
+  }
+
+  .settings-gdrive-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 10px;
+  }
+
+  .settings-gdrive-conflict-help {
+    border: 1px solid var(--ui-border);
+    background: var(--ui-surface-2);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+
+  .settings-gdrive-conflict-help.is-warning {
+    border-color: var(--ui-warning);
+  }
+
+  .settings-gdrive-conflict-title {
+    font-size: 12px;
+    color: var(--ui-fg);
+    margin-bottom: 4px;
+  }
+
+  .settings-gdrive-workcopy {
+    border-top: 1px solid var(--ui-border);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .settings-gdrive-days-input {
+    width: 80px;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--ui-border-strong);
+    background: var(--ui-surface);
+    color: var(--ui-fg);
+    border-radius: 3px;
+  }
+
+  .settings-gdrive-workcopy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .settings-gdrive-workcopy-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid var(--ui-border);
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--ui-surface-2);
+  }
+
+  .settings-gdrive-workcopy-main {
+    min-width: 0;
+  }
+
+  .settings-gdrive-workcopy-name {
+    font-size: 12px;
+    color: var(--ui-fg);
+    overflow-wrap: anywhere;
+  }
+
+  .settings-gdrive-workcopy-meta {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ui-muted);
+    flex-wrap: wrap;
+  }
+
+  .settings-gdrive-workcopy-path {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--ui-muted);
+    overflow-wrap: anywhere;
   }
 </style>
 

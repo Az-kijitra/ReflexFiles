@@ -50,7 +50,9 @@ export interface AppConfig {
   external_terminal_profile_cmd: string;
   external_terminal_profile_powershell: string;
   external_terminal_profile_wsl: string;
+  gdrive_oauth_client_id: string;
+  gdrive_oauth_redirect_uri: string;
+  gdrive_account_id: string;
   log_path: string;
   log_enabled: boolean;
 }
-

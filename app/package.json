@@ -1,15 +1,17 @@
 {
   "name": "app",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "",
   "type": "module",
   "scripts": {
     "sync:version": "node scripts/sync_version.mjs",
     "dev": "node scripts/sync_version.mjs && node scripts/build_manual.mjs && vite dev",
     "build": "node scripts/sync_version.mjs && node scripts/build_manual.mjs && vite build",
+    "docs:keymap-main": "node --experimental-strip-types scripts/build_keyboard_behavior_doc.mjs",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
+    "test:keys": "node --experimental-strip-types scripts/tests/run-key-tests.mjs",
     "audit:npm": "npm audit --audit-level=high",
     "audit:npm:prod": "npm audit --omit=dev --audit-level=high",
     "audit:cargo": "cargo audit --file src-tauri/Cargo.lock",

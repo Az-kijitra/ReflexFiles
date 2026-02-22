@@ -5,14 +5,17 @@
   export let listEl = null;
   /** @type {HTMLElement | null} */
   export let listBodyEl = null;
+  export let currentPath = "";
   export let showSize = false;
   export let showTime = false;
   export let uiFileIconMode = "by_type";
   export let loading = false;
   export let filteredEntries = [];
+  export let pathCompletionPreviewActive = false;
   export let entries = [];
   export let focusedIndex = 0;
   export let anchorIndex = null;
+  export let dropdownOpen = false;
   export let overflowLeft = false;
   export let overflowRight = false;
   export let visibleColStart = 0;
@@ -20,6 +23,7 @@
   export let listRows = 1;
   export let t;
   export let selectedPaths = [];
+  export let resolveGdriveWorkcopyBadge;
   export let openContextMenu;
   export let selectRange;
   export let toggleSelection;
@@ -44,10 +48,23 @@
   function getEntryIndex(entry) {
     return entries.findIndex((item) => item.path === entry.path);
   }
+
+  /** @param {import("$lib/types").Entry} entry */
+  function getGdriveWorkcopyBadge(entry) {
+    if (typeof resolveGdriveWorkcopyBadge !== "function") return "";
+    try {
+      const value = String(resolveGdriveWorkcopyBadge(entry) || "");
+      return value === "dirty" || value === "local" ? value : "";
+    } catch {
+      return "";
+    }
+  }
+
+  $: isGdrivePath = String(currentPath || "").trim().toLowerCase().startsWith("gdrive://");
 </script>
 
 <div
-  class="list {showSize ? 'show-size' : ''} {showTime ? 'show-time' : ''}"
+  class="list {showSize ? 'show-size' : ''} {showTime ? 'show-time' : ''} {isGdrivePath ? 'gdrive-surface' : ''} {pathCompletionPreviewActive ? 'path-completion-surface' : ''}"
   tabindex="0"
   role="listbox"
   aria-label={t("label.list")}
@@ -55,6 +72,9 @@
   aria-activedescendant={getActiveDescendant()}
   bind:this={listEl}
   oncontextmenu={openContextMenu}
+  onfocus={() => {
+    dropdownOpen = false;
+  }}
 >
   <div class="list-body" bind:this={listBodyEl}>
     {#if loading}
@@ -72,6 +92,9 @@
           {formatName}
           {formatSize}
           {formatModified}
+          gdriveWorkcopyBadge={getGdriveWorkcopyBadge(entry)}
+          gdriveWorkcopyLocalTitle={t("list.gdrive_workcopy_local")}
+          gdriveWorkcopyDirtyTitle={t("list.gdrive_workcopy_dirty")}
           {overflowLeft}
           {overflowRight}
           {visibleColStart}
@@ -116,6 +139,14 @@
     flex: 1;
     min-height: 0;
     color: var(--ui-fg);
+  }
+
+  .list.gdrive-surface {
+    background: var(--ui-gdrive-surface);
+  }
+
+  .list.path-completion-surface {
+    background: var(--ui-path-completion-surface);
   }
 
   .list:focus-visible {

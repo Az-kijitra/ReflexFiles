@@ -10,6 +10,8 @@ import { formatError } from "$lib/utils/error_format";
  */
 export function createEditEntryActions(ctx, helpers) {
   const { setStatusMessage, showError, pushUndoEntry } = helpers;
+  let renamingInFlight = false;
+  let creatingInFlight = false;
 
   /** @param {import("$lib/types").Entry} entry */
   function openRename(entry) {
@@ -21,6 +23,7 @@ export function createEditEntryActions(ctx, helpers) {
   }
 
   async function confirmRename() {
+    if (renamingInFlight) return;
     const target = ctx.getRenameTarget();
     if (!target) {
       ctx.setRenameOpen(false);
@@ -32,6 +35,7 @@ export function createEditEntryActions(ctx, helpers) {
       return;
     }
     try {
+      renamingInFlight = true;
       await ctx.fsRename(target, nextName);
       const parent = getParentPath(target);
       const nextPath = parent ? `${parent}\\${nextName}` : target;
@@ -55,6 +59,8 @@ export function createEditEntryActions(ctx, helpers) {
       } else {
         ctx.getRenameModalEl()?.focus();
       }
+    } finally {
+      renamingInFlight = false;
     }
   }
 
@@ -74,6 +80,7 @@ export function createEditEntryActions(ctx, helpers) {
   }
 
   async function confirmCreate() {
+    if (creatingInFlight) return;
     const name = ctx.getCreateName().trim();
     if (!name) {
       ctx.setCreateError(ctx.t("error.name_required"));
@@ -85,6 +92,7 @@ export function createEditEntryActions(ctx, helpers) {
       return;
     }
     try {
+      creatingInFlight = true;
       await ctx.fsCreate(currentPath, name, ctx.getCreateType());
       pushUndoEntry({
         kind: "create",
@@ -107,6 +115,9 @@ export function createEditEntryActions(ctx, helpers) {
       } else {
         ctx.getCreateModalEl()?.focus();
       }
+    }
+    finally {
+      creatingInFlight = false;
     }
   }
 

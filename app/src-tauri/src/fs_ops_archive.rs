@@ -76,15 +76,17 @@ pub fn zip_create(
 ) -> Result<(), String> {
     let started = Instant::now();
     let resolved_destination =
-        resolve_legacy_path_for(&destination, ProviderCapability::ArchiveCreate).map_err(|err| {
-            crate::log_error(
-                "zip_create",
-                "batch",
-                &destination,
-                &format!("code={}; {}", err.code(), err),
-            );
-            format!("code={}; {}", err.code(), err)
-        })?;
+        resolve_legacy_path_for(&destination, ProviderCapability::ArchiveCreate).map_err(
+            |err| {
+                crate::log_error(
+                    "zip_create",
+                    "batch",
+                    &destination,
+                    &format!("code={}; {}", err.code(), err),
+                );
+                format!("code={}; {}", err.code(), err)
+            },
+        )?;
     let mut resolved_items: Vec<(String, PathBuf)> = Vec::with_capacity(items.len());
     for item in &items {
         let resolved = resolve_legacy_path_for(item, ProviderCapability::Read).map_err(|err| {
@@ -154,15 +156,17 @@ pub fn zip_extract(
             format!("code={}; {}", err.code(), err)
         })?;
     let resolved_destination =
-        resolve_legacy_path_for(&destination, ProviderCapability::ArchiveExtract).map_err(|err| {
-            crate::log_error(
-                "zip_extract",
-                &path,
-                &destination,
-                &format!("code={}; {}", err.code(), err),
-            );
-            format!("code={}; {}", err.code(), err)
-        })?;
+        resolve_legacy_path_for(&destination, ProviderCapability::ArchiveExtract).map_err(
+            |err| {
+                crate::log_error(
+                    "zip_extract",
+                    &path,
+                    &destination,
+                    &format!("code={}; {}", err.code(), err),
+                );
+                format!("code={}; {}", err.code(), err)
+            },
+        )?;
     let resolved_path_text = resolved_path.to_string_lossy().to_string();
     let resolved_destination_text = resolved_destination.to_string_lossy().to_string();
     if let Err(err) = preflight_zip_extract(&resolved_path_text, &resolved_destination_text) {
@@ -174,7 +178,8 @@ pub fn zip_extract(
         );
         return Err(format!("code={}; {}", err.code, err.message));
     }
-    let file = fs::File::open(&resolved_path).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+    let file = fs::File::open(&resolved_path)
+        .map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
     let mut archive =
         ZipArchive::new(file).map_err(|e| format_error(AppErrorKind::Unknown, e.to_string()))?;
     let dest_path = resolved_destination;
@@ -215,4 +220,54 @@ pub fn zip_extract(
         &format!("count={}; ms={}", total, started.elapsed().as_millis()),
     );
     Ok(())
+}
+
+#[tauri::command]
+pub fn zip_extract_list_conflicts(
+    path: String,
+    destination: String,
+    password: Option<String>,
+) -> Result<Vec<String>, String> {
+    let resolved_path = resolve_legacy_path_for(&path, ProviderCapability::ArchiveExtract).map_err(
+        |err| format!("code={}; {}", err.code(), err),
+    )?;
+    let resolved_destination =
+        resolve_legacy_path_for(&destination, ProviderCapability::ArchiveExtract).map_err(
+            |err| format!("code={}; {}", err.code(), err),
+        )?;
+    let resolved_path_text = resolved_path.to_string_lossy().to_string();
+    let resolved_destination_text = resolved_destination.to_string_lossy().to_string();
+    if let Err(err) = preflight_zip_extract(&resolved_path_text, &resolved_destination_text) {
+        return Err(format!("code={}; {}", err.code, err.message));
+    }
+
+    let file = fs::File::open(&resolved_path).map_err(|e| format_error(AppErrorKind::Io, e.to_string()))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| format_error(AppErrorKind::Unknown, e.to_string()))?;
+    let dest_path = resolved_destination;
+    let mut conflicts = Vec::new();
+    let total = archive.len();
+    for i in 0..total {
+        let file = match password.as_deref() {
+            Some(pass) => archive.by_index_decrypt(i, pass.as_bytes()).map_err(|e| {
+                if matches!(e, ZipError::InvalidPassword) {
+                    format_error(AppErrorKind::Unknown, "ZIP_BAD_PASSWORD")
+                } else {
+                    format_error(AppErrorKind::Unknown, e.to_string())
+                }
+            })?,
+            None => archive
+                .by_index(i)
+                .map_err(|e| format_error(AppErrorKind::Unknown, e.to_string()))?,
+        };
+        let name = file.name().to_string();
+        if name.ends_with('/') {
+            continue;
+        }
+        let outpath = zip_safe_path(&dest_path, &name)?;
+        if outpath.exists() {
+            conflicts.push(name);
+        }
+    }
+    Ok(conflicts)
 }

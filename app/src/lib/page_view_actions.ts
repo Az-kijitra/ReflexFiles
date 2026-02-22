@@ -6,8 +6,10 @@
  *   closeMenu: () => void;
  *   loadDir: (path: string) => Promise<void>;
  *   focusList: () => void;
- *   focusTreeTop: () => void;
  *   handlePathTabCompletion: () => Promise<void>;
+ *   handlePathCompletionSeparator: (pathInput: string, key: string) => Promise<boolean>;
+ *   handlePathCompletionInputChange: (pathInput: string) => void;
+ *   clearPathCompletionPreview: () => void;
  *   setStatusMessage: (message: string, opts?: any) => void;
  *   getVisibleTreeNodes: (...args: any[]) => any[];
  *   focusTree: () => void;
@@ -38,8 +40,10 @@ export function buildViewActions(params) {
     closeMenu: params.closeMenu,
     loadDir: params.loadDir,
     focusList: params.focusList,
-    focusTreeTop: params.focusTreeTop,
     handlePathTabCompletion: params.handlePathTabCompletion,
+    handlePathCompletionSeparator: params.handlePathCompletionSeparator,
+    handlePathCompletionInputChange: params.handlePathCompletionInputChange,
+    clearPathCompletionPreview: params.clearPathCompletionPreview,
     setStatusMessage: params.setStatusMessage,
     getVisibleTreeNodes: params.getVisibleTreeNodes,
     focusTree: params.focusTree,
@@ -50,6 +54,7 @@ export function buildViewActions(params) {
     toggleSelection: pageActions.toggleSelection,
     setSelected: pageActions.setSelected,
     openEntry: pageActions.openEntry,
+    resolveGdriveWorkcopyBadge: pageActions.resolveGdriveWorkcopyBadge,
     matchesAction: params.matchesAction,
     scrollDropdownToIndex: pageActions.scrollDropdownToIndex,
     selectDropdown: pageActions.selectDropdown,
@@ -67,6 +72,7 @@ export function buildViewActions(params) {
     cancelDelete: pageActions.cancelDelete,
     confirmPasteOverwrite: pageActions.confirmPasteOverwrite,
     confirmPasteSkip: pageActions.confirmPasteSkip,
+    confirmPasteKeepBoth: pageActions.confirmPasteKeepBoth,
     cancelPasteConfirm: pageActions.cancelPasteConfirm,
     confirmCreate: pageActions.confirmCreate,
     cancelCreate: pageActions.cancelCreate,

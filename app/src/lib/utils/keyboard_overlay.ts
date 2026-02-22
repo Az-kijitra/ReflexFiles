@@ -4,6 +4,19 @@
  */
 export function handleOverlayKey(event, ctx) {
   const active = ctx.activeElement;
+  const target = event.target;
+  const isWithin = (el) =>
+    !!el && !!target && typeof el.contains === "function" && el.contains(target);
+  const inRenameModal = isWithin(ctx.renameModalEl);
+  const inCreateModal = isWithin(ctx.createModalEl);
+  const inJumpUrlModal = isWithin(ctx.jumpUrlModalEl);
+
+  // Let modal-local handlers own Enter/Escape/Tab for input-based modals.
+  // We still report "handled" here to block main-view shortcuts while the modal is open.
+  if ((ctx.renameOpen && inRenameModal) || (ctx.createOpen && inCreateModal) || (ctx.jumpUrlOpen && inJumpUrlModal)) {
+    return true;
+  }
+
   if (ctx.pasteConfirmOpen || ctx.deleteConfirmOpen || ctx.jumpUrlOpen) {
     return true;
   }
@@ -23,17 +36,9 @@ export function handleOverlayKey(event, ctx) {
     return true;
   }
   if (event.key === "Tab") {
-    if (!event.shiftKey) {
-      const isPathActive =
-        ctx.pathInputEl &&
-        (active === ctx.pathInputEl ||
-          (ctx.pathInputEl.contains && ctx.pathInputEl.contains(active)));
-      if (isPathActive) {
-        return true;
-      }
-    }
     event.preventDefault();
     event.stopPropagation();
+    const isReverse = Boolean(event.shiftKey);
     const isListActive =
       ctx.listEl && (active === ctx.listEl || (ctx.listEl.contains && ctx.listEl.contains(active)));
     const isPathActive =
@@ -42,28 +47,57 @@ export function handleOverlayKey(event, ctx) {
         (ctx.pathInputEl.contains && ctx.pathInputEl.contains(active)));
     const isTreeActive =
       ctx.treeEl && (active === ctx.treeEl || (ctx.treeEl.contains && ctx.treeEl.contains(active)));
+    if (!isReverse) {
+      if (isListActive) {
+        ctx.pathInputEl?.focus({ preventScroll: true });
+        ctx.pathInputEl?.select?.();
+        return true;
+      }
+      if (isPathActive) {
+        if (ctx.showTree && ctx.treeEl) {
+          ctx.focusTreeTop();
+        } else {
+          ctx.focusList();
+        }
+        return true;
+      }
+      if (isTreeActive) {
+        ctx.focusList();
+        return true;
+      }
+      if (ctx.showTree && ctx.treeEl) {
+        ctx.focusTreeTop();
+        return true;
+      }
+      ctx.focusList();
+      return true;
+    }
+
+    // Shift+Tab: reverse cycle (PATH <- Tree <- List)
     if (isListActive) {
+      if (ctx.showTree && ctx.treeEl) {
+        ctx.focusTreeTop();
+      } else {
+        ctx.pathInputEl?.focus({ preventScroll: true });
+        ctx.pathInputEl?.select?.();
+      }
+      return true;
+    }
+    if (isTreeActive) {
       ctx.pathInputEl?.focus({ preventScroll: true });
       ctx.pathInputEl?.select?.();
       return true;
     }
     if (isPathActive) {
-      if (ctx.showTree && ctx.treeEl) {
-        ctx.focusTreeTop();
-      } else {
-        ctx.focusList();
-      }
-      return true;
-    }
-    if (isTreeActive) {
       ctx.focusList();
       return true;
     }
     if (ctx.showTree && ctx.treeEl) {
-      ctx.focusTreeTop();
+      ctx.focusList();
       return true;
     }
-    ctx.focusList();
+    ctx.pathInputEl?.focus({ preventScroll: true });
+    ctx.pathInputEl?.select?.();
     return true;
   }
   if (ctx.renameOpen) {
