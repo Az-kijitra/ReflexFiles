@@ -30,6 +30,7 @@ export function buildTreeProps(params) {
     treeRoot: params.treeRoot,
     treeSelectedPath: params.treeSelectedPath,
     treeFocusedIndex: params.treeFocusedIndex,
+    pathCompletionPreviewActive: params.pathCompletionPreviewActive,
     t: params.t,
     getVisibleTreeNodes: params.getVisibleTreeNodes,
     focusTree: params.focusTree,
