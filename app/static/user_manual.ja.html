@@ -223,6 +223,13 @@
 <li>ZIP 解凍</li>
 </ul>
 </li>
+<li><strong>ドラッグ&amp;ドロップ（ローカル限定）</strong>
+<ul>
+<li>エクスプローラー → ReflexFiles（ローカルフォルダ表示中にドロップ）</li>
+<li>ReflexFiles → エクスプローラー（コンテキストメニューの <strong>エクスプローラーへドラッグ転送</strong>）</li>
+<li>Google Drive パス（<code>gdrive://</code>）は対象外</li>
+</ul>
+</li>
 <li><strong>ソート</strong>
 <ul>
 <li>ソートメニューから選択</li>
@@ -701,7 +708,12 @@
 <li>回避策: アクセス可能なフォルダから移動するか、PATH バーで直接指定してください。</li>
 </ul>
 </li>
-<li>ドラッグ&amp;ドロップは未対応です。</li>
+<li>ドラッグ&amp;ドロップはローカルパスのみ対応です。
+<ul>
+<li><code>gdrive://</code> パスは対象外です。</li>
+<li>エクスプローラーへの書き出しは、コンテキストメニューの <strong>エクスプローラーへドラッグ転送</strong> から開始します。</li>
+</ul>
+</li>
 <li>外部アプリ（VS Code / Git クライアント）は、未設定の場合起動できません。
 <ul>
 <li>回避策: <code>config.toml</code> の <code>external_vscode_path</code> / <code>external_git_client_path</code> を設定してください。</li>

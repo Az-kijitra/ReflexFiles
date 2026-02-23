@@ -223,6 +223,13 @@ copy, and archive files quickly.</p>
 <li>Extract ZIP</li>
 </ul>
 </li>
+<li><strong>Drag and Drop (local-only)</strong>
+<ul>
+<li>Explorer -&gt; ReflexFiles (drop into a local folder view)</li>
+<li>ReflexFiles -&gt; Explorer (use context menu <strong>Drag to Explorer</strong>)</li>
+<li>Google Drive paths (<code>gdrive://</code>) are not supported</li>
+</ul>
+</li>
 <li><strong>Sorting</strong>
 <ul>
 <li>Choose from sort menu</li>
@@ -701,7 +708,12 @@ Each user configures and owns their own Google Cloud project and OAuth client.</
 <li>Workaround: move from an accessible folder or enter path directly in PATH bar.</li>
 </ul>
 </li>
-<li>Drag and drop is not supported yet.</li>
+<li>Drag and drop is available only for local paths.
+<ul>
+<li><code>gdrive://</code> paths are excluded.</li>
+<li>Outbound drag to Explorer starts from the context menu (<strong>Drag to Explorer</strong>).</li>
+</ul>
+</li>
 <li>External apps (VS Code / Git client) cannot be opened when not configured.
 <ul>
 <li>Workaround: set <code>external_vscode_path</code> / <code>external_git_client_path</code> in <code>config.toml</code>.</li>
