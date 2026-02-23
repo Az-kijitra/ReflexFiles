@@ -5,6 +5,7 @@
     DND_OUTBOUND_LOCAL_ONLY_POLICY,
     endNativeOutboundDrag,
     evaluateOutboundAppDragCandidate,
+    isFormalOutboundDirectDragMouseChord,
     markNativeOutboundDragSuppress,
     NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
     NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
@@ -135,11 +136,8 @@
 
   /** @param {MouseEvent} event @param {import("$lib/types").Entry} entry */
   async function handleRowMouseDown(event, entry) {
-    if (event.button !== 0) return;
     // Formal local outbound drag trigger: Ctrl+Alt + left click.
-    const isFormalDirectChord =
-      event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey;
-    if (!isFormalDirectChord) return;
+    if (!isFormalOutboundDirectDragMouseChord(event)) return;
 
     const dragEntries = buildDragSelection(entry);
     const decision = evaluateOutboundAppDragCandidate({

@@ -235,3 +235,19 @@ export function endNativeOutboundDrag(
   if (!win) return;
   win.__rf_native_outbound_drag_inflight = false;
 }
+
+export function isFormalOutboundDirectDragMouseChord(evt: {
+  button: number;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+  metaKey?: boolean;
+}): boolean {
+  return (
+    evt.button === 0 &&
+    !!evt.ctrlKey &&
+    !!evt.altKey &&
+    !evt.shiftKey &&
+    !evt.metaKey
+  );
+}

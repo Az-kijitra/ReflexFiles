@@ -9,6 +9,7 @@ import {
   normalizeDroppedOsPaths,
   parseDragDropExperimentPolicy,
   endNativeOutboundDrag,
+  isFormalOutboundDirectDragMouseChord,
   tryBeginNativeOutboundDrag,
 } from "../../src/lib/utils/drag_drop_experiment.ts";
 
@@ -170,6 +171,60 @@ test("native outbound in-flight guard prevents reentry and can be cleared", () =
   assert.equal(tryBeginNativeOutboundDrag(fakeWindow), false);
   endNativeOutboundDrag(fakeWindow);
   assert.equal(tryBeginNativeOutboundDrag(fakeWindow), true);
+});
+
+test("formal outbound direct drag chord is Ctrl+Alt + left click only", () => {
+  assert.equal(
+    isFormalOutboundDirectDragMouseChord({
+      button: 0,
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: false,
+      metaKey: false,
+    }),
+    true
+  );
+
+  assert.equal(
+    isFormalOutboundDirectDragMouseChord({
+      button: 0,
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: true,
+      metaKey: false,
+    }),
+    false
+  );
+  assert.equal(
+    isFormalOutboundDirectDragMouseChord({
+      button: 0,
+      ctrlKey: false,
+      altKey: true,
+      shiftKey: true,
+      metaKey: false,
+    }),
+    false
+  );
+  assert.equal(
+    isFormalOutboundDirectDragMouseChord({
+      button: 0,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+    }),
+    false
+  );
+  assert.equal(
+    isFormalOutboundDirectDragMouseChord({
+      button: 2,
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: false,
+      metaKey: false,
+    }),
+    false
+  );
 });
 
 let failed = 0;
