@@ -137,7 +137,12 @@
     if (!outboundDragProbeEnabled) return;
     if (event.button !== 0) return;
     // Gate D direct-integration probe: modifier-gated to avoid changing normal list behavior.
-    if (!(event.altKey && event.shiftKey)) return;
+    // Alt+Shift is the primary probe combo, but some Windows environments intercept it
+    // for input-language switching. Ctrl+Alt is accepted as a fallback probe combo.
+    const directProbeChord =
+      (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey) ||
+      (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey);
+    if (!directProbeChord) return;
 
     const dragEntries = buildDragSelection(entry);
     const decision = evaluateOutboundAppDragCandidate({
