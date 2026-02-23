@@ -636,7 +636,7 @@
       "status.dnd_experiment_phase1_active":
         "D&D experiment active (phase1 inbound local-only). Drag from Explorer into a local folder in ReflexFiles.",
       "status.dnd_experiment_phase2_active":
-        "D&D experiment active (phase2 outbound local-only). Use context menu 'Explorer D&D (Exp)' or Alt+Shift / Ctrl+Alt + left click on a list item.",
+        "D&D experiment active (phase2 outbound local-only). Use Ctrl+Alt + left click on a list item (formal), or context menu 'Explorer D&D (Exp)' as fallback.",
       "focus.list": "List",
       "focus.tree": "Tree",
       "focus.path": "Path",
@@ -1161,7 +1161,7 @@
       "status.dnd_experiment_phase1_active":
         "D&D実験を有効化しました（phase1: 取り込み/ローカルのみ）。エクスプローラーから ReflexFiles のローカルフォルダへドロップできます。",
       "status.dnd_experiment_phase2_active":
-        "D&D実験を有効化しました（phase2: 書き出し/ローカルのみ）。右クリックの実験項目、または Alt+Shift / Ctrl+Alt + 左クリックで開始できます。",
+        "D&D実験を有効化しました（phase2: 書き出し/ローカルのみ）。正式操作は Ctrl+Alt + 左クリックです。右クリックの実験項目も fallback として使えます。",
       "focus.list": "リスト",
       "focus.tree": "ツリー",
       "focus.path": "パス",

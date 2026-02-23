@@ -137,16 +137,9 @@
   async function handleRowMouseDown(event, entry) {
     if (event.button !== 0) return;
     // Formal local outbound drag trigger: Ctrl+Alt + left click.
-    // Experimental probe alias (Alt+Shift + left click) remains available only in phase2.
     const isFormalDirectChord =
       event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey;
-    const isExperimentalProbeChord =
-      outboundDragProbeEnabled &&
-      event.altKey &&
-      event.shiftKey &&
-      !event.ctrlKey &&
-      !event.metaKey;
-    if (!isFormalDirectChord && !isExperimentalProbeChord) return;
+    if (!isFormalDirectChord) return;
 
     const dragEntries = buildDragSelection(entry);
     const decision = evaluateOutboundAppDragCandidate({
