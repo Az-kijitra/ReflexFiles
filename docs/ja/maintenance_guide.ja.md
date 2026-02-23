@@ -322,7 +322,7 @@ npm run check
 - `npm run e2e:tauri`
 - 手動スポット確認（Windows）
   - Explorer -> ReflexFiles（ローカルフォルダ取り込み）
-  - ReflexFiles -> Explorer（ファイルリスト行で `Ctrl+Alt + 左クリック`）
+  - ReflexFiles -> Explorer（ファイルリスト行で `Ctrl+Alt + 左クリック`, copy のみ）
   - `gdrive://` はドラッグ&ドロップ対象外のまま（block）
   - D&D 後にキー操作（`Ctrl+F`, `F2`, `Ctrl+C/V`）が壊れていないこと
 3. マージ前/リリース候補前

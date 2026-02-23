@@ -337,7 +337,7 @@ Recommended order for key-related changes:
 - run `npm run e2e:tauri`
 - manual spot check (Windows):
   - Explorer -> ReflexFiles (local folder import)
-  - ReflexFiles -> Explorer via file list direct trigger (`Ctrl+Alt + left click` on row)
+  - ReflexFiles -> Explorer via file list direct trigger (`Ctrl+Alt + left click` on row, copy-only)
   - `gdrive://` remains blocked for drag and drop
   - verify key shortcuts still work after D&D (`Ctrl+F`, `F2`, `Ctrl+C/V`)
 3. Before merge/release candidate
