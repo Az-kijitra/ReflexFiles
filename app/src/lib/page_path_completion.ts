@@ -31,6 +31,8 @@ export function createPathCompletionHelpers(params) {
     treeNodeName,
   } = params;
   const PATH_COMPLETION_STATUS_STICKY_MS = 0;
+  const PATH_COMPLETION_ONE_SHOT_STATUS_MS = 1600;
+  const PATH_COMPLETION_STATUS_REFRESH_MS = 150;
   /** @type {{ baseInput: string; parent: string; prefix: string; matches: any[]; index: number } | null} */
   let completionSession = null;
   let ignoreNextInputChange = false;
@@ -143,7 +145,7 @@ export function createPathCompletionHelpers(params) {
       const latest = typeof getStatusMessage === "function" ? String(getStatusMessage() || "") : "";
       if (latest === completionStatusMessage) return;
       getSetStatusMessage()(completionStatusMessage, PATH_COMPLETION_STATUS_STICKY_MS);
-    }, 300);
+    }, PATH_COMPLETION_STATUS_REFRESH_MS);
   }
 
   /**
@@ -297,7 +299,7 @@ export function createPathCompletionHelpers(params) {
     const trimmed = rawInput.trim();
     if (isGdrivePath(trimmed) || (!isAbsolutePath(trimmed) && isGdrivePath(getCurrentPath()))) {
       clearCompletionSession();
-      getSetStatusMessage()(t("status.path_completion_local_only"));
+      getSetStatusMessage()(t("status.path_completion_local_only"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
       return;
     }
     const context = getPathCompletionContext(rawInput);
@@ -307,14 +309,14 @@ export function createPathCompletionHelpers(params) {
     }
     if (isGdrivePath(context.parent)) {
       clearCompletionSession();
-      getSetStatusMessage()(t("status.path_completion_local_only"));
+      getSetStatusMessage()(t("status.path_completion_local_only"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
       return;
     }
     try {
       const matches = await resolveMatches(context);
       if (!matches.length) {
         clearCompletionSession();
-        getSetStatusMessage()(t("no_items"));
+        getSetStatusMessage()(t("no_items"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
         return;
       }
       if (matches.length === 1) {
@@ -351,7 +353,7 @@ export function createPathCompletionHelpers(params) {
       const matches = await resolveMatches(context);
       if (!matches.length) {
         clearCompletionSession();
-        getSetStatusMessage()(t("no_items"));
+        getSetStatusMessage()(t("no_items"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
         return true;
       }
       startCompletionSession(nextBase, context, matches, { selectFirst: false });

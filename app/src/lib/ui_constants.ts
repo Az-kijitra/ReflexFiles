@@ -599,6 +599,7 @@
       "status.path_completion_candidates_cycle":
         "PATH completion candidates: {count} ({index}/{total})",
       "status.path_completion_local_only": "PATH completion is available only for local paths",
+      "status.path_completion_closed": "PATH completion candidates closed",
       "status.cache_cleared": "Dir stats cache cleared",
       "status.selection_cleared": "Selection cleared",
       "status.no_parent": "No parent",
@@ -1124,6 +1125,7 @@
       "status.path_completion_candidates": "PATH補完候補: {count}件",
       "status.path_completion_candidates_cycle": "PATH補完候補: {count}件 ({index}/{total})",
       "status.path_completion_local_only": "PATH補完はローカルパスでのみ利用できます",
+      "status.path_completion_closed": "PATH補完候補を閉じました",
       "status.cache_cleared": "統計キャッシュをクリアしました",
       "status.selection_cleared": "選択を解除しました",
       "status.no_parent": "親フォルダなし",

@@ -56,6 +56,7 @@
           event.preventDefault();
           const completionCanceled = clearPathCompletionPreview?.();
           if (completionCanceled) {
+            setStatusMessage(t("status.path_completion_closed"), 1400);
             return;
           }
           pathInput = currentPath;
