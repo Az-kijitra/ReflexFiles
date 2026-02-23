@@ -11,11 +11,13 @@ import {
   buildUndoFeature,
 } from "$lib/page_actions_registry_feature_builders";
 import {
+  endNativeOutboundDrag,
   evaluateOutboundAppDragCandidate,
   markNativeOutboundDragSuppress,
   NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
   NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
   readDragDropExperimentPolicyFromStorage,
+  tryBeginNativeOutboundDrag,
 } from "$lib/utils/drag_drop_experiment";
 import type { PageActionsRegistryContext } from "$lib/page_actions_registry_features_types";
 
@@ -176,8 +178,16 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     );
     try {
       if (typeof window !== "undefined") {
+        const dragWin = window as Window & {
+          __rf_native_outbound_drag_suppress_until?: number;
+          __rf_native_outbound_drag_inflight?: boolean;
+        };
+        if (!tryBeginNativeOutboundDrag(dragWin)) {
+          setStatusMessage(ctx.t("status.dnd_export_native_busy"), 2500);
+          return;
+        }
         markNativeOutboundDragSuppress(
-          window as Window & { __rf_native_outbound_drag_suppress_until?: number },
+          dragWin,
           NATIVE_OUTBOUND_DND_SUPPRESS_START_MS
         );
       }
@@ -194,8 +204,13 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       showError(err);
     } finally {
       if (typeof window !== "undefined") {
+        const dragWin = window as Window & {
+          __rf_native_outbound_drag_suppress_until?: number;
+          __rf_native_outbound_drag_inflight?: boolean;
+        };
+        endNativeOutboundDrag(dragWin);
         markNativeOutboundDragSuppress(
-          window as Window & { __rf_native_outbound_drag_suppress_until?: number },
+          dragWin,
           NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS
         );
       }

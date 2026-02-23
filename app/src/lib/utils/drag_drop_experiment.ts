@@ -188,6 +188,7 @@ export function formatInboundDropProbeStatus(params: {
 
 type NativeOutboundSuppressWindow = {
   __rf_native_outbound_drag_suppress_until?: number;
+  __rf_native_outbound_drag_inflight?: boolean;
 };
 
 export function markNativeOutboundDragSuppress(
@@ -207,4 +208,20 @@ export function isNativeOutboundDragSuppressActive(
   if (!win) return false;
   const until = Number(win.__rf_native_outbound_drag_suppress_until ?? 0);
   return Number.isFinite(until) && now < until;
+}
+
+export function tryBeginNativeOutboundDrag(
+  win: NativeOutboundSuppressWindow | null | undefined
+): boolean {
+  if (!win) return true;
+  if (win.__rf_native_outbound_drag_inflight) return false;
+  win.__rf_native_outbound_drag_inflight = true;
+  return true;
+}
+
+export function endNativeOutboundDrag(
+  win: NativeOutboundSuppressWindow | null | undefined
+): void {
+  if (!win) return;
+  win.__rf_native_outbound_drag_inflight = false;
 }

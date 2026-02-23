@@ -2,11 +2,13 @@
   import ListRow from "$lib/components/ListRow.svelte";
   import { clipboardSetFiles, shellStartFileDrag } from "$lib/utils/tauri_fs";
   import {
+    endNativeOutboundDrag,
     evaluateOutboundAppDragCandidate,
     markNativeOutboundDragSuppress,
     NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
     NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
     readDragDropExperimentPolicyFromStorage,
+    tryBeginNativeOutboundDrag,
   } from "$lib/utils/drag_drop_experiment";
 
   /** @type {HTMLElement | null} */
@@ -151,6 +153,10 @@
     event.preventDefault();
     event.stopPropagation();
     if (typeof window !== "undefined") {
+      if (!tryBeginNativeOutboundDrag(window)) {
+        emitDndExperimentStatus("D&D direct export already running", 2500);
+        return;
+      }
       markNativeOutboundDragSuppress(window, NATIVE_OUTBOUND_DND_SUPPRESS_START_MS);
     }
     emitDndExperimentStatus(
@@ -165,6 +171,7 @@
       emitDndExperimentStatus(`D&D direct export failed (${msg})`, 5000);
     } finally {
       if (typeof window !== "undefined") {
+        endNativeOutboundDrag(window);
         markNativeOutboundDragSuppress(window, NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS);
       }
     }

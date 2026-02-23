@@ -8,6 +8,8 @@ import {
   markNativeOutboundDragSuppress,
   normalizeDroppedOsPaths,
   parseDragDropExperimentPolicy,
+  endNativeOutboundDrag,
+  tryBeginNativeOutboundDrag,
 } from "../../src/lib/utils/drag_drop_experiment.ts";
 
 const tests = [];
@@ -160,6 +162,14 @@ test("native outbound suppress helpers set and check TTL safely", () => {
   } finally {
     Date.now = realNow;
   }
+});
+
+test("native outbound in-flight guard prevents reentry and can be cleared", () => {
+  const fakeWindow = {};
+  assert.equal(tryBeginNativeOutboundDrag(fakeWindow), true);
+  assert.equal(tryBeginNativeOutboundDrag(fakeWindow), false);
+  endNativeOutboundDrag(fakeWindow);
+  assert.equal(tryBeginNativeOutboundDrag(fakeWindow), true);
 });
 
 let failed = 0;
