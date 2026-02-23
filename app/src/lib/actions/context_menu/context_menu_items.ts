@@ -2,6 +2,7 @@ import { getParentPath } from "$lib/utils/path";
 import {
   DND_OUTBOUND_LOCAL_ONLY_POLICY,
   evaluateOutboundAppDragCandidate,
+  readDragDropExperimentPolicyFromStorage,
 } from "$lib/utils/drag_drop_experiment";
 
 /**
@@ -326,6 +327,10 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canRenameSingle = isSingle && singleSupports(selectedEntry, "can_rename");
     const canExtractZip = isZip && singleSupports(selectedEntry, "can_archive_extract");
     const extApps = getExternalApps ? getExternalApps() : [];
+    const dndExperimentPolicy =
+      typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+        ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
+        : null;
     const dndExportDecision = evaluateOutboundAppDragCandidate({
       policy: DND_OUTBOUND_LOCAL_ONLY_POLICY,
       selectedEntries: selectedEntries.map((entry) => ({
@@ -333,7 +338,10 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         provider: entry?.provider ?? entry?.ref?.provider ?? "local",
       })),
     });
-    const dndExportUiVisible = hasSelection;
+    const dndExportUiVisible =
+      hasSelection &&
+      !!dndExperimentPolicy?.enabled &&
+      dndExperimentPolicy.phase === "phase2_outbound_local_only";
     const dndExportEnabled = hasSelection && dndExportDecision.allowed;
     const dndExportReason =
       hasSelection && !dndExportDecision.allowed ? dndExportReasonLabel(dndExportDecision.reason) : "";

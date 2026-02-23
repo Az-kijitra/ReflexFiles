@@ -125,7 +125,7 @@ Supported files open in ReflexViewer.
   - Extract ZIP
 - **Drag and Drop (local-only)**
   - Explorer -> ReflexFiles (drop into a local folder view)
-  - ReflexFiles -> Explorer (use context menu **Drag to Explorer**)
+  - ReflexFiles -> Explorer (`Ctrl+Alt + Left Click` on a file list row, then drag to Explorer)
   - Google Drive paths (`gdrive://`) are not supported
 - **Sorting**
   - Choose from sort menu
@@ -352,7 +352,7 @@ In **Settings > Advanced**, conflict warnings include:
   - Workaround: move from an accessible folder or enter path directly in PATH bar.
 - Drag and drop is available only for local paths.
   - `gdrive://` paths are excluded.
-  - Outbound drag to Explorer starts from the context menu (**Drag to Explorer**).
+  - Outbound drag to Explorer starts from the file list (`Ctrl+Alt + Left Click` on a row).
 - External apps (VS Code / Git client) cannot be opened when not configured.
   - Workaround: set `external_vscode_path` / `external_git_client_path` in `config.toml`.
 - In folders with huge numbers of items, automatic tree expansion may be limited.

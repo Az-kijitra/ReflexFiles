@@ -2,6 +2,7 @@
   import ListRow from "$lib/components/ListRow.svelte";
   import { clipboardSetFiles, shellStartFileDrag } from "$lib/utils/tauri_fs";
   import {
+    DND_OUTBOUND_LOCAL_ONLY_POLICY,
     endNativeOutboundDrag,
     evaluateOutboundAppDragCandidate,
     markNativeOutboundDragSuppress,
@@ -134,46 +135,85 @@
 
   /** @param {MouseEvent} event @param {import("$lib/types").Entry} entry */
   async function handleRowMouseDown(event, entry) {
-    if (!outboundDragProbeEnabled) return;
     if (event.button !== 0) return;
-    // Gate D direct-integration probe: modifier-gated to avoid changing normal list behavior.
-    // Alt+Shift is the primary probe combo, but some Windows environments intercept it
-    // for input-language switching. Ctrl+Alt is accepted as a fallback probe combo.
-    const directProbeChord =
-      (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey) ||
-      (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey);
-    if (!directProbeChord) return;
+    // Formal local outbound drag trigger: Ctrl+Alt + left click.
+    // Experimental probe alias (Alt+Shift + left click) remains available only in phase2.
+    const isFormalDirectChord =
+      event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey;
+    const isExperimentalProbeChord =
+      outboundDragProbeEnabled &&
+      event.altKey &&
+      event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey;
+    if (!isFormalDirectChord && !isExperimentalProbeChord) return;
 
     const dragEntries = buildDragSelection(entry);
     const decision = evaluateOutboundAppDragCandidate({
-      policy: dndExperimentPolicy,
+      policy: DND_OUTBOUND_LOCAL_ONLY_POLICY,
       selectedEntries: dragEntries.map((item) => ({ path: item.path, provider: item.provider })),
     });
     if (!decision.allowed) {
       event.preventDefault();
       event.stopPropagation();
-      emitDndExperimentStatus(`D&D direct export blocked (${decision.reason})`, 4000);
+      let reasonText = String(decision.reason || "");
+      if (typeof t === "function") {
+        switch (reasonText) {
+          case "source_not_local":
+            reasonText = t("dnd.export_local_only");
+            break;
+          case "mixed_or_invalid_sources":
+            reasonText = t("dnd.export_mixed_selection_not_supported");
+            break;
+          case "no_items":
+            reasonText = t("status.no_selection");
+            break;
+          default:
+            reasonText = t("capability.not_available");
+            break;
+        }
+      }
+      emitDndExperimentStatus(t?.("status.dnd_export_blocked", { reason: reasonText }) || `D&D export blocked (${reasonText})`, 4000);
       return;
     }
     event.preventDefault();
     event.stopPropagation();
     if (typeof window !== "undefined") {
       if (!tryBeginNativeOutboundDrag(window)) {
-        emitDndExperimentStatus("D&D direct export already running", 2500);
+        emitDndExperimentStatus(
+          t?.("status.dnd_export_native_busy") || "D&D export is already running",
+          2500
+        );
         return;
       }
       markNativeOutboundDragSuppress(window, NATIVE_OUTBOUND_DND_SUPPRESS_START_MS);
     }
     emitDndExperimentStatus(
-      `D&D direct export starting (experimental): ${decision.acceptedPaths.length} item(s)`,
+      t?.("status.dnd_export_native_starting", { count: decision.acceptedPaths.length }) ||
+        `D&D export starting: ${decision.acceptedPaths.length} item(s)`,
       2500
     );
     try {
       const result = await shellStartFileDrag(decision.acceptedPaths);
-      emitDndExperimentStatus(`D&D direct export finished (experimental): ${String(result)}`, 4000);
+      const resultText = String(result || "");
+      if (resultText === "none") {
+        emitDndExperimentStatus(
+          t?.("status.dnd_export_native_canceled") || "D&D export canceled",
+          3000
+        );
+      } else {
+        emitDndExperimentStatus(
+          t?.("status.dnd_export_native_finished", { result: resultText }) ||
+            `D&D export finished: ${resultText}`,
+          4000
+        );
+      }
     } catch (err) {
       const msg = typeof err === "string" ? err : err?.message || "shell_start_file_drag failed";
-      emitDndExperimentStatus(`D&D direct export failed (${msg})`, 5000);
+      emitDndExperimentStatus(
+        t?.("status.dnd_export_failed", { error: msg }) || `D&D export failed (${msg})`,
+        5000
+      );
     } finally {
       if (typeof window !== "undefined") {
         endNativeOutboundDrag(window);

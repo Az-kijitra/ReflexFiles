@@ -621,9 +621,11 @@
       "status.dnd_export_blocked": "D&D export blocked: {reason}",
       "status.dnd_export_native_ready":
         "D&D export ready ({count} item(s)). Hold left mouse button and drag to Explorer.",
+      "status.dnd_export_native_starting": "D&D export starting: {count} item(s)",
       "status.dnd_export_native_finished": "D&D export finished: {result}",
       "status.dnd_export_native_canceled": "D&D export canceled",
       "status.dnd_export_native_busy": "D&D export is already running",
+      "status.dnd_export_failed": "D&D export failed ({error})",
       "status.dnd_import_blocked": "D&D import blocked: {reason}",
       "status.dnd_import_blocked_self": "D&D import is temporarily blocked during outbound drag",
       "status.dnd_import_blocked_overlay": "Close the current dialog/menu before dropping files",
@@ -1144,9 +1146,11 @@
       "status.dnd_export_blocked": "D&D書き出しをブロックしました: {reason}",
       "status.dnd_export_native_ready":
         "D&D書き出しの準備完了（{count}件）。左ボタンを押したままエクスプローラーへドラッグしてください。",
+      "status.dnd_export_native_starting": "D&D書き出しを開始します: {count}件",
       "status.dnd_export_native_finished": "D&D書き出しを終了しました: {result}",
       "status.dnd_export_native_canceled": "D&D書き出しをキャンセルしました",
       "status.dnd_export_native_busy": "D&D書き出しはすでに実行中です",
+      "status.dnd_export_failed": "D&D書き出しに失敗しました（{error}）",
       "status.dnd_import_blocked": "D&D取り込みをブロックしました: {reason}",
       "status.dnd_import_blocked_self": "D&D書き出し中のため、一時的にD&D取り込みをブロックしています",
       "status.dnd_import_blocked_overlay": "ダイアログ/メニューを閉じてからファイルをドロップしてください",
