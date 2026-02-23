@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn parse_drag_out_effect_policy_rejects_unknown() {
-        let err = parse_drag_out_effect_policy(Some("move_only")).expect_err("reject unknown");
+        let err = parse_drag_out_effect_policy(Some("invalid_mode")).expect_err("reject unknown");
         assert!(err.contains("code=invalid_path"));
     }
 

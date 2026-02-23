@@ -1,6 +1,6 @@
 <script>
   import ListRow from "$lib/components/ListRow.svelte";
-  import { clipboardSetFiles, shellStartFileDrag, shellStartFileDragWithEffects } from "$lib/utils/tauri_fs";
+  import { clipboardSetFiles, shellStartFileDrag } from "$lib/utils/tauri_fs";
   import {
     DND_OUTBOUND_LOCAL_ONLY_POLICY,
     endNativeOutboundDrag,
@@ -139,14 +139,7 @@
     // Formal local outbound drag trigger: Ctrl+Alt + left click.
     const isFormalDirectChord =
       event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey;
-    // phase2 experimental extension: Ctrl+Alt+Shift + left click enables copy/move effects.
-    const isExperimentalEffectsChord =
-      outboundDragProbeEnabled &&
-      event.ctrlKey &&
-      event.altKey &&
-      event.shiftKey &&
-      !event.metaKey;
-    if (!isFormalDirectChord && !isExperimentalEffectsChord) return;
+    if (!isFormalDirectChord) return;
 
     const dragEntries = buildDragSelection(entry);
     const decision = evaluateOutboundAppDragCandidate({
@@ -194,9 +187,7 @@
       2500
     );
     try {
-      const result = isExperimentalEffectsChord
-        ? await shellStartFileDragWithEffects(decision.acceptedPaths, "copy_or_move")
-        : await shellStartFileDrag(decision.acceptedPaths);
+      const result = await shellStartFileDrag(decision.acceptedPaths);
       const resultText = String(result || "");
       if (resultText === "none") {
         emitDndExperimentStatus(

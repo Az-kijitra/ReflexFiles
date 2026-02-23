@@ -123,7 +123,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     pushUndoEntry,
   });
 
-  const startExplorerDrag = async () => {
+  const startExplorerDragCore = async (mode: "copy" | "copy_or_move") => {
     const entries = ctx.getEntries();
     const selectedPaths = ctx.getSelectedPaths();
     const focusedIndex = ctx.getFocusedIndex();
@@ -187,9 +187,15 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
           NATIVE_OUTBOUND_DND_SUPPRESS_START_MS
         );
       }
-      const result = await ctx.invoke("shell_start_file_drag_debug", {
-        paths: decision.acceptedPaths,
-      });
+      const result =
+        mode === "copy_or_move"
+          ? await ctx.invoke("shell_start_file_drag_debug_with_effects", {
+              paths: decision.acceptedPaths,
+              effect_mode: "copy_or_move",
+            })
+          : await ctx.invoke("shell_start_file_drag_debug", {
+              paths: decision.acceptedPaths,
+            });
       const resultText = String(result || "");
       if (resultText === "none") {
         setStatusMessage(ctx.t("status.dnd_export_native_canceled"), 3000);
@@ -212,6 +218,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       }
     }
   };
+
+  const startExplorerDrag = async () => startExplorerDragCore("copy");
 
   const { zipActions, contextMenuActions } = buildContextMenuFeature(ctx, {
     openCreate,
