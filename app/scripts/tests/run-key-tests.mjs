@@ -506,6 +506,116 @@ defineTest("overlay Tab focus cycle", () => {
   assert.equal(state5.focusList, 1);
 });
 
+defineTest("overlay input modals delegate Enter/Escape to modal-local handlers when target is inside modal", () => {
+  const makeKeyEvent = (key, target) => {
+    let prevented = 0;
+    return {
+      event: {
+        key,
+        target,
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+      },
+      get prevented() {
+        return prevented;
+      },
+    };
+  };
+
+  const baseCtx = () => {
+    const { ctx } = createOverlayContext();
+    Object.assign(ctx, {
+      renameModalEl: null,
+      createModalEl: null,
+      jumpUrlModalEl: null,
+      confirmRenameCalled: 0,
+      confirmCreateCalled: 0,
+      confirmJumpUrlCalled: 0,
+      confirmRename() {
+        this.confirmRenameCalled += 1;
+      },
+      confirmCreate() {
+        this.confirmCreateCalled += 1;
+      },
+      confirmJumpUrl() {
+        this.confirmJumpUrlCalled += 1;
+      },
+      cancelRename() {},
+      cancelCreate() {},
+      cancelJumpUrl() {},
+    });
+    return ctx;
+  };
+
+  const renameInput = {};
+  const renameCtx = baseCtx();
+  renameCtx.renameOpen = true;
+  renameCtx.renameModalEl = { contains: (el) => el === renameInput };
+  const renameEnter = makeKeyEvent("Enter", renameInput);
+  assert.equal(handleOverlayKey(renameEnter.event, renameCtx), true);
+  assert.equal(renameCtx.confirmRenameCalled, 0);
+  assert.equal(renameEnter.prevented, 0);
+
+  const createInput = {};
+  const createCtx = baseCtx();
+  createCtx.createOpen = true;
+  createCtx.createModalEl = { contains: (el) => el === createInput };
+  const createEnter = makeKeyEvent("Enter", createInput);
+  assert.equal(handleOverlayKey(createEnter.event, createCtx), true);
+  assert.equal(createCtx.confirmCreateCalled, 0);
+  assert.equal(createEnter.prevented, 0);
+
+  const jumpInput = {};
+  const jumpCtx = baseCtx();
+  jumpCtx.jumpUrlOpen = true;
+  jumpCtx.jumpUrlModalEl = { contains: (el) => el === jumpInput };
+  const jumpEnter = makeKeyEvent("Enter", jumpInput);
+  assert.equal(handleOverlayKey(jumpEnter.event, jumpCtx), true);
+  assert.equal(jumpCtx.confirmJumpUrlCalled, 0);
+  assert.equal(jumpEnter.prevented, 0);
+});
+
+defineTest("overlay input modals handle Enter when modal is open but target is outside modal", () => {
+  const makeKeyEvent = (key, target) => {
+    let prevented = 0;
+    return {
+      event: {
+        key,
+        target,
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+      },
+      get prevented() {
+        return prevented;
+      },
+    };
+  };
+  const outsideTarget = {};
+
+  const ctx = {
+    ...createOverlayContext().ctx,
+    renameOpen: true,
+    renameModalEl: { contains: () => false },
+    createOpen: false,
+    createModalEl: null,
+    jumpUrlOpen: false,
+    jumpUrlModalEl: null,
+    confirmRenameCalled: 0,
+    confirmRename() {
+      this.confirmRenameCalled += 1;
+    },
+    cancelRename() {},
+  };
+  const enter = makeKeyEvent("Enter", outsideTarget);
+  assert.equal(handleOverlayKey(enter.event, ctx), true);
+  assert.equal(ctx.confirmRenameCalled, 1);
+  assert.equal(enter.prevented, 1);
+});
+
 defineTest("path completion cycle and separator behavior", async () => {
   const { helpers, state } = createPathCompletionHarness({
     pathInput: "C:\\Users\\toshi\\a",
