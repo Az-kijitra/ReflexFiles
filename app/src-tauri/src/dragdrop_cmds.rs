@@ -46,11 +46,30 @@ fn validate_local_drag_selection(paths: &[String]) -> Result<LocalDragSelection,
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DragOutEffectPolicy {
+    CopyOnly,
+    CopyOrMove,
+}
+
+fn parse_drag_out_effect_policy(effect_mode: Option<&str>) -> Result<DragOutEffectPolicy, String> {
+    match effect_mode.map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        None => Ok(DragOutEffectPolicy::CopyOnly),
+        Some("copy") => Ok(DragOutEffectPolicy::CopyOnly),
+        Some("copy_or_move") => Ok(DragOutEffectPolicy::CopyOrMove),
+        Some(other) => Err(format_error(
+            AppErrorKind::InvalidPath,
+            format!("unsupported drag-out effect mode: {other}"),
+        )),
+    }
+}
+
 #[tauri::command]
 pub fn shell_start_file_drag(paths: Vec<String>) -> Result<String, String> {
+    let effect_policy = DragOutEffectPolicy::CopyOnly;
     #[cfg(target_os = "windows")]
     {
-        shell_start_file_drag_windows(paths, false)
+        shell_start_file_drag_windows(paths, false, effect_policy)
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -64,9 +83,10 @@ pub fn shell_start_file_drag(paths: Vec<String>) -> Result<String, String> {
 
 #[tauri::command]
 pub fn shell_start_file_drag_debug(paths: Vec<String>) -> Result<String, String> {
+    let effect_policy = DragOutEffectPolicy::CopyOnly;
     #[cfg(target_os = "windows")]
     {
-        shell_start_file_drag_windows(paths, true)
+        shell_start_file_drag_windows(paths, true, effect_policy)
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -78,8 +98,52 @@ pub fn shell_start_file_drag_debug(paths: Vec<String>) -> Result<String, String>
     }
 }
 
+#[tauri::command]
+pub fn shell_start_file_drag_with_effects(
+    paths: Vec<String>,
+    effect_mode: Option<String>,
+) -> Result<String, String> {
+    let effect_policy = parse_drag_out_effect_policy(effect_mode.as_deref())?;
+    #[cfg(target_os = "windows")]
+    {
+        shell_start_file_drag_windows(paths, false, effect_policy)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (paths, effect_policy);
+        Err(format_error(
+            AppErrorKind::Unknown,
+            "native file drag-out is only supported on Windows",
+        ))
+    }
+}
+
+#[tauri::command]
+pub fn shell_start_file_drag_debug_with_effects(
+    paths: Vec<String>,
+    effect_mode: Option<String>,
+) -> Result<String, String> {
+    let effect_policy = parse_drag_out_effect_policy(effect_mode.as_deref())?;
+    #[cfg(target_os = "windows")]
+    {
+        shell_start_file_drag_windows(paths, true, effect_policy)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (paths, effect_policy);
+        Err(format_error(
+            AppErrorKind::Unknown,
+            "native file drag-out is only supported on Windows",
+        ))
+    }
+}
+
 #[cfg(target_os = "windows")]
-fn shell_start_file_drag_windows(paths: Vec<String>, debug_console_mode: bool) -> Result<String, String> {
+fn shell_start_file_drag_windows(
+    paths: Vec<String>,
+    debug_console_mode: bool,
+    effect_policy: DragOutEffectPolicy,
+) -> Result<String, String> {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use windows::core::{implement, PCWSTR};
@@ -279,8 +343,12 @@ fn shell_start_file_drag_windows(paths: Vec<String>, debug_console_mode: bool) -
         } else {
             SimpleDropSource.into()
         };
-        // Gate A/B experimental policy: copy-only for safety.
-        let allowed = DROPEFFECT_COPY;
+        let allowed = match effect_policy {
+            // Current production default: copy-only for safety.
+            DragOutEffectPolicy::CopyOnly => DROPEFFECT_COPY,
+            // Next-phase groundwork: allow both copy and move, Explorer decides based on drop target/modifiers.
+            DragOutEffectPolicy::CopyOrMove => DROPEFFECT_COPY | DROPEFFECT_MOVE,
+        };
         let effect = SHDoDragDrop(None, &data_object, &drop_source, allowed)
             .map_err(|e| format_error(AppErrorKind::Io, format!("SHDoDragDrop failed: {e}")))?;
         if effect == DROPEFFECT_COPY {
@@ -299,6 +367,7 @@ fn shell_start_file_drag_windows(paths: Vec<String>, debug_console_mode: bool) -
 #[cfg(test)]
 mod tests {
     use super::validate_local_drag_selection;
+    use super::{parse_drag_out_effect_policy, DragOutEffectPolicy};
     use std::fs;
 
     fn make_temp_case(name: &str) -> std::path::PathBuf {
@@ -315,6 +384,36 @@ mod tests {
     #[test]
     fn validate_local_drag_selection_rejects_empty() {
         let err = validate_local_drag_selection(&[]).expect_err("must reject empty");
+        assert!(err.contains("code=invalid_path"));
+    }
+
+    #[test]
+    fn parse_drag_out_effect_policy_defaults_to_copy_only() {
+        assert_eq!(
+            parse_drag_out_effect_policy(None).expect("default"),
+            DragOutEffectPolicy::CopyOnly
+        );
+        assert_eq!(
+            parse_drag_out_effect_policy(Some("")).expect("empty"),
+            DragOutEffectPolicy::CopyOnly
+        );
+        assert_eq!(
+            parse_drag_out_effect_policy(Some("copy")).expect("copy"),
+            DragOutEffectPolicy::CopyOnly
+        );
+    }
+
+    #[test]
+    fn parse_drag_out_effect_policy_accepts_copy_or_move() {
+        assert_eq!(
+            parse_drag_out_effect_policy(Some("copy_or_move")).expect("copy_or_move"),
+            DragOutEffectPolicy::CopyOrMove
+        );
+    }
+
+    #[test]
+    fn parse_drag_out_effect_policy_rejects_unknown() {
+        let err = parse_drag_out_effect_policy(Some("move_only")).expect_err("reject unknown");
         assert!(err.contains("code=invalid_path"));
     }
 

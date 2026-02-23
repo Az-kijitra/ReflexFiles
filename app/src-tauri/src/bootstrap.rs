@@ -80,6 +80,8 @@ pub fn run() {
             crate::clipboard_cmds::clipboard_get_files,
             crate::dragdrop_cmds::shell_start_file_drag,
             crate::dragdrop_cmds::shell_start_file_drag_debug,
+            crate::dragdrop_cmds::shell_start_file_drag_with_effects,
+            crate::dragdrop_cmds::shell_start_file_drag_debug_with_effects,
             crate::external_apps_cmds::external_open_with_app,
             crate::external_apps_cmds::external_open_explorer,
             crate::external_apps_cmds::external_open_cmd,

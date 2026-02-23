@@ -66,12 +66,24 @@ export async function setupPageLifecycle(ctx) {
       __rf_debug?: {
         shellStartFileDrag?: (paths: string[]) => Promise<string>;
         shellStartFileDragDebug?: (paths: string[]) => Promise<string>;
+        shellStartFileDragWithEffects?: (
+          paths: string[],
+          effectMode: "copy" | "copy_or_move"
+        ) => Promise<string>;
+        shellStartFileDragDebugWithEffects?: (
+          paths: string[],
+          effectMode: "copy" | "copy_or_move"
+        ) => Promise<string>;
       };
     };
     const debugApi = debugWindow.__rf_debug || {};
     debugApi.shellStartFileDrag = (paths) => ctx.invoke("shell_start_file_drag", { paths });
     debugApi.shellStartFileDragDebug = (paths) =>
       ctx.invoke("shell_start_file_drag_debug", { paths });
+    debugApi.shellStartFileDragWithEffects = (paths, effectMode) =>
+      ctx.invoke("shell_start_file_drag_with_effects", { paths, effect_mode: effectMode });
+    debugApi.shellStartFileDragDebugWithEffects = (paths, effectMode) =>
+      ctx.invoke("shell_start_file_drag_debug_with_effects", { paths, effect_mode: effectMode });
     debugWindow.__rf_debug = debugApi;
   }
   const home = await ctx.homeDir();
