@@ -1018,6 +1018,67 @@ defineTest("keydown core shortcuts bypass stale overlay flags when target is mai
   }
 });
 
+defineTest("keydown core shortcuts do not fire direct fallbacks when event target is inside overlay", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+    globalThis.document = { activeElement: null };
+    const zipEntry = { path: "C:\\Users\\toshi\\a.zip", name: "a.zip", ext: ".zip", type: "file" };
+    const base = createKeydownParams({
+      entries: [zipEntry],
+      params: {
+        getCreateOpen: () => true,
+      },
+    });
+    const onKeyDown = createPageKeydownHandler(base.params);
+    const overlayTarget = {
+      closest: (sel) => (sel.includes(".modal") ? {} : null),
+    };
+
+    const ctrlF = createCtrlEvent("F", 70);
+    ctrlF.event.target = overlayTarget;
+    onKeyDown(ctrlF.event);
+    assert.equal(ctrlF.prevented, 0);
+    assert.equal(base.calls.searchSet.length, 0);
+
+    const f2 = {
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      key: "F2",
+      code: "F2",
+      keyCode: 113,
+      which: 113,
+      getModifierState: () => false,
+      target: overlayTarget,
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(f2);
+    assert.equal(f2._prevented, 0);
+    assert.equal(base.calls.rename, 0);
+
+    const ctrlAltZ = createKeyEvent({ ctrlKey: true, altKey: true, letter: "Z", keyCode: 90 });
+    ctrlAltZ.event.target = overlayTarget;
+    onKeyDown(ctrlAltZ.event);
+    assert.equal(ctrlAltZ.prevented, 0);
+    assert.equal(base.calls.zipCreate, 0);
+
+    const ctrlAltX = createKeyEvent({ ctrlKey: true, altKey: true, letter: "X", keyCode: 88 });
+    ctrlAltX.event.target = overlayTarget;
+    onKeyDown(ctrlAltX.event);
+    assert.equal(ctrlAltX.prevented, 0);
+    assert.equal(base.calls.zipExtract, 0);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
 defineTest("keydown fallback Ctrl+H / Ctrl+Shift+O (path input allowed, other inputs blocked)", () => {
   const prevDocument = globalThis.document;
   const prevWindow = globalThis.window;
