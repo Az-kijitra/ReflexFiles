@@ -557,6 +557,9 @@ defineTest("overlay input modals delegate Enter/Escape to modal-local handlers w
   assert.equal(handleOverlayKey(renameEnter.event, renameCtx), true);
   assert.equal(renameCtx.confirmRenameCalled, 0);
   assert.equal(renameEnter.prevented, 0);
+  const renameEsc = makeKeyEvent("Escape", renameInput);
+  assert.equal(handleOverlayKey(renameEsc.event, renameCtx), true);
+  assert.equal(renameEsc.prevented, 0);
 
   const createInput = {};
   const createCtx = baseCtx();
@@ -566,6 +569,9 @@ defineTest("overlay input modals delegate Enter/Escape to modal-local handlers w
   assert.equal(handleOverlayKey(createEnter.event, createCtx), true);
   assert.equal(createCtx.confirmCreateCalled, 0);
   assert.equal(createEnter.prevented, 0);
+  const createEsc = makeKeyEvent("Escape", createInput);
+  assert.equal(handleOverlayKey(createEsc.event, createCtx), true);
+  assert.equal(createEsc.prevented, 0);
 
   const jumpInput = {};
   const jumpCtx = baseCtx();
@@ -575,6 +581,9 @@ defineTest("overlay input modals delegate Enter/Escape to modal-local handlers w
   assert.equal(handleOverlayKey(jumpEnter.event, jumpCtx), true);
   assert.equal(jumpCtx.confirmJumpUrlCalled, 0);
   assert.equal(jumpEnter.prevented, 0);
+  const jumpEsc = makeKeyEvent("Escape", jumpInput);
+  assert.equal(handleOverlayKey(jumpEsc.event, jumpCtx), true);
+  assert.equal(jumpEsc.prevented, 0);
 });
 
 defineTest("overlay input modals handle Enter when modal is open but target is outside modal", () => {
@@ -614,6 +623,45 @@ defineTest("overlay input modals handle Enter when modal is open but target is o
   assert.equal(handleOverlayKey(enter.event, ctx), true);
   assert.equal(ctx.confirmRenameCalled, 1);
   assert.equal(enter.prevented, 1);
+});
+
+defineTest("overlay input modals handle Escape when modal is open but target is outside modal", () => {
+  const makeKeyEvent = (key, target) => {
+    let prevented = 0;
+    return {
+      event: {
+        key,
+        target,
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+      },
+      get prevented() {
+        return prevented;
+      },
+    };
+  };
+  const outsideTarget = {};
+
+  const ctx = {
+    ...createOverlayContext().ctx,
+    createOpen: true,
+    createModalEl: { contains: () => false },
+    renameOpen: false,
+    renameModalEl: null,
+    jumpUrlOpen: false,
+    jumpUrlModalEl: null,
+    cancelCreateCalled: 0,
+    cancelCreate() {
+      this.cancelCreateCalled += 1;
+    },
+    confirmCreate() {},
+  };
+  const esc = makeKeyEvent("Escape", outsideTarget);
+  assert.equal(handleOverlayKey(esc.event, ctx), true);
+  assert.equal(ctx.cancelCreateCalled, 1);
+  assert.equal(esc.prevented, 1);
 });
 
 defineTest("path completion cycle and separator behavior", async () => {
