@@ -123,7 +123,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     pushUndoEntry,
   });
 
-  const startExplorerDragExperimental = async () => {
+  const startExplorerDrag = async () => {
     const entries = ctx.getEntries();
     const selectedPaths = ctx.getSelectedPaths();
     const focusedIndex = ctx.getFocusedIndex();
@@ -234,7 +234,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     runExternalApp,
     getExternalApps,
     syncGdriveWorkcopyForEntry,
-    startExplorerDragExperimental,
+    startExplorerDrag,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {

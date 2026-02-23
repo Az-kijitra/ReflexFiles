@@ -624,6 +624,13 @@
       "status.dnd_export_native_finished": "D&D export finished: {result}",
       "status.dnd_export_native_canceled": "D&D export canceled",
       "status.dnd_export_native_busy": "D&D export is already running",
+      "status.dnd_import_blocked": "D&D import blocked: {reason}",
+      "status.dnd_import_blocked_self": "D&D import is temporarily blocked during outbound drag",
+      "status.dnd_import_blocked_overlay": "Close the current dialog/menu before dropping files",
+      "status.dnd_import_conflict": "D&D import conflict: {count} item(s)",
+      "status.dnd_import_done": "D&D import done: {ok}/{total}",
+      "status.dnd_import_done_with_fail": "D&D import done: {ok}/{total} (failed {failed})",
+      "status.dnd_import_failed": "D&D import failed",
       "status.dnd_experiment_phase1_active":
         "D&D experiment active (phase1 inbound local-only). Drag from Explorer into a local folder in ReflexFiles.",
       "status.dnd_experiment_phase2_active":
@@ -1140,6 +1147,13 @@
       "status.dnd_export_native_finished": "D&D書き出しを終了しました: {result}",
       "status.dnd_export_native_canceled": "D&D書き出しをキャンセルしました",
       "status.dnd_export_native_busy": "D&D書き出しはすでに実行中です",
+      "status.dnd_import_blocked": "D&D取り込みをブロックしました: {reason}",
+      "status.dnd_import_blocked_self": "D&D書き出し中のため、一時的にD&D取り込みをブロックしています",
+      "status.dnd_import_blocked_overlay": "ダイアログ/メニューを閉じてからファイルをドロップしてください",
+      "status.dnd_import_conflict": "D&D取り込みで名前競合: {count}件",
+      "status.dnd_import_done": "D&D取り込み完了: {ok}/{total}",
+      "status.dnd_import_done_with_fail": "D&D取り込み完了: {ok}/{total}（失敗 {failed}件）",
+      "status.dnd_import_failed": "D&D取り込みに失敗しました",
       "status.dnd_experiment_phase1_active":
         "D&D実験を有効化しました（phase1: 取り込み/ローカルのみ）。エクスプローラーから ReflexFiles のローカルフォルダへドロップできます。",
       "status.dnd_experiment_phase2_active":

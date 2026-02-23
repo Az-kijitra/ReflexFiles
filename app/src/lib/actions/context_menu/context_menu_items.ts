@@ -43,7 +43,7 @@ import {
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
  * @param {(entry: import("$lib/types").Entry | null) => void} [actions.syncGdriveWorkcopyForEntry]
- * @param {() => Promise<void>} [actions.startExplorerDragExperimental]
+ * @param {() => Promise<void>} [actions.startExplorerDrag]
  * @param {() => void} closeContextMenu
  */
 export function createContextMenuItems(ctx, actions, closeContextMenu) {
@@ -67,7 +67,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     runExternalApp,
     getExternalApps,
     syncGdriveWorkcopyForEntry,
-    startExplorerDragExperimental,
+    startExplorerDrag,
   } = actions;
 
   function dndExportReasonLabel(reason) {
@@ -117,7 +117,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
 
   async function onContextExplorerDragExperimental() {
     closeContextMenu();
-    await startExplorerDragExperimental?.();
+    await startExplorerDrag?.();
   }
 
   function onContextGdriveWriteBack() {

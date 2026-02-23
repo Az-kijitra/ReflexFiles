@@ -2,7 +2,6 @@ import {
   DND_INBOUND_LOCAL_ONLY_POLICY,
   DND_EXPERIMENT_DEFAULT_POLICY,
   evaluateInboundOsDrop,
-  formatInboundDropProbeStatus,
   isNativeOutboundDragSuppressActive,
   readDragDropExperimentPolicyFromStorage,
 } from "$lib/utils/drag_drop_experiment";
@@ -201,6 +200,21 @@ export async function setupPageLifecycle(ctx) {
         ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
         : DND_EXPERIMENT_DEFAULT_POLICY;
     if (typeof win?.onDragDropEvent === "function") {
+      const inboundReasonLabel = (reason) => {
+        switch (String(reason || "")) {
+          case "destination_not_local":
+          case "source_not_local":
+            return ctx.t("dnd.export_local_only");
+          case "mixed_or_invalid_sources":
+            return ctx.t("dnd.export_mixed_selection_not_supported");
+          case "destination_capability_denied":
+            return ctx.t("capability.not_available");
+          case "no_items":
+            return ctx.t("status.no_selection");
+          default:
+            return ctx.t("capability.not_available");
+        }
+      };
       unlistenDragDrop = await win.onDragDropEvent((event) => {
         const payload = event?.payload ?? event;
         if (!payload || payload.type !== "drop") return;
@@ -210,7 +224,7 @@ export async function setupPageLifecycle(ctx) {
               window as Window & { __rf_native_outbound_drag_suppress_until?: number }
             )
           ) {
-            ctx.setStatusMessage("D&D import blocked (self native drag-out)", 1500);
+            ctx.setStatusMessage(ctx.t("status.dnd_import_blocked_self"), 1500);
             return;
           }
         }
@@ -220,7 +234,7 @@ export async function setupPageLifecycle(ctx) {
             ".modal, .modal-backdrop, .context-menu, .dropdown, .menu-dropdown, .sort-menu"
           )
         ) {
-          ctx.setStatusMessage("D&D import blocked (overlay_open)", 2000);
+          ctx.setStatusMessage(ctx.t("status.dnd_import_blocked_overlay"), 2000);
           return;
         }
         const currentPath = String(ctx.getCurrentPath?.() || "");
@@ -230,11 +244,14 @@ export async function setupPageLifecycle(ctx) {
           destinationCapabilities: ctx.getCurrentPathCapabilities?.() ?? null,
           droppedPaths: payload.paths,
         });
-        ctx.setStatusMessage(
-          formatInboundDropProbeStatus({ currentPath, decision }),
-          3000
-        );
-        if (!decision.allowed || dndImportInFlight) return;
+        if (!decision.allowed) {
+          ctx.setStatusMessage(
+            ctx.t("status.dnd_import_blocked", { reason: inboundReasonLabel(decision.reason) }),
+            3000
+          );
+          return;
+        }
+        if (dndImportInFlight) return;
         const conflictNames =
           typeof ctx.getEntries === "function"
             ? getPasteConflicts(decision.acceptedPaths, ctx.getEntries())
@@ -254,7 +271,7 @@ export async function setupPageLifecycle(ctx) {
           ctx.setPasteApplyAll(true);
           ctx.setPasteConfirmIndex(0);
           ctx.setPasteConfirmOpen(true);
-          ctx.setStatusMessage(`D&D import conflict: ${conflictNames.length} item(s)`, 3000);
+          ctx.setStatusMessage(ctx.t("status.dnd_import_conflict", { count: conflictNames.length }), 3000);
           return;
         }
         dndImportInFlight = true;
@@ -268,9 +285,10 @@ export async function setupPageLifecycle(ctx) {
             const ok = Number(summary?.ok ?? 0);
             const failed = Number(summary?.failed ?? 0);
             const total = Number(summary?.total ?? decision.acceptedPaths.length);
-            const suffix = failed > 0 ? ` (failed ${failed})` : "";
             ctx.setStatusMessage(
-              `D&D import done (experimental): ${ok}/${total}${suffix}`,
+              failed > 0
+                ? ctx.t("status.dnd_import_done_with_fail", { ok, total, failed })
+                : ctx.t("status.dnd_import_done", { ok, total }),
               4000
             );
             if (ok > 0) {
@@ -279,15 +297,13 @@ export async function setupPageLifecycle(ctx) {
           })
           .catch((err) => {
             ctx.showError(err);
-            ctx.setStatusMessage("D&D import failed (experimental)", 4000);
+            ctx.setStatusMessage(ctx.t("status.dnd_import_failed"), 4000);
           })
           .finally(() => {
             dndImportInFlight = false;
           });
       });
-      if (experimentPolicy.phase === "phase1_inbound_local_only") {
-        ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase1_active"), 2500);
-      } else if (experimentPolicy.phase === "phase2_outbound_local_only") {
+      if (experimentPolicy.phase === "phase2_outbound_local_only") {
         ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase2_active"), 4500);
       } else if (experimentPolicy.enabled) {
         ctx.setStatusMessage(`D&D experiment active (${experimentPolicy.phase})`, 1500);
