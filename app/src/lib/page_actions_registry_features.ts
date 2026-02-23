@@ -11,12 +11,12 @@ import {
   buildUndoFeature,
 } from "$lib/page_actions_registry_feature_builders";
 import {
+  DND_OUTBOUND_LOCAL_ONLY_POLICY,
   endNativeOutboundDrag,
   evaluateOutboundAppDragCandidate,
   markNativeOutboundDragSuppress,
   NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
   NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
-  readDragDropExperimentPolicyFromStorage,
   tryBeginNativeOutboundDrag,
 } from "$lib/utils/drag_drop_experiment";
 import type { PageActionsRegistryContext } from "$lib/page_actions_registry_features_types";
@@ -139,12 +139,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
         : focusedIndex >= 0 && focusedIndex < entries.length && entries[focusedIndex]
           ? [entries[focusedIndex]]
           : [];
-    const policy =
-      typeof window !== "undefined" && typeof window.localStorage !== "undefined"
-        ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
-        : null;
     const decision = evaluateOutboundAppDragCandidate({
-      policy,
+      policy: DND_OUTBOUND_LOCAL_ONLY_POLICY,
       selectedEntries: operationEntries.map((entry: any) => ({
         path: String(entry?.path || ""),
         provider: entry?.provider ?? entry?.ref?.provider ?? "local",

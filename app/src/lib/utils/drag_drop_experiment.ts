@@ -30,6 +30,16 @@ export const DND_EXPERIMENT_DEFAULT_POLICY: DragDropExperimentPolicy = {
   phase: "phase0_foundation",
 };
 
+export const DND_INBOUND_LOCAL_ONLY_POLICY: DragDropExperimentPolicy = {
+  enabled: true,
+  phase: "phase1_inbound_local_only",
+};
+
+export const DND_OUTBOUND_LOCAL_ONLY_POLICY: DragDropExperimentPolicy = {
+  enabled: true,
+  phase: "phase2_outbound_local_only",
+};
+
 export function parseDragDropExperimentPolicy(raw: unknown): DragDropExperimentPolicy {
   const value = String(raw ?? "").trim().toLowerCase();
   if (!value || value === "0" || value === "off" || value === "false") {

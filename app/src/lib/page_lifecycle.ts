@@ -1,4 +1,5 @@
 import {
+  DND_INBOUND_LOCAL_ONLY_POLICY,
   DND_EXPERIMENT_DEFAULT_POLICY,
   evaluateInboundOsDrop,
   formatInboundDropProbeStatus,
@@ -195,11 +196,11 @@ export async function setupPageLifecycle(ctx) {
   let unlistenDragDrop = null;
   let dndImportInFlight = false;
   try {
-    const policy =
+    const experimentPolicy =
       typeof window !== "undefined" && typeof window.localStorage !== "undefined"
         ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
         : DND_EXPERIMENT_DEFAULT_POLICY;
-    if (policy.enabled && typeof win?.onDragDropEvent === "function") {
+    if (typeof win?.onDragDropEvent === "function") {
       unlistenDragDrop = await win.onDragDropEvent((event) => {
         const payload = event?.payload ?? event;
         if (!payload || payload.type !== "drop") return;
@@ -224,7 +225,7 @@ export async function setupPageLifecycle(ctx) {
         }
         const currentPath = String(ctx.getCurrentPath?.() || "");
         const decision = evaluateInboundOsDrop({
-          policy,
+          policy: DND_INBOUND_LOCAL_ONLY_POLICY,
           destinationPath: currentPath,
           destinationCapabilities: ctx.getCurrentPathCapabilities?.() ?? null,
           droppedPaths: payload.paths,
@@ -284,12 +285,12 @@ export async function setupPageLifecycle(ctx) {
             dndImportInFlight = false;
           });
       });
-      if (policy.phase === "phase1_inbound_local_only") {
+      if (experimentPolicy.phase === "phase1_inbound_local_only") {
         ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase1_active"), 2500);
-      } else if (policy.phase === "phase2_outbound_local_only") {
+      } else if (experimentPolicy.phase === "phase2_outbound_local_only") {
         ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase2_active"), 4500);
-      } else {
-        ctx.setStatusMessage(`D&D experiment active (${policy.phase})`, 1500);
+      } else if (experimentPolicy.enabled) {
+        ctx.setStatusMessage(`D&D experiment active (${experimentPolicy.phase})`, 1500);
       }
     }
   } catch {
