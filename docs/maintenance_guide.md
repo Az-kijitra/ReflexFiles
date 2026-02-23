@@ -332,6 +332,14 @@ Recommended order for key-related changes:
 - viewer changes -> `npm run e2e:viewer`
 - settings/config changes -> `npm run e2e:settings`
 - file operation changes -> `npm run e2e:tauri`
+2.5. If drag-and-drop behavior (Explorer <-> ReflexFiles) was changed
+- run `npm run test:dnd`
+- run `npm run e2e:tauri`
+- manual spot check (Windows):
+  - Explorer -> ReflexFiles (local folder import)
+  - ReflexFiles -> Explorer via context menu `Drag to Explorer`
+  - `gdrive://` remains blocked for drag and drop
+  - verify key shortcuts still work after D&D (`Ctrl+F`, `F2`, `Ctrl+C/V`)
 3. Before merge/release candidate
 - run `npm run e2e:full`
 - verify suite `summary.json` exists and all cases pass
