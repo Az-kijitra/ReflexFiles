@@ -14,6 +14,7 @@ import {
   DND_OUTBOUND_LOCAL_ONLY_POLICY,
   endNativeOutboundDrag,
   evaluateOutboundAppDragCandidate,
+  formatNativeOutboundDragResultForStatus,
   markNativeOutboundDragSuppress,
   NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
   NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
@@ -200,7 +201,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       if (resultText === "none") {
         setStatusMessage(ctx.t("status.dnd_export_native_canceled"), 3000);
       } else {
-        setStatusMessage(ctx.t("status.dnd_export_native_finished", { result: resultText }), 4000);
+        const resultLabel = formatNativeOutboundDragResultForStatus(resultText, ctx.t);
+        setStatusMessage(ctx.t("status.dnd_export_native_finished", { result: resultLabel }), 4000);
       }
     } catch (err) {
       showError(err);

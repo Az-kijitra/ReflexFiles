@@ -5,6 +5,7 @@
     DND_OUTBOUND_LOCAL_ONLY_POLICY,
     endNativeOutboundDrag,
     evaluateOutboundAppDragCandidate,
+    formatNativeOutboundDragResultForStatus,
     isFormalOutboundDirectDragMouseChord,
     markNativeOutboundDragSuppress,
     NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
@@ -193,9 +194,10 @@
           3000
         );
       } else {
+        const resultLabel = formatNativeOutboundDragResultForStatus(resultText, t);
         emitDndExperimentStatus(
-          t?.("status.dnd_export_native_finished", { result: resultText }) ||
-            `D&D export finished: ${resultText}`,
+          t?.("status.dnd_export_native_finished", { result: resultLabel }) ||
+            `D&D export finished: ${resultLabel}`,
           4000
         );
       }

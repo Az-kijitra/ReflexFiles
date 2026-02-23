@@ -251,3 +251,20 @@ export function isFormalOutboundDirectDragMouseChord(evt: {
     !evt.metaKey
   );
 }
+
+export function formatNativeOutboundDragResultForStatus(
+  result: string,
+  t?: (key: string, vars?: Record<string, string | number>) => string
+): string {
+  const value = String(result || "");
+  switch (value) {
+    case "copy":
+      return t?.("dnd.export_result_copy") || "copy";
+    case "move":
+      return t?.("dnd.export_result_move") || "move";
+    case "move_unexpected":
+      return t?.("dnd.export_result_move_unexpected") || "move (unexpected)";
+    default:
+      return value;
+  }
+}
