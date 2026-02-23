@@ -2,6 +2,7 @@ import {
   DND_EXPERIMENT_DEFAULT_POLICY,
   evaluateInboundOsDrop,
   formatInboundDropProbeStatus,
+  isNativeOutboundDragSuppressActive,
   readDragDropExperimentPolicyFromStorage,
 } from "$lib/utils/drag_drop_experiment";
 import { getPasteConflicts } from "$lib/utils/file_ops";
@@ -203,11 +204,11 @@ export async function setupPageLifecycle(ctx) {
         const payload = event?.payload ?? event;
         if (!payload || payload.type !== "drop") return;
         if (typeof window !== "undefined") {
-          const suppressUntil = Number(
-            (window as Window & { __rf_native_outbound_drag_suppress_until?: number })
-              .__rf_native_outbound_drag_suppress_until ?? 0
-          );
-          if (Number.isFinite(suppressUntil) && Date.now() < suppressUntil) {
+          if (
+            isNativeOutboundDragSuppressActive(
+              window as Window & { __rf_native_outbound_drag_suppress_until?: number }
+            )
+          ) {
             ctx.setStatusMessage("D&D import blocked (self native drag-out)", 1500);
             return;
           }

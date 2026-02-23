@@ -4,6 +4,8 @@ import {
   evaluateInboundOsDrop,
   evaluateOutboundAppDragCandidate,
   formatInboundDropProbeStatus,
+  isNativeOutboundDragSuppressActive,
+  markNativeOutboundDragSuppress,
   normalizeDroppedOsPaths,
   parseDragDropExperimentPolicy,
 } from "../../src/lib/utils/drag_drop_experiment.ts";
@@ -142,6 +144,22 @@ test("status formatter reports probe result", () => {
     },
   });
   assert.match(blocked, /blocked \(destination_not_local\)/);
+});
+
+test("native outbound suppress helpers set and check TTL safely", () => {
+  const fakeWindow = {};
+  assert.equal(isNativeOutboundDragSuppressActive(fakeWindow, 1000), false);
+  const realNow = Date.now;
+  try {
+    Date.now = () => 1000;
+    const until = markNativeOutboundDragSuppress(fakeWindow, 500);
+    assert.equal(until, 1500);
+    assert.equal(fakeWindow.__rf_native_outbound_drag_suppress_until, 1500);
+    assert.equal(isNativeOutboundDragSuppressActive(fakeWindow, 1499), true);
+    assert.equal(isNativeOutboundDragSuppressActive(fakeWindow, 1500), false);
+  } finally {
+    Date.now = realNow;
+  }
 });
 
 let failed = 0;

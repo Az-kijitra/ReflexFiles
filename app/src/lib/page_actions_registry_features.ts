@@ -12,6 +12,9 @@ import {
 } from "$lib/page_actions_registry_feature_builders";
 import {
   evaluateOutboundAppDragCandidate,
+  markNativeOutboundDragSuppress,
+  NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
+  NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
   readDragDropExperimentPolicyFromStorage,
 } from "$lib/utils/drag_drop_experiment";
 import type { PageActionsRegistryContext } from "$lib/page_actions_registry_features_types";
@@ -173,8 +176,10 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     );
     try {
       if (typeof window !== "undefined") {
-        (window as Window & { __rf_native_outbound_drag_suppress_until?: number })
-          .__rf_native_outbound_drag_suppress_until = Date.now() + 15000;
+        markNativeOutboundDragSuppress(
+          window as Window & { __rf_native_outbound_drag_suppress_until?: number },
+          NATIVE_OUTBOUND_DND_SUPPRESS_START_MS
+        );
       }
       const result = await ctx.invoke("shell_start_file_drag_debug", {
         paths: decision.acceptedPaths,
@@ -189,8 +194,10 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
       showError(err);
     } finally {
       if (typeof window !== "undefined") {
-        (window as Window & { __rf_native_outbound_drag_suppress_until?: number })
-          .__rf_native_outbound_drag_suppress_until = Date.now() + 1000;
+        markNativeOutboundDragSuppress(
+          window as Window & { __rf_native_outbound_drag_suppress_until?: number },
+          NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS
+        );
       }
     }
   };

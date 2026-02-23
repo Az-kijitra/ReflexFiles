@@ -22,6 +22,9 @@ export interface DragDropDecision {
   rejectedPaths: string[];
 }
 
+export const NATIVE_OUTBOUND_DND_SUPPRESS_START_MS = 15000;
+export const NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS = 1000;
+
 export const DND_EXPERIMENT_DEFAULT_POLICY: DragDropExperimentPolicy = {
   enabled: false,
   phase: "phase0_foundation",
@@ -181,4 +184,27 @@ export function formatInboundDropProbeStatus(params: {
     return `D&D import probe (experimental): ${count} item(s) -> ${params.currentPath}`;
   }
   return `D&D import blocked (${params.decision.reason}): ${count} item(s)`;
+}
+
+type NativeOutboundSuppressWindow = {
+  __rf_native_outbound_drag_suppress_until?: number;
+};
+
+export function markNativeOutboundDragSuppress(
+  win: NativeOutboundSuppressWindow | null | undefined,
+  durationMs: number
+): number {
+  if (!win || !Number.isFinite(durationMs) || durationMs <= 0) return 0;
+  const until = Date.now() + Math.trunc(durationMs);
+  win.__rf_native_outbound_drag_suppress_until = until;
+  return until;
+}
+
+export function isNativeOutboundDragSuppressActive(
+  win: NativeOutboundSuppressWindow | null | undefined,
+  now = Date.now()
+): boolean {
+  if (!win) return false;
+  const until = Number(win.__rf_native_outbound_drag_suppress_until ?? 0);
+  return Number.isFinite(until) && now < until;
 }

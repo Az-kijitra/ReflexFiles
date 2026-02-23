@@ -3,6 +3,9 @@
   import { clipboardSetFiles, shellStartFileDrag } from "$lib/utils/tauri_fs";
   import {
     evaluateOutboundAppDragCandidate,
+    markNativeOutboundDragSuppress,
+    NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
+    NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
     readDragDropExperimentPolicyFromStorage,
   } from "$lib/utils/drag_drop_experiment";
 
@@ -148,7 +151,7 @@
     event.preventDefault();
     event.stopPropagation();
     if (typeof window !== "undefined") {
-      window.__rf_native_outbound_drag_suppress_until = Date.now() + 15000;
+      markNativeOutboundDragSuppress(window, NATIVE_OUTBOUND_DND_SUPPRESS_START_MS);
     }
     emitDndExperimentStatus(
       `D&D direct export starting (experimental): ${decision.acceptedPaths.length} item(s)`,
@@ -162,7 +165,7 @@
       emitDndExperimentStatus(`D&D direct export failed (${msg})`, 5000);
     } finally {
       if (typeof window !== "undefined") {
-        window.__rf_native_outbound_drag_suppress_until = Date.now() + 1000;
+        markNativeOutboundDragSuppress(window, NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS);
       }
     }
   }
