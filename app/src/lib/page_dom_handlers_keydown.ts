@@ -326,7 +326,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("C", 67)) {
-        if (isPathInputActive) return;
+        if (isAnyInputActive) return;
         event.preventDefault();
         if (!hasOperationTargets) {
           params.setStatusMessage(params.t("status.no_selection"));
@@ -339,7 +339,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("X", 88)) {
-        if (isPathInputActive) return;
+        if (isAnyInputActive) return;
         event.preventDefault();
         if (!hasOperationTargets) {
           params.setStatusMessage(params.t("status.no_selection"));
@@ -352,7 +352,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("V", 86)) {
-        if (isPathInputActive) return;
+        if (isAnyInputActive) return;
         event.preventDefault();
         if (devKeyDebug) {
           params.setStatusMessage("DBG Ctrl+V");

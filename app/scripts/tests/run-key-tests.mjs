@@ -732,7 +732,7 @@ defineTest("keydown fallback Ctrl+N/Ctrl+Shift+N/C/V", () => {
     assert.equal(calls.paste, 1);
     assert.equal(calls.global, 0);
 
-    const pathInputEl = { contains: () => false };
+    const pathInputEl = { contains: () => false, tagName: "INPUT" };
     globalThis.document = { activeElement: pathInputEl };
     const fallback2 = createKeydownParams({ pathInputEl });
     const onKeyDown2 = createPageKeydownHandler(fallback2.params);
@@ -747,6 +747,57 @@ defineTest("keydown fallback Ctrl+N/Ctrl+Shift+N/C/V", () => {
     const ctrlCNoSelection = createCtrlEvent("C", 67);
     onKeyDown3(ctrlCNoSelection.event);
     assert.equal(fallback3.calls.status.at(-1), "NO_SELECTION");
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
+defineTest("keydown fallback Ctrl+C/X/V respects text inputs (search/other inputs)", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+
+    const searchInputEl = {
+      tagName: "INPUT",
+      contains: () => false,
+      focus() {},
+    };
+    globalThis.document = { activeElement: searchInputEl };
+    const searchCase = createKeydownParams({ searchInputEl });
+    const onKeyDownSearch = createPageKeydownHandler(searchCase.params);
+    const ctrlCSearch = createCtrlEvent("C", 67);
+    const ctrlXSearch = createCtrlEvent("X", 88);
+    const ctrlVSearch = createCtrlEvent("V", 86);
+    onKeyDownSearch(ctrlCSearch.event);
+    onKeyDownSearch(ctrlXSearch.event);
+    onKeyDownSearch(ctrlVSearch.event);
+    assert.equal(ctrlCSearch.prevented, 0);
+    assert.equal(ctrlXSearch.prevented, 0);
+    assert.equal(ctrlVSearch.prevented, 0);
+    assert.equal(searchCase.calls.copy, 0);
+    assert.equal(searchCase.calls.cut, 0);
+    assert.equal(searchCase.calls.paste, 0);
+    assert.equal(searchCase.calls.global, 0);
+
+    const otherInputEl = { tagName: "INPUT", contains: () => false };
+    globalThis.document = { activeElement: otherInputEl };
+    const otherCase = createKeydownParams();
+    const onKeyDownOther = createPageKeydownHandler(otherCase.params);
+    const ctrlCOther = createCtrlEvent("C", 67);
+    const ctrlXOther = createCtrlEvent("X", 88);
+    const ctrlVOther = createCtrlEvent("V", 86);
+    onKeyDownOther(ctrlCOther.event);
+    onKeyDownOther(ctrlXOther.event);
+    onKeyDownOther(ctrlVOther.event);
+    assert.equal(ctrlCOther.prevented, 0);
+    assert.equal(ctrlXOther.prevented, 0);
+    assert.equal(ctrlVOther.prevented, 0);
+    assert.equal(otherCase.calls.copy, 0);
+    assert.equal(otherCase.calls.cut, 0);
+    assert.equal(otherCase.calls.paste, 0);
+    assert.equal(otherCase.calls.global, 0);
   } finally {
     globalThis.document = prevDocument;
     globalThis.window = prevWindow;
