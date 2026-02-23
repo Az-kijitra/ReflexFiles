@@ -337,6 +337,10 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         provider: entry?.provider ?? entry?.ref?.provider ?? "local",
       })),
     });
+    const dndExportUiVisible =
+      hasSelection &&
+      !!dndPolicy?.enabled &&
+      dndPolicy.phase === "phase2_outbound_local_only";
     const dndExportEnabled = hasSelection && dndExportDecision.allowed;
     const dndExportReason =
       hasSelection && !dndExportDecision.allowed ? dndExportReasonLabel(dndExportDecision.reason) : "";
@@ -360,7 +364,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         label: ctx.t("context.open_explorer_drag_experimental"),
         enabled: dndExportEnabled,
         reason: dndExportReason,
-        visible: hasSelection,
+        visible: dndExportUiVisible,
         action: onContextExplorerDragExperimental,
       },
       {
