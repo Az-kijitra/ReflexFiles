@@ -697,6 +697,58 @@ defineTest("path completion cycle and separator behavior", async () => {
   helpers.clearPathCompletionPreview();
 });
 
+defineTest("path completion input-change ignores programmatic update once, then clears on manual edit", async () => {
+  const { helpers, state } = createPathCompletionHarness({
+    pathInput: "C:\\Users\\toshi\\a",
+    invokeImpl: async (_command, payload) => {
+      if (payload.path === "C:\\Users\\toshi") {
+        return [
+          { path: "C:\\Users\\toshi\\alpha", name: "alpha", type: "dir" },
+          { path: "C:\\Users\\toshi\\atlas", name: "atlas", type: "dir" },
+        ];
+      }
+      return [];
+    },
+  });
+
+  await helpers.handlePathTabCompletion(state.pathInput, 1);
+  assert.equal(state.previewActive, true);
+  assert.equal(state.pathInput, "C:\\Users\\toshi\\alpha");
+
+  // First input-change callback after applyPathInput() should be ignored.
+  helpers.handlePathCompletionInputChange(state.pathInput);
+  assert.equal(state.previewActive, true);
+
+  // Manual edit should terminate the preview session and restore normal list view.
+  state.pathInput = `${state.pathInput}x`;
+  helpers.handlePathCompletionInputChange(state.pathInput);
+  assert.equal(state.previewActive, false);
+  assert.deepEqual(state.filteredEntries, state.entries);
+});
+
+defineTest("path completion clear and separator boundaries", async () => {
+  const { helpers, state } = createPathCompletionHarness({
+    pathInput: "C:\\Users\\toshi\\a",
+    invokeImpl: async (_command, payload) => {
+      if (payload.path === "C:\\Users\\toshi") {
+        return [
+          { path: "C:\\Users\\toshi\\alpha", name: "alpha", type: "dir" },
+          { path: "C:\\Users\\toshi\\atlas", name: "atlas", type: "dir" },
+        ];
+      }
+      return [];
+    },
+  });
+
+  assert.equal(helpers.clearPathCompletionPreview(), false);
+  assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "/"), false);
+  assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "a"), false);
+
+  await helpers.handlePathTabCompletion(state.pathInput, 1);
+  assert.equal(state.previewActive, true);
+  assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "¥"), true);
+});
+
 defineTest("gdrive path completion is local-only", async () => {
   const { helpers, state } = createPathCompletionHarness({
     currentPath: "gdrive://root/my-drive",
