@@ -749,6 +749,29 @@ defineTest("path completion clear and separator boundaries", async () => {
   assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "¥"), true);
 });
 
+defineTest("path completion clear can restore original typed input (Esc cancel semantics)", async () => {
+  const { helpers, state } = createPathCompletionHarness({
+    pathInput: "C:\\Users\\toshi\\a",
+    invokeImpl: async (_command, payload) => {
+      if (payload.path === "C:\\Users\\toshi") {
+        return [
+          { path: "C:\\Users\\toshi\\alpha", name: "alpha", type: "dir" },
+          { path: "C:\\Users\\toshi\\atlas", name: "atlas", type: "dir" },
+        ];
+      }
+      return [];
+    },
+  });
+
+  await helpers.handlePathTabCompletion(state.pathInput, 1);
+  assert.equal(state.previewActive, true);
+  assert.equal(state.pathInput, "C:\\Users\\toshi\\alpha");
+
+  assert.equal(helpers.clearPathCompletionPreview({ restoreInput: true }), true);
+  assert.equal(state.previewActive, false);
+  assert.equal(state.pathInput, "C:\\Users\\toshi\\a");
+});
+
 defineTest("gdrive path completion is local-only", async () => {
   const { helpers, state } = createPathCompletionHarness({
     currentPath: "gdrive://root/my-drive",

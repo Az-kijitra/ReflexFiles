@@ -54,7 +54,7 @@
 
         if (event.key === "Escape") {
           event.preventDefault();
-          const completionCanceled = clearPathCompletionPreview?.();
+          const completionCanceled = clearPathCompletionPreview?.({ restoreInput: true });
           if (completionCanceled) {
             setStatusMessage(t("status.path_completion_closed"), 1400);
             return;

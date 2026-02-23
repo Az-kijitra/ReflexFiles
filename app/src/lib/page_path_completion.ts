@@ -74,7 +74,15 @@ export function createPathCompletionHelpers(params) {
     setFilteredEntries(getEntries() || []);
   }
 
-  function clearCompletionSession() {
+  /**
+   * @param {{ restoreInput?: boolean }} [options]
+   */
+  function clearCompletionSession(options = undefined) {
+    const shouldRestoreInput = Boolean(options?.restoreInput);
+    const baseInput = shouldRestoreInput && completionSession ? String(completionSession.baseInput || "") : "";
+    if (shouldRestoreInput && completionSession) {
+      applyPathInput(baseInput);
+    }
     completionSession = null;
     restoreDefaultListView();
     setPathCompletionPreviewActive(false);
@@ -382,9 +390,12 @@ export function createPathCompletionHelpers(params) {
     clearCompletionSession();
   }
 
-  function clearPathCompletionPreview() {
+  /**
+   * @param {{ restoreInput?: boolean }} [options]
+   */
+  function clearPathCompletionPreview(options = undefined) {
     if (!completionSession) return false;
-    clearCompletionSession();
+    clearCompletionSession(options);
     return true;
   }
 
