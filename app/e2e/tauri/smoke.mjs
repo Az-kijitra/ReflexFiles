@@ -1093,6 +1093,22 @@ try {
     const rowB = await rowByName(fileB);
     await driver.actions().keyDown(Key.CONTROL).click(rowB).keyUp(Key.CONTROL).perform();
   }, 'ctrl+click rowB');
+  console.log('[smoke] verify keyboard shortcut (Ctrl+Alt+Z compress)...');
+  await assertZipModalOpensByShortcut({
+    key: 'z',
+    code: 'KeyZ',
+    selectName: fileB,
+    workingPath: targetPath,
+    label: 'Ctrl+Alt+Z compress',
+  });
+  await withStaleRetry(async () => {
+    const rowA = await rowByName(fileA);
+    await rowA.click();
+  }, 'reselect rowA after Ctrl+Alt+Z check');
+  await withStaleRetry(async () => {
+    const rowB = await rowByName(fileB);
+    await driver.actions().keyDown(Key.CONTROL).click(rowB).keyUp(Key.CONTROL).perform();
+  }, 'reselect rowB after Ctrl+Alt+Z check');
 
   console.log('[smoke] opening zip modal...');
   await withStaleRetry(async () => {
@@ -1131,6 +1147,14 @@ try {
   );
   await waitForVisibleName(zipName);
   console.log('[smoke] zip created.');
+  console.log('[smoke] verify keyboard shortcut (Ctrl+Alt+X extract)...');
+  await assertZipModalOpensByShortcut({
+    key: 'x',
+    code: 'KeyX',
+    selectName: zipName,
+    workingPath: targetPath,
+    label: 'Ctrl+Alt+X extract',
+  });
 
   console.log('[smoke] extracting zip...');
   const extractDir = resolve(targetPath, `extracted_${testId}`);
@@ -1608,6 +1632,34 @@ try {
       'wait rename modal close after escape'
     );
   };
+
+  async function assertZipModalOpensByShortcut({
+    key,
+    code,
+    selectName,
+    workingPath,
+    label,
+  }) {
+    await setPath(workingPath);
+    await focusList();
+    await withStaleRetry(async () => {
+      const row = await rowByName(selectName);
+      await row.click();
+    }, `select ${selectName} for ${label}`);
+    await focusList();
+    await triggerShortcut({ key, code, ctrl: true, alt: true });
+    const zipDestinationInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('#zip-destination')), timeoutMs),
+      timeoutMs,
+      `wait zip destination (${label})`
+    );
+    await zipDestinationInput.sendKeys(Key.ESCAPE);
+    await withTimeout(
+      driver.wait(until.stalenessOf(zipDestinationInput), timeoutMs),
+      timeoutMs,
+      `wait zip modal close (${label})`
+    );
+  }
 
   console.log('[smoke] verify keyboard focus boundary (PATH Ctrl+A/Delete / list Ctrl+A)...');
   await assertPathCtrlAAndDeleteBoundary(opA, opsDstDir);
