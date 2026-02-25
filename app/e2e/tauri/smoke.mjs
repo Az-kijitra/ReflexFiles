@@ -1677,6 +1677,37 @@ try {
     );
   };
 
+  const assertCtrlShiftDOpensJumpUrlModal = async (workingPath) => {
+    await setPath(workingPath);
+    await focusList();
+    await triggerShortcut({ key: 'D', code: 'KeyD', ctrl: true, shift: true });
+    const jumpUrlInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('#jump-url-input')), timeoutMs),
+      timeoutMs,
+      'wait jump url input after Ctrl+Shift+D'
+    );
+    await withTimeout(
+      driver.wait(async () => {
+        try {
+          return driver.executeScript((el) => {
+            const active = document.activeElement;
+            return active === el || (active && typeof active.closest === 'function' && active.closest('.modal') === el.closest('.modal'));
+          }, jumpUrlInput);
+        } catch {
+          return false;
+        }
+      }, timeoutMs),
+      timeoutMs,
+      'wait jump url input focus after Ctrl+Shift+D'
+    );
+    await jumpUrlInput.sendKeys(Key.ESCAPE);
+    await withTimeout(
+      driver.wait(until.stalenessOf(jumpUrlInput), timeoutMs),
+      timeoutMs,
+      'wait jump url modal close after escape'
+    );
+  };
+
   async function assertZipModalOpensByShortcut({
     key,
     code,
@@ -1712,6 +1743,8 @@ try {
   await assertSearchEscTabBoundary(opsDstDir);
   console.log('[smoke] verify keyboard shortcut (F2 rename)...');
   await assertF2OpensRenameModal(opB, opsDstDir);
+  console.log('[smoke] verify keyboard shortcut (Ctrl+Shift+D jump URL modal)...');
+  await assertCtrlShiftDOpensJumpUrlModal(opsDstDir);
 
   await withStaleRetry(async () => {
     const rowCopy = await rowByName(opA);
