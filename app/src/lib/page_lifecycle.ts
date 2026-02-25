@@ -215,14 +215,15 @@ export async function setupPageLifecycle(ctx) {
       const inboundReasonLabel = (reason) => {
         switch (String(reason || "")) {
           case "destination_not_local":
+            return ctx.t("dnd.import_destination_local_only");
           case "source_not_local":
-            return ctx.t("dnd.export_local_only");
+            return ctx.t("dnd.import_source_local_only");
           case "mixed_or_invalid_sources":
-            return ctx.t("dnd.export_mixed_selection_not_supported");
+            return ctx.t("dnd.import_mixed_sources_not_supported");
           case "destination_capability_denied":
             return ctx.t("capability.not_available");
           case "no_items":
-            return ctx.t("status.no_selection");
+            return ctx.t("dnd.import_no_items");
           default:
             return ctx.t("capability.not_available");
         }
