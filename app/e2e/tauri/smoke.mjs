@@ -1524,13 +1524,12 @@ try {
     await waitForSearchBarOpen(false, 'search closed precondition');
     await triggerShortcut({ key: 'f', code: 'KeyF', ctrl: true });
     await waitForSearchBarOpen(true, 'open search from list');
+    await waitForFocusKind('search', 'Ctrl+F from list should focus search');
     const searchInput = await withTimeout(
       driver.wait(until.elementLocated(By.css('.search-bar input')), timeoutMs),
       timeoutMs,
       'wait search input for escape'
     );
-    await searchInput.click();
-    await waitForFocusKind('search', 'focus search input before escape');
     await searchInput.sendKeys(Key.ESCAPE);
     await waitForSearchBarOpen(false, 'close search with escape');
 
