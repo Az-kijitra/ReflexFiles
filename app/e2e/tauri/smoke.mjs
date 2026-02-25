@@ -612,6 +612,56 @@ try {
     await waitForVisibleName(name);
   };
 
+  const confirmCreateFolderViaShortcutOnly = async (name) => {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await closeOverlays();
+        await focusList();
+        await triggerShortcut({ key: 'N', code: 'KeyN', ctrl: true, shift: true });
+        const input = await withTimeout(
+          driver.wait(until.elementLocated(By.css('#create-name')), 4_000),
+          4_000,
+          'wait for create input (ctrl+shift+n strict)'
+        );
+        await input.click();
+        const typeSelect = await driver.findElement(By.css('#create-type'));
+        const typeValue = await typeSelect.getAttribute('value');
+        if (typeValue !== 'folder') {
+          throw new Error(`ctrl+shift+n opened create modal with unexpected type=${typeValue}`);
+        }
+        await input.clear();
+        await input.sendKeys(name);
+        const createButton = await withTimeout(
+          driver.wait(
+            until.elementLocated(
+              By.xpath(
+                "//div[contains(@class,'modal')]//button[normalize-space(text())='作成' or normalize-space(text())='Create']"
+              )
+            ),
+            timeoutMs
+          ),
+          timeoutMs,
+          'wait for create folder button (ctrl+shift+n strict)'
+        );
+        await createButton.click();
+        await withTimeout(
+          driver.wait(until.stalenessOf(input), timeoutMs),
+          timeoutMs,
+          'wait for create folder modal close (ctrl+shift+n strict)'
+        );
+        await waitForVisibleName(name);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (isTransientDomError(error)) {
+          await driver.sleep(150);
+        }
+      }
+    }
+    throw lastError ?? new Error('ctrl+shift+n strict create folder failed');
+  };
+
   const assertPathCompletionForward = async ({ basePath, targetName, typedPrefix }) => {
     const expectedPath = normalizePath(resolve(basePath, targetName)).toLowerCase();
     await setPath(basePath);
@@ -929,9 +979,11 @@ try {
     throw new Error(`${label} was not created: ${path}`);
   };
 
-  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH copy/paste / PATH completion)...');
+  console.log('[smoke] verify keyboard shortcuts (Ctrl+N/Ctrl+Shift+N / PATH copy/paste / PATH completion)...');
   const shortcutProbeFile = `e2e_${testId}_shortcut_probe.txt`;
+  const shortcutProbeDir = `e2e_${testId}_shortcut_dir`;
   await confirmCreateViaShortcutOnly(shortcutProbeFile);
+  await confirmCreateFolderViaShortcutOnly(shortcutProbeDir);
   await assertPathInputCopyPaste({
     basePath: targetPath,
     suffix: `clip_probe_${testId}`,
