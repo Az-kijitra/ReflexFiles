@@ -31,7 +31,7 @@ export function createPathCompletionHelpers(params) {
     treeNodeName,
   } = params;
   const PATH_COMPLETION_STATUS_STICKY_MS = 0;
-  const PATH_COMPLETION_ONE_SHOT_STATUS_MS = 1600;
+  const PATH_COMPLETION_ONE_SHOT_STATUS_MS = 2200;
   const PATH_COMPLETION_STATUS_REFRESH_MS = 150;
   /** @type {{ baseInput: string; parent: string; prefix: string; matches: any[]; index: number } | null} */
   let completionSession = null;
@@ -324,7 +324,7 @@ export function createPathCompletionHelpers(params) {
       const matches = await resolveMatches(context);
       if (!matches.length) {
         clearCompletionSession();
-        getSetStatusMessage()(t("no_items"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
+        getSetStatusMessage()(t("status.path_completion_no_candidates"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
         return;
       }
       if (matches.length === 1) {
@@ -361,7 +361,7 @@ export function createPathCompletionHelpers(params) {
       const matches = await resolveMatches(context);
       if (!matches.length) {
         clearCompletionSession();
-        getSetStatusMessage()(t("no_items"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
+        getSetStatusMessage()(t("status.path_completion_no_candidates"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
         return true;
       }
       startCompletionSession(nextBase, context, matches, { selectFirst: false });
