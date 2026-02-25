@@ -39,6 +39,10 @@ jobs:
         working-directory: app
         run: npm run test:keys
 
+      - name: DnD regression gate
+        working-directory: app
+        run: npm run test:dnd
+
       - name: Frontend type/check gate
         working-directory: app
         run: npm run check

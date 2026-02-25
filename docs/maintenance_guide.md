@@ -253,6 +253,7 @@ Workflow file:
 Current CI split:
 - **Quality gate (PR/Push)**:
   - `npm run test:keys` (lightweight keyboard regression gate)
+  - `npm run test:dnd` (lightweight drag-and-drop regression gate)
   - `npm run check`
   - `cargo check`
   - `cargo test`

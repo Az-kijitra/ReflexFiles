@@ -249,6 +249,8 @@ cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-r
 
 現行の分割運用:
 - **Quality gate（PR/Push）**:
+  - `npm run test:keys`（軽量キー回帰ゲート）
+  - `npm run test:dnd`（軽量D&D回帰ゲート）
   - `npm run check`
   - `cargo check`
   - `cargo test`
