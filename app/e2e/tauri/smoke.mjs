@@ -1569,11 +1569,53 @@ try {
     await waitForSearchBarOpen(false, 'close search after path Ctrl+F');
   };
 
+  const assertF2OpensRenameModal = async (name, workingPath) => {
+    await setPath(workingPath);
+    await focusList();
+    await withStaleRetry(async () => {
+      const row = await rowByName(name);
+      await row.click();
+    }, `select ${name} for F2 rename`);
+    await focusList();
+    await triggerShortcut({ key: 'F2', code: 'F2' });
+    const renameInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('#rename-input')), timeoutMs),
+      timeoutMs,
+      'wait rename input after F2'
+    );
+    await withTimeout(
+      driver.wait(async () => {
+        try {
+          return driver.executeScript((el) => {
+            const active = document.activeElement;
+            return active === el || (active && typeof active.closest === 'function' && active.closest('.modal') === el.closest('.modal'));
+          }, renameInput);
+        } catch {
+          return false;
+        }
+      }, timeoutMs),
+      timeoutMs,
+      'wait rename input focus after F2'
+    );
+    const renameValue = String((await renameInput.getAttribute('value')) || '');
+    if (!renameValue.includes(name)) {
+      throw new Error(`F2 rename modal value mismatch: expected includes=${name} actual=${renameValue}`);
+    }
+    await renameInput.sendKeys(Key.ESCAPE);
+    await withTimeout(
+      driver.wait(until.stalenessOf(renameInput), timeoutMs),
+      timeoutMs,
+      'wait rename modal close after escape'
+    );
+  };
+
   console.log('[smoke] verify keyboard focus boundary (PATH Ctrl+A/Delete / list Ctrl+A)...');
   await assertPathCtrlAAndDeleteBoundary(opA, opsDstDir);
   await assertListCtrlASelectsAll();
   console.log('[smoke] verify keyboard focus boundary (Search/Escape/Tab)...');
   await assertSearchEscTabBoundary(opsDstDir);
+  console.log('[smoke] verify keyboard shortcut (F2 rename)...');
+  await assertF2OpensRenameModal(opB, opsDstDir);
 
   await withStaleRetry(async () => {
     const rowCopy = await rowByName(opA);
