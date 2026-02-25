@@ -145,9 +145,11 @@ copy, and archive files quickly.</p>
 <ul>
 <li>Type directly and press <strong>Enter</strong> to navigate</li>
 <li><strong>Esc</strong> cancels editing and returns focus to list</li>
-<li><strong>Tab</strong> performs path completion while editing PATH</li>
+<li><strong>Ctrl+Space / Ctrl+Shift+Space</strong> cycles PATH completion candidates forward / backward</li>
+<li>While PATH completion candidates are shown, <strong>Enter</strong> commits the current candidate and navigates to that directory (preview ends and focus returns to list)</li>
+<li>While PATH completion candidates are shown, typing <strong>\</strong> confirms the current directory candidate and continues completion under that directory</li>
 <li><strong>Tab / Shift+Tab</strong> cycles focus (list -&gt; PATH -&gt; tree -&gt; list)</li>
-<li><strong>Ctrl+J / Ctrl+Y</strong> opens Jump List / History</li>
+<li><strong>Ctrl+Shift+O / Ctrl+H</strong> opens Jump List / History</li>
 <li>PATH completion and candidate preview are supported for <strong>local filesystem paths only</strong>.</li>
 <li><code>gdrive://</code> paths are out of scope for PATH completion/candidate preview.</li>
 <li>For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.</li>

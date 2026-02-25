@@ -65,9 +65,11 @@ Installation steps depend on the distribution type.
 ### PATH Bar
 - Type directly and press **Enter** to navigate
 - **Esc** cancels editing and returns focus to list
-- **Tab** performs path completion while editing PATH
+- **Ctrl+Space / Ctrl+Shift+Space** cycles PATH completion candidates forward / backward
+- While PATH completion candidates are shown, **Enter** commits the current candidate and navigates to that directory (preview ends and focus returns to list)
+- While PATH completion candidates are shown, typing **\\** confirms the current directory candidate and continues completion under that directory
 - **Tab / Shift+Tab** cycles focus (list -> PATH -> tree -> list)
-- **Ctrl+J / Ctrl+Y** opens Jump List / History
+- **Ctrl+Shift+O / Ctrl+H** opens Jump List / History
 - PATH completion and candidate preview are supported for **local filesystem paths only**.
 - `gdrive://` paths are out of scope for PATH completion/candidate preview.
 - For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.

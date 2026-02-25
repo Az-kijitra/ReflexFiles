@@ -809,12 +809,56 @@ try {
     while (Date.now() < enterDeadline) {
       const current = await (await getPathInput()).getAttribute('value');
       if (normalizeCompare(current) === normalizeCompare(secondPath)) {
+        await assertPathCompletionEnterCommitsAndLeavesPreview();
         return;
       }
       await driver.sleep(120);
     }
     const enterLatest = await (await getPathInput()).getAttribute('value');
     throw new Error(`path enter confirm failed: expected=${secondPath} actual=${enterLatest}`);
+  };
+
+  const assertPathCompletionEnterCommitsAndLeavesPreview = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await driver.executeScript(() => {
+        const list = document.querySelector('.list');
+        const tree = document.querySelector('.tree-panel');
+        const active = document.activeElement;
+        const listFocused =
+          Boolean(list) &&
+          Boolean(active) &&
+          (active === list ||
+            (typeof list.contains === 'function' && list.contains(active)) ||
+            (typeof active.closest === 'function' && active.closest('.list') === list));
+        return {
+          listPreview: Boolean(list?.classList?.contains('path-completion-surface')),
+          treePreview: Boolean(tree?.classList?.contains('path-completion-surface')),
+          listFocused,
+        };
+      });
+      if (!state.listPreview && !state.treePreview && state.listFocused) {
+        return;
+      }
+      await driver.sleep(100);
+    }
+    const latest = await driver.executeScript(() => {
+      const list = document.querySelector('.list');
+      const tree = document.querySelector('.tree-panel');
+      const active = document.activeElement;
+      const listFocused =
+        Boolean(list) &&
+        Boolean(active) &&
+        (active === list ||
+          (typeof list.contains === 'function' && list.contains(active)) ||
+          (typeof active.closest === 'function' && active.closest('.list') === list));
+      return {
+        listPreview: Boolean(list?.classList?.contains('path-completion-surface')),
+        treePreview: Boolean(tree?.classList?.contains('path-completion-surface')),
+        listFocused,
+      };
+    });
+    throw new Error(`path enter post-state failed: ${JSON.stringify(latest)}`);
   };
 
   const assertPathInputCopyPaste = async ({ basePath, suffix }) => {
