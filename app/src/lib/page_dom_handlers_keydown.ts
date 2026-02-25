@@ -255,7 +255,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
 
     // WebView/IME differences occasionally break keymap matching for these basic shortcuts.
     // Keep a direct fallback at the top-level keydown entry.
-    if (!hasBlockingOverlay) {
+    if (!hasBlockingOverlay && !isOverlayDomTarget) {
       if (isCtrlComma) {
         event.preventDefault();
         params.openConfigFile();

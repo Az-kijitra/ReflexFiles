@@ -1367,6 +1367,55 @@ defineTest("keydown fallback Ctrl+, / F1 / Alt+S boundaries", () => {
   }
 });
 
+defineTest("keydown fallback Ctrl+, / Ctrl+D / Ctrl+Shift+D are suppressed for overlay targets", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+    globalThis.document = { activeElement: null };
+    const base = createKeydownParams();
+    const onKeyDown = createPageKeydownHandler(base.params);
+    const overlayTarget = {
+      closest: (sel) => (sel.includes(".modal") ? {} : null),
+    };
+
+    const ctrlComma = {
+      ctrlKey: true,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      code: "Comma",
+      key: ",",
+      keyCode: 188,
+      which: 188,
+      target: overlayTarget,
+      getModifierState: () => false,
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(ctrlComma);
+    assert.equal(ctrlComma._prevented, 0);
+    assert.equal(base.calls.openConfig, 0);
+
+    const ctrlD = createCtrlEvent("D", 68);
+    ctrlD.event.target = overlayTarget;
+    onKeyDown(ctrlD.event);
+    assert.equal(ctrlD.prevented, 0);
+    assert.equal(base.calls.jumpAdd, 0);
+
+    const ctrlShiftD = createKeyEvent({ ctrlKey: true, shiftKey: true, letter: "D", keyCode: 68 });
+    ctrlShiftD.event.target = overlayTarget;
+    onKeyDown(ctrlShiftD.event);
+    assert.equal(ctrlShiftD.prevented, 0);
+    assert.equal(base.calls.jumpAddUrl, 0);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
 let failed = 0;
 for (const { name, fn } of tests) {
   try {
