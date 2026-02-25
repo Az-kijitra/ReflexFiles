@@ -640,7 +640,7 @@
       "status.dnd_experiment_phase1_active":
         "D&D experiment active (phase1 inbound local-only). Drag from Explorer into a local folder in ReflexFiles.",
       "status.dnd_experiment_phase2_active":
-        "D&D experiment active (phase2 outbound local-only). Use Ctrl+Alt + left click (formal), or context menu 'Explorer D&D (Exp)' as fallback.",
+        "D&D experiment active (phase2 outbound local-only). Default operation is Ctrl+Alt + left click. The context-menu Explorer drag item is available as a fallback.",
       "focus.list": "List",
       "focus.tree": "Tree",
       "focus.path": "Path",
@@ -1153,7 +1153,7 @@
       "dnd.export_result_move_unexpected": "移動（想定外）",
       "status.dnd_export_blocked": "D&D書き出しをブロックしました: {reason}",
       "status.dnd_export_native_ready":
-        "D&D書き出しの準備完了（{count}件、copy のみ）。左ボタンを押したままエクスプローラーへドラッグしてください。",
+        "D&D書き出しの準備完了（{count}件、コピーのみ）。左ボタンを押したままエクスプローラーへドラッグしてください。",
       "status.dnd_export_native_starting": "D&D書き出しを開始します: {count}件",
       "status.dnd_export_native_finished": "D&D書き出しを終了しました: {result}",
       "status.dnd_export_native_canceled": "D&D書き出しをキャンセルしました",
@@ -1169,7 +1169,7 @@
       "status.dnd_experiment_phase1_active":
         "D&D実験を有効化しました（phase1: 取り込み/ローカルのみ）。エクスプローラーから ReflexFiles のローカルフォルダへドロップできます。",
       "status.dnd_experiment_phase2_active":
-        "D&D実験を有効化しました（phase2: 書き出し/ローカルのみ）。正式操作は Ctrl+Alt + 左クリックです。右クリックの実験項目は fallback として使えます。",
+        "D&D実験を有効化しました（phase2: 書き出し/ローカルのみ）。標準操作は Ctrl+Alt + 左クリックです。右クリックのエクスプローラー向けドラッグ項目はフォールバックとして使えます。",
       "focus.list": "リスト",
       "focus.tree": "ツリー",
       "focus.path": "パス",
