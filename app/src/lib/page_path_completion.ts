@@ -32,7 +32,9 @@ export function createPathCompletionHelpers(params) {
   } = params;
   const PATH_COMPLETION_STATUS_STICKY_MS = 0;
   const PATH_COMPLETION_ONE_SHOT_STATUS_MS = 2200;
-  const PATH_COMPLETION_STATUS_REFRESH_MS = 150;
+  // Re-assert the PATH completion status while preview mode is active.
+  // Keep this fairly short so transient status updates do not hide the candidate state for long.
+  const PATH_COMPLETION_STATUS_REFRESH_MS = 80;
   /** @type {{ baseInput: string; parent: string; prefix: string; matches: any[]; index: number } | null} */
   let completionSession = null;
   let ignoreNextInputChange = false;
