@@ -1,3 +1,12 @@
+import {
+  DND_INBOUND_LOCAL_ONLY_POLICY,
+  DND_EXPERIMENT_DEFAULT_POLICY,
+  evaluateInboundOsDrop,
+  isNativeOutboundDragSuppressActive,
+  readDragDropExperimentPolicyFromStorage,
+} from "$lib/utils/drag_drop_experiment";
+import { getPasteConflicts } from "$lib/utils/file_ops";
+
 /**
  * @param {object} ctx
  * @param {() => Promise<string>} ctx.homeDir
@@ -9,6 +18,8 @@
  * @param {(err: unknown) => void} ctx.showError
  * @param {(path: string) => Promise<void>} ctx.loadDir
  * @param {() => string} ctx.getCurrentPath
+ * @param {() => import("$lib/types").Entry[]} [ctx.getEntries]
+ * @param {() => import("$lib/types").ProviderCapabilities | null} [ctx.getCurrentPathCapabilities]
  * @param {() => ReturnType<typeof setTimeout> | null} ctx.getWatchRefreshTimer
  * @param {(value: ReturnType<typeof setTimeout> | null) => void} ctx.setWatchRefreshTimer
  * @param {(value: number) => void} ctx.setDirStatsTimeoutMs
@@ -41,9 +52,40 @@
  * @param {(event: MouseEvent) => void} ctx.onClick
  * @param {() => void} ctx.recomputeStatusItems
  * @param {(value: () => Promise<void>) => void} ctx.setUpdateWindowBounds
+ * @param {(value: boolean) => void} [ctx.setPasteConfirmOpen]
+ * @param {(value: string[]) => void} [ctx.setPastePendingPaths]
+ * @param {(value: string[]) => void} [ctx.setPasteConflicts]
+ * @param {(value: "copy" | "cut") => void} [ctx.setPasteMode]
+ * @param {(value: boolean) => void} [ctx.setPasteApplyAll]
+ * @param {(value: number) => void} [ctx.setPasteConfirmIndex]
  * @param {(key: string, vars?: Record<string, string | number>) => string} ctx.t
  */
 export async function setupPageLifecycle(ctx) {
+  if (typeof window !== "undefined" && import.meta.env?.DEV) {
+    const debugWindow = window as Window & {
+      __rf_debug?: {
+        shellStartFileDrag?: (paths: string[]) => Promise<string>;
+        shellStartFileDragDebug?: (paths: string[]) => Promise<string>;
+        shellStartFileDragWithEffects?: (
+          paths: string[],
+          effectMode: "copy" | "copy_or_move"
+        ) => Promise<string>;
+        shellStartFileDragDebugWithEffects?: (
+          paths: string[],
+          effectMode: "copy" | "copy_or_move"
+        ) => Promise<string>;
+      };
+    };
+    const debugApi = debugWindow.__rf_debug || {};
+    debugApi.shellStartFileDrag = (paths) => ctx.invoke("shell_start_file_drag", { paths });
+    debugApi.shellStartFileDragDebug = (paths) =>
+      ctx.invoke("shell_start_file_drag_debug", { paths });
+    debugApi.shellStartFileDragWithEffects = (paths, effectMode) =>
+      ctx.invoke("shell_start_file_drag_with_effects", { paths, effect_mode: effectMode });
+    debugApi.shellStartFileDragDebugWithEffects = (paths, effectMode) =>
+      ctx.invoke("shell_start_file_drag_debug_with_effects", { paths, effect_mode: effectMode });
+    debugWindow.__rf_debug = debugApi;
+  }
   const home = await ctx.homeDir();
   let config = null;
   try {
@@ -161,6 +203,129 @@ export async function setupPageLifecycle(ctx) {
     }
   });
 
+  const win = ctx.getCurrentWindow();
+  let unlistenDragDrop = null;
+  let dndImportInFlight = false;
+  try {
+    const experimentPolicy =
+      typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+        ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
+        : DND_EXPERIMENT_DEFAULT_POLICY;
+    if (typeof win?.onDragDropEvent === "function") {
+      const inboundReasonLabel = (reason) => {
+        switch (String(reason || "")) {
+          case "destination_not_local":
+            return ctx.t("dnd.import_destination_local_only");
+          case "source_not_local":
+            return ctx.t("dnd.import_source_local_only");
+          case "mixed_or_invalid_sources":
+            return ctx.t("dnd.import_mixed_sources_not_supported");
+          case "destination_capability_denied":
+            return ctx.t("capability.not_available");
+          case "no_items":
+            return ctx.t("dnd.import_no_items");
+          default:
+            return ctx.t("capability.not_available");
+        }
+      };
+      unlistenDragDrop = await win.onDragDropEvent((event) => {
+        const payload = event?.payload ?? event;
+        if (!payload || payload.type !== "drop") return;
+        if (typeof window !== "undefined") {
+          if (
+            isNativeOutboundDragSuppressActive(
+              window as Window & { __rf_native_outbound_drag_suppress_until?: number }
+            )
+          ) {
+            ctx.setStatusMessage(ctx.t("status.dnd_import_blocked_self"), 1500);
+            return;
+          }
+        }
+        if (
+          typeof document !== "undefined" &&
+          document.querySelector(
+            ".modal, .modal-backdrop, .context-menu, .dropdown, .menu-dropdown, .sort-menu"
+          )
+        ) {
+          ctx.setStatusMessage(ctx.t("status.dnd_import_blocked_overlay"), 2000);
+          return;
+        }
+        const currentPath = String(ctx.getCurrentPath?.() || "");
+        const decision = evaluateInboundOsDrop({
+          policy: DND_INBOUND_LOCAL_ONLY_POLICY,
+          destinationPath: currentPath,
+          destinationCapabilities: ctx.getCurrentPathCapabilities?.() ?? null,
+          droppedPaths: payload.paths,
+        });
+        if (!decision.allowed) {
+          ctx.setStatusMessage(
+            ctx.t("status.dnd_import_blocked", { reason: inboundReasonLabel(decision.reason) }),
+            3000
+          );
+          return;
+        }
+        if (dndImportInFlight) return;
+        const conflictNames =
+          typeof ctx.getEntries === "function"
+            ? getPasteConflicts(decision.acceptedPaths, ctx.getEntries())
+            : [];
+        if (
+          conflictNames.length &&
+          ctx.setPasteConflicts &&
+          ctx.setPasteMode &&
+          ctx.setPastePendingPaths &&
+          ctx.setPasteApplyAll &&
+          ctx.setPasteConfirmIndex &&
+          ctx.setPasteConfirmOpen
+        ) {
+          ctx.setPasteConflicts(conflictNames);
+          ctx.setPasteMode("copy");
+          ctx.setPastePendingPaths(decision.acceptedPaths);
+          ctx.setPasteApplyAll(true);
+          ctx.setPasteConfirmIndex(0);
+          ctx.setPasteConfirmOpen(true);
+          ctx.setStatusMessage(ctx.t("status.dnd_import_conflict", { count: conflictNames.length }), 3000);
+          return;
+        }
+        dndImportInFlight = true;
+        Promise.resolve()
+          .then(async () => {
+            const summary = await ctx.invoke("fs_copy", {
+              items: decision.acceptedPaths,
+              destination: currentPath,
+              name_overrides: null,
+            });
+            const ok = Number(summary?.ok ?? 0);
+            const failed = Number(summary?.failed ?? 0);
+            const total = Number(summary?.total ?? decision.acceptedPaths.length);
+            ctx.setStatusMessage(
+              failed > 0
+                ? ctx.t("status.dnd_import_done_with_fail", { ok, total, failed })
+                : ctx.t("status.dnd_import_done", { ok, total }),
+              4000
+            );
+            if (ok > 0) {
+              await ctx.loadDir(currentPath);
+            }
+          })
+          .catch((err) => {
+            ctx.showError(err);
+            ctx.setStatusMessage(ctx.t("status.dnd_import_failed"), 4000);
+          })
+          .finally(() => {
+            dndImportInFlight = false;
+          });
+      });
+      if (experimentPolicy.phase === "phase2_outbound_local_only") {
+        ctx.setStatusMessage(ctx.t("status.dnd_experiment_phase2_active"), 4500);
+      } else if (experimentPolicy.enabled) {
+        ctx.setStatusMessage(`D&D experiment active (${experimentPolicy.phase})`, 1500);
+      }
+    }
+  } catch {
+    // D&D experiment probe is optional and must not break startup.
+  }
+
   const onWindowKeydownCapture = (event) => {
     if ((import.meta as any)?.env?.DEV) {
       const ctrl = !!(event.ctrlKey || event.getModifierState?.("Control"));
@@ -199,12 +364,19 @@ export async function setupPageLifecycle(ctx) {
   window.addEventListener("keydown", onWindowKeydownCapture, { capture: true });
   window.addEventListener("click", ctx.onClick, { capture: true });
   window.addEventListener("beforeunload", ctx.onBeforeUnload);
+  const onDndExperimentStatus = (event) => {
+    const detail = event?.detail ?? {};
+    const message = String(detail?.message || "");
+    if (!message) return;
+    const durationMs = Number(detail?.durationMs ?? 0);
+    ctx.setStatusMessage(message, Number.isFinite(durationMs) && durationMs > 0 ? durationMs : undefined);
+  };
+  window.addEventListener("rf:dnd-experiment-status", onDndExperimentStatus);
   const onFocusIn = () => {
     ctx.recomputeStatusItems?.();
   };
   window.addEventListener("focusin", onFocusIn, { capture: true });
 
-  const win = ctx.getCurrentWindow();
   const updateWindowBounds = async () => {
     try {
       const [pos, size, maximized] = await Promise.all([
@@ -240,10 +412,14 @@ export async function setupPageLifecycle(ctx) {
     if (unlistenOpProgress) {
       unlistenOpProgress();
     }
+    if (unlistenDragDrop) {
+      unlistenDragDrop();
+    }
     ctx.invoke("fs_watch_stop").catch(() => {});
     window.removeEventListener("keydown", onWindowKeydownCapture, { capture: true });
     window.removeEventListener("click", ctx.onClick, { capture: true });
     window.removeEventListener("beforeunload", ctx.onBeforeUnload);
+    window.removeEventListener("rf:dnd-experiment-status", onDndExperimentStatus);
     window.removeEventListener("focusin", onFocusIn, { capture: true });
     unlistenMove();
     unlistenResize();

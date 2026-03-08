@@ -1,4 +1,9 @@
 import { getParentPath } from "$lib/utils/path";
+import {
+  DND_OUTBOUND_LOCAL_ONLY_POLICY,
+  evaluateOutboundAppDragCandidate,
+  readDragDropExperimentPolicyFromStorage,
+} from "$lib/utils/drag_drop_experiment";
 
 /**
  * @param {object} ctx
@@ -39,6 +44,7 @@ import { getParentPath } from "$lib/utils/path";
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
  * @param {(entry: import("$lib/types").Entry | null) => void} [actions.syncGdriveWorkcopyForEntry]
+ * @param {() => Promise<void>} [actions.startExplorerDrag]
  * @param {() => void} closeContextMenu
  */
 export function createContextMenuItems(ctx, actions, closeContextMenu) {
@@ -62,7 +68,24 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     runExternalApp,
     getExternalApps,
     syncGdriveWorkcopyForEntry,
+    startExplorerDrag,
   } = actions;
+
+  function dndExportReasonLabel(reason) {
+    switch (String(reason || "")) {
+      case "disabled":
+      case "phase_not_supported":
+        return ctx.t("dnd.export_experimental_disabled");
+      case "no_items":
+        return ctx.t("status.no_selection");
+      case "source_not_local":
+        return ctx.t("dnd.export_local_only");
+      case "mixed_or_invalid_sources":
+        return ctx.t("dnd.export_mixed_selection_not_supported");
+      default:
+        return ctx.t("capability.not_available");
+    }
+  }
 
   function onContextOpen() {
     const selected = ctx.getSelectedPaths();
@@ -91,6 +114,11 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
   function onContextOpenGitClient() {
     openInGitClient();
     closeContextMenu();
+  }
+
+  async function onContextExplorerDragExperimental() {
+    closeContextMenu();
+    await startExplorerDrag?.();
   }
 
   function onContextGdriveWriteBack() {
@@ -299,6 +327,24 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canRenameSingle = isSingle && singleSupports(selectedEntry, "can_rename");
     const canExtractZip = isZip && singleSupports(selectedEntry, "can_archive_extract");
     const extApps = getExternalApps ? getExternalApps() : [];
+    const dndExperimentPolicy =
+      typeof window !== "undefined" && typeof window.localStorage !== "undefined"
+        ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
+        : null;
+    const dndExportDecision = evaluateOutboundAppDragCandidate({
+      policy: DND_OUTBOUND_LOCAL_ONLY_POLICY,
+      selectedEntries: selectedEntries.map((entry) => ({
+        path: String(entry?.path || ""),
+        provider: entry?.provider ?? entry?.ref?.provider ?? "local",
+      })),
+    });
+    const dndExportUiVisible =
+      hasSelection &&
+      !!dndExperimentPolicy?.enabled &&
+      dndExperimentPolicy.phase === "phase2_outbound_local_only";
+    const dndExportEnabled = hasSelection && dndExportDecision.allowed;
+    const dndExportReason =
+      hasSelection && !dndExportDecision.allowed ? dndExportReasonLabel(dndExportDecision.reason) : "";
     return normalizeMenuItems([
       {
         id: "ctx-open",
@@ -313,6 +359,14 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         enabled: isSingle,
         visible: isSingle,
         action: onContextOpenExplorer,
+      },
+      {
+        id: "ctx-open-explorer-dnd-exp",
+        label: ctx.t("context.open_explorer_drag_experimental"),
+        enabled: dndExportEnabled,
+        reason: dndExportReason,
+        visible: dndExportUiVisible,
+        action: onContextExplorerDragExperimental,
       },
       {
         id: "ctx-open-cmd",

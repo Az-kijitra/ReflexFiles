@@ -33,6 +33,7 @@ export function setupPageContextMenuWiring(ctx, deps) {
     runExternalApp: deps.runExternalApp,
     getExternalApps: deps.getExternalApps,
     syncGdriveWorkcopyForEntry: deps.syncGdriveWorkcopyForEntry,
+    startExplorerDrag: deps.startExplorerDrag,
   });
 
   closeContextMenu = contextMenuActions.closeContextMenu;

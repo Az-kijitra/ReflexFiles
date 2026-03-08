@@ -253,6 +253,7 @@ Workflow file:
 Current CI split:
 - **Quality gate (PR/Push)**:
   - `npm run test:keys` (lightweight keyboard regression gate)
+  - `npm run test:dnd` (lightweight drag-and-drop regression gate)
   - `npm run check`
   - `cargo check`
   - `cargo test`
@@ -332,6 +333,14 @@ Recommended order for key-related changes:
 - viewer changes -> `npm run e2e:viewer`
 - settings/config changes -> `npm run e2e:settings`
 - file operation changes -> `npm run e2e:tauri`
+2.5. If drag-and-drop behavior (Explorer <-> ReflexFiles) was changed
+- run `npm run test:dnd`
+- run `npm run e2e:tauri`
+- manual spot check (Windows):
+  - Explorer -> ReflexFiles (local folder import)
+  - ReflexFiles -> Explorer via file list direct trigger (`Ctrl+Alt + left click` on row, copy-only)
+  - `gdrive://` remains blocked for drag and drop
+  - verify key shortcuts still work after D&D (`Ctrl+F`, `F2`, `Ctrl+C/V`)
 3. Before merge/release candidate
 - run `npm run e2e:full`
 - verify suite `summary.json` exists and all cases pass

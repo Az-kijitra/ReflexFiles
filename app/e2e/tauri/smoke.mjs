@@ -612,6 +612,56 @@ try {
     await waitForVisibleName(name);
   };
 
+  const confirmCreateFolderViaShortcutOnly = async (name) => {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await closeOverlays();
+        await focusList();
+        await triggerShortcut({ key: 'N', code: 'KeyN', ctrl: true, shift: true });
+        const input = await withTimeout(
+          driver.wait(until.elementLocated(By.css('#create-name')), 4_000),
+          4_000,
+          'wait for create input (ctrl+shift+n strict)'
+        );
+        await input.click();
+        const typeSelect = await driver.findElement(By.css('#create-type'));
+        const typeValue = await typeSelect.getAttribute('value');
+        if (typeValue !== 'folder') {
+          throw new Error(`ctrl+shift+n opened create modal with unexpected type=${typeValue}`);
+        }
+        await input.clear();
+        await input.sendKeys(name);
+        const createButton = await withTimeout(
+          driver.wait(
+            until.elementLocated(
+              By.xpath(
+                "//div[contains(@class,'modal')]//button[normalize-space(text())='作成' or normalize-space(text())='Create']"
+              )
+            ),
+            timeoutMs
+          ),
+          timeoutMs,
+          'wait for create folder button (ctrl+shift+n strict)'
+        );
+        await createButton.click();
+        await withTimeout(
+          driver.wait(until.stalenessOf(input), timeoutMs),
+          timeoutMs,
+          'wait for create folder modal close (ctrl+shift+n strict)'
+        );
+        await waitForVisibleName(name);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (isTransientDomError(error)) {
+          await driver.sleep(150);
+        }
+      }
+    }
+    throw lastError ?? new Error('ctrl+shift+n strict create folder failed');
+  };
+
   const assertPathCompletionForward = async ({ basePath, targetName, typedPrefix }) => {
     const expectedPath = normalizePath(resolve(basePath, targetName)).toLowerCase();
     await setPath(basePath);
@@ -759,12 +809,56 @@ try {
     while (Date.now() < enterDeadline) {
       const current = await (await getPathInput()).getAttribute('value');
       if (normalizeCompare(current) === normalizeCompare(secondPath)) {
+        await assertPathCompletionEnterCommitsAndLeavesPreview();
         return;
       }
       await driver.sleep(120);
     }
     const enterLatest = await (await getPathInput()).getAttribute('value');
     throw new Error(`path enter confirm failed: expected=${secondPath} actual=${enterLatest}`);
+  };
+
+  const assertPathCompletionEnterCommitsAndLeavesPreview = async () => {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await driver.executeScript(() => {
+        const list = document.querySelector('.list');
+        const tree = document.querySelector('.tree-panel');
+        const active = document.activeElement;
+        const listFocused =
+          Boolean(list) &&
+          Boolean(active) &&
+          (active === list ||
+            (typeof list.contains === 'function' && list.contains(active)) ||
+            (typeof active.closest === 'function' && active.closest('.list') === list));
+        return {
+          listPreview: Boolean(list?.classList?.contains('path-completion-surface')),
+          treePreview: Boolean(tree?.classList?.contains('path-completion-surface')),
+          listFocused,
+        };
+      });
+      if (!state.listPreview && !state.treePreview && state.listFocused) {
+        return;
+      }
+      await driver.sleep(100);
+    }
+    const latest = await driver.executeScript(() => {
+      const list = document.querySelector('.list');
+      const tree = document.querySelector('.tree-panel');
+      const active = document.activeElement;
+      const listFocused =
+        Boolean(list) &&
+        Boolean(active) &&
+        (active === list ||
+          (typeof list.contains === 'function' && list.contains(active)) ||
+          (typeof active.closest === 'function' && active.closest('.list') === list));
+      return {
+        listPreview: Boolean(list?.classList?.contains('path-completion-surface')),
+        treePreview: Boolean(tree?.classList?.contains('path-completion-surface')),
+        listFocused,
+      };
+    });
+    throw new Error(`path enter post-state failed: ${JSON.stringify(latest)}`);
   };
 
   const assertPathInputCopyPaste = async ({ basePath, suffix }) => {
@@ -929,9 +1023,11 @@ try {
     throw new Error(`${label} was not created: ${path}`);
   };
 
-  console.log('[smoke] verify keyboard shortcuts (Ctrl+N / PATH copy/paste / PATH completion)...');
+  console.log('[smoke] verify keyboard shortcuts (Ctrl+N/Ctrl+Shift+N / PATH copy/paste / PATH completion)...');
   const shortcutProbeFile = `e2e_${testId}_shortcut_probe.txt`;
+  const shortcutProbeDir = `e2e_${testId}_shortcut_dir`;
   await confirmCreateViaShortcutOnly(shortcutProbeFile);
+  await confirmCreateFolderViaShortcutOnly(shortcutProbeDir);
   await assertPathInputCopyPaste({
     basePath: targetPath,
     suffix: `clip_probe_${testId}`,
@@ -1041,6 +1137,22 @@ try {
     const rowB = await rowByName(fileB);
     await driver.actions().keyDown(Key.CONTROL).click(rowB).keyUp(Key.CONTROL).perform();
   }, 'ctrl+click rowB');
+  console.log('[smoke] verify keyboard shortcut (Ctrl+Alt+Z compress)...');
+  await assertZipModalOpensByShortcut({
+    key: 'z',
+    code: 'KeyZ',
+    selectName: fileB,
+    workingPath: targetPath,
+    label: 'Ctrl+Alt+Z compress',
+  });
+  await withStaleRetry(async () => {
+    const rowA = await rowByName(fileA);
+    await rowA.click();
+  }, 'reselect rowA after Ctrl+Alt+Z check');
+  await withStaleRetry(async () => {
+    const rowB = await rowByName(fileB);
+    await driver.actions().keyDown(Key.CONTROL).click(rowB).keyUp(Key.CONTROL).perform();
+  }, 'reselect rowB after Ctrl+Alt+Z check');
 
   console.log('[smoke] opening zip modal...');
   await withStaleRetry(async () => {
@@ -1079,6 +1191,14 @@ try {
   );
   await waitForVisibleName(zipName);
   console.log('[smoke] zip created.');
+  console.log('[smoke] verify keyboard shortcut (Ctrl+Alt+X extract)...');
+  await assertZipModalOpensByShortcut({
+    key: 'x',
+    code: 'KeyX',
+    selectName: zipName,
+    workingPath: targetPath,
+    label: 'Ctrl+Alt+X extract',
+  });
 
   console.log('[smoke] extracting zip...');
   const extractDir = resolve(targetPath, `extracted_${testId}`);
@@ -1137,12 +1257,15 @@ try {
     }
   }
   await setInputValue(extractDestination, extractDir);
-  const overwriteCheckbox = await driver.findElement(
+  const overwriteCheckboxes = await driver.findElements(
     By.css('.modal-inline input[type="checkbox"]')
   );
-  const checked = await overwriteCheckbox.isSelected();
-  if (!checked) {
-    await overwriteCheckbox.click();
+  if (overwriteCheckboxes.length > 0) {
+    const overwriteCheckbox = overwriteCheckboxes[0];
+    const checked = await overwriteCheckbox.isSelected();
+    if (!checked) {
+      await overwriteCheckbox.click();
+    }
   }
   const extractButton = await withTimeout(
     driver.wait(
@@ -1469,13 +1592,12 @@ try {
     await waitForSearchBarOpen(false, 'search closed precondition');
     await triggerShortcut({ key: 'f', code: 'KeyF', ctrl: true });
     await waitForSearchBarOpen(true, 'open search from list');
+    await waitForFocusKind('search', 'Ctrl+F from list should focus search');
     const searchInput = await withTimeout(
       driver.wait(until.elementLocated(By.css('.search-bar input')), timeoutMs),
       timeoutMs,
       'wait search input for escape'
     );
-    await searchInput.click();
-    await waitForFocusKind('search', 'focus search input before escape');
     await searchInput.sendKeys(Key.ESCAPE);
     await waitForSearchBarOpen(false, 'close search with escape');
 
@@ -1504,18 +1626,125 @@ try {
     const pathInput = await getPathInput();
     await pathInput.click();
     await triggerShortcut({ key: 'f', code: 'KeyF', ctrl: true });
-    await driver.sleep(200);
-    const searchOpen = await isSearchBarOpen();
-    if (searchOpen) {
-      throw new Error('path Ctrl+F unexpectedly opened search');
-    }
+    await waitForSearchBarOpen(true, 'path Ctrl+F should open search');
+    await waitForFocusKind('search', 'path Ctrl+F should focus search');
+    const searchInput2 = await withTimeout(
+      driver.wait(until.elementLocated(By.css('.search-bar input')), timeoutMs),
+      timeoutMs,
+      'wait search input after path Ctrl+F'
+    );
+    await searchInput2.sendKeys(Key.ESCAPE);
+    await waitForSearchBarOpen(false, 'close search after path Ctrl+F');
   };
+
+  const assertF2OpensRenameModal = async (name, workingPath) => {
+    await setPath(workingPath);
+    await focusList();
+    await withStaleRetry(async () => {
+      const row = await rowByName(name);
+      await row.click();
+    }, `select ${name} for F2 rename`);
+    await focusList();
+    await triggerShortcut({ key: 'F2', code: 'F2' });
+    const renameInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('#rename-input')), timeoutMs),
+      timeoutMs,
+      'wait rename input after F2'
+    );
+    await withTimeout(
+      driver.wait(async () => {
+        try {
+          return driver.executeScript((el) => {
+            const active = document.activeElement;
+            return active === el || (active && typeof active.closest === 'function' && active.closest('.modal') === el.closest('.modal'));
+          }, renameInput);
+        } catch {
+          return false;
+        }
+      }, timeoutMs),
+      timeoutMs,
+      'wait rename input focus after F2'
+    );
+    const renameValue = String((await renameInput.getAttribute('value')) || '');
+    if (!renameValue.includes(name)) {
+      throw new Error(`F2 rename modal value mismatch: expected includes=${name} actual=${renameValue}`);
+    }
+    await renameInput.sendKeys(Key.ESCAPE);
+    await withTimeout(
+      driver.wait(until.stalenessOf(renameInput), timeoutMs),
+      timeoutMs,
+      'wait rename modal close after escape'
+    );
+  };
+
+  const assertCtrlShiftDOpensJumpUrlModal = async (workingPath) => {
+    await setPath(workingPath);
+    await focusList();
+    await triggerShortcut({ key: 'D', code: 'KeyD', ctrl: true, shift: true });
+    const jumpUrlInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('#jump-url-input')), timeoutMs),
+      timeoutMs,
+      'wait jump url input after Ctrl+Shift+D'
+    );
+    await withTimeout(
+      driver.wait(async () => {
+        try {
+          return driver.executeScript((el) => {
+            const active = document.activeElement;
+            return active === el || (active && typeof active.closest === 'function' && active.closest('.modal') === el.closest('.modal'));
+          }, jumpUrlInput);
+        } catch {
+          return false;
+        }
+      }, timeoutMs),
+      timeoutMs,
+      'wait jump url input focus after Ctrl+Shift+D'
+    );
+    await jumpUrlInput.sendKeys(Key.ESCAPE);
+    await withTimeout(
+      driver.wait(until.stalenessOf(jumpUrlInput), timeoutMs),
+      timeoutMs,
+      'wait jump url modal close after escape'
+    );
+  };
+
+  async function assertZipModalOpensByShortcut({
+    key,
+    code,
+    selectName,
+    workingPath,
+    label,
+  }) {
+    await setPath(workingPath);
+    await focusList();
+    await withStaleRetry(async () => {
+      const row = await rowByName(selectName);
+      await row.click();
+    }, `select ${selectName} for ${label}`);
+    await focusList();
+    await triggerShortcut({ key, code, ctrl: true, alt: true });
+    const zipDestinationInput = await withTimeout(
+      driver.wait(until.elementLocated(By.css('#zip-destination')), timeoutMs),
+      timeoutMs,
+      `wait zip destination (${label})`
+    );
+    await zipDestinationInput.sendKeys(Key.ESCAPE);
+    await withTimeout(
+      driver.wait(until.stalenessOf(zipDestinationInput), timeoutMs),
+      timeoutMs,
+      `wait zip modal close (${label})`
+    );
+  }
 
   console.log('[smoke] verify keyboard focus boundary (PATH Ctrl+A/Delete / list Ctrl+A)...');
   await assertPathCtrlAAndDeleteBoundary(opA, opsDstDir);
   await assertListCtrlASelectsAll();
   console.log('[smoke] verify keyboard focus boundary (Search/Escape/Tab)...');
   await assertSearchEscTabBoundary(opsDstDir);
+  console.log('[smoke] verify keyboard shortcut (F2 rename)...');
+  await assertF2OpensRenameModal(opB, opsDstDir);
+  console.log('[smoke] verify keyboard shortcut (Ctrl+Shift+D jump URL modal)...');
+  await assertCtrlShiftDOpensJumpUrlModal(opsDstDir);
 
   await withStaleRetry(async () => {
     const rowCopy = await rowByName(opA);

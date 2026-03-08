@@ -16,6 +16,17 @@ export function clipboardGetFiles(): Promise<{ paths: string[]; cut: boolean } |
   return invoke("clipboard_get_files");
 }
 
+export function shellStartFileDrag(paths: string[]): Promise<string> {
+  return invoke("shell_start_file_drag", { paths });
+}
+
+export function shellStartFileDragWithEffects(
+  paths: string[],
+  effectMode: "copy" | "copy_or_move"
+): Promise<string> {
+  return invoke("shell_start_file_drag_with_effects", { paths, effect_mode: effectMode });
+}
+
 export function fsCopyPairs(pairs: { from: string; to: string }[]): Promise<OpSummary> {
   return invoke("fs_copy_pairs", { pairs });
 }

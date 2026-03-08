@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::error::{AppError, AppErrorKind, AppResult};
+#[cfg(not(feature = "gdrive-readonly-stub"))]
 use crate::fs_query::clear_gdrive_read_cache_impl;
+#[cfg(not(feature = "gdrive-readonly-stub"))]
 use crate::gdrive_auth::gdrive_auth_report_write_conflict_impl;
 use crate::types::{ResourceRef, StorageProvider};
 
@@ -404,6 +406,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     out
 }
 
+#[cfg(not(feature = "gdrive-readonly-stub"))]
 fn snapshot_from_revision_info(
     resource_id: &str,
     revision: &crate::gdrive_real::GdriveRevisionInfo,

@@ -249,6 +249,8 @@ cargo test --manifest-path app/src-tauri/Cargo.toml --locked --features gdrive-r
 
 現行の分割運用:
 - **Quality gate（PR/Push）**:
+  - `npm run test:keys`（軽量キー回帰ゲート）
+  - `npm run test:dnd`（軽量D&D回帰ゲート）
   - `npm run check`
   - `cargo check`
   - `cargo test`
@@ -317,6 +319,14 @@ npm run check
 - Viewer 変更: `npm run e2e:viewer`
 - 設定系変更: `npm run e2e:settings`
 - ファイル操作変更: `npm run e2e:tauri`
+2.5. ドラッグ&ドロップ（Explorer <-> ReflexFiles）を変更した場合
+- `npm run test:dnd`
+- `npm run e2e:tauri`
+- 手動スポット確認（Windows）
+  - Explorer -> ReflexFiles（ローカルフォルダ取り込み）
+  - ReflexFiles -> Explorer（ファイルリスト行で `Ctrl+Alt + 左クリック`, copy のみ）
+  - `gdrive://` はドラッグ&ドロップ対象外のまま（block）
+  - D&D 後にキー操作（`Ctrl+F`, `F2`, `Ctrl+C/V`）が壊れていないこと
 3. マージ前/リリース候補前
 - `npm run e2e:full`
 - スイート `summary.json` 生成と全ケース PASS を確認

@@ -31,6 +31,10 @@ export function createPathCompletionHelpers(params) {
     treeNodeName,
   } = params;
   const PATH_COMPLETION_STATUS_STICKY_MS = 0;
+  const PATH_COMPLETION_ONE_SHOT_STATUS_MS = 2200;
+  // Re-assert the PATH completion status while preview mode is active.
+  // Keep this fairly short so transient status updates do not hide the candidate state for long.
+  const PATH_COMPLETION_STATUS_REFRESH_MS = 80;
   /** @type {{ baseInput: string; parent: string; prefix: string; matches: any[]; index: number } | null} */
   let completionSession = null;
   let ignoreNextInputChange = false;
@@ -72,7 +76,15 @@ export function createPathCompletionHelpers(params) {
     setFilteredEntries(getEntries() || []);
   }
 
-  function clearCompletionSession() {
+  /**
+   * @param {{ restoreInput?: boolean }} [options]
+   */
+  function clearCompletionSession(options = undefined) {
+    const shouldRestoreInput = Boolean(options?.restoreInput);
+    const baseInput = shouldRestoreInput && completionSession ? String(completionSession.baseInput || "") : "";
+    if (shouldRestoreInput && completionSession) {
+      applyPathInput(baseInput);
+    }
     completionSession = null;
     restoreDefaultListView();
     setPathCompletionPreviewActive(false);
@@ -143,7 +155,7 @@ export function createPathCompletionHelpers(params) {
       const latest = typeof getStatusMessage === "function" ? String(getStatusMessage() || "") : "";
       if (latest === completionStatusMessage) return;
       getSetStatusMessage()(completionStatusMessage, PATH_COMPLETION_STATUS_STICKY_MS);
-    }, 300);
+    }, PATH_COMPLETION_STATUS_REFRESH_MS);
   }
 
   /**
@@ -297,7 +309,7 @@ export function createPathCompletionHelpers(params) {
     const trimmed = rawInput.trim();
     if (isGdrivePath(trimmed) || (!isAbsolutePath(trimmed) && isGdrivePath(getCurrentPath()))) {
       clearCompletionSession();
-      getSetStatusMessage()(t("status.path_completion_local_only"));
+      getSetStatusMessage()(t("status.path_completion_local_only"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
       return;
     }
     const context = getPathCompletionContext(rawInput);
@@ -307,14 +319,14 @@ export function createPathCompletionHelpers(params) {
     }
     if (isGdrivePath(context.parent)) {
       clearCompletionSession();
-      getSetStatusMessage()(t("status.path_completion_local_only"));
+      getSetStatusMessage()(t("status.path_completion_local_only"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
       return;
     }
     try {
       const matches = await resolveMatches(context);
       if (!matches.length) {
         clearCompletionSession();
-        getSetStatusMessage()(t("no_items"));
+        getSetStatusMessage()(t("status.path_completion_no_candidates"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
         return;
       }
       if (matches.length === 1) {
@@ -351,7 +363,7 @@ export function createPathCompletionHelpers(params) {
       const matches = await resolveMatches(context);
       if (!matches.length) {
         clearCompletionSession();
-        getSetStatusMessage()(t("no_items"));
+        getSetStatusMessage()(t("status.path_completion_no_candidates"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
         return true;
       }
       startCompletionSession(nextBase, context, matches, { selectFirst: false });
@@ -380,9 +392,12 @@ export function createPathCompletionHelpers(params) {
     clearCompletionSession();
   }
 
-  function clearPathCompletionPreview() {
+  /**
+   * @param {{ restoreInput?: boolean }} [options]
+   */
+  function clearPathCompletionPreview(options = undefined) {
     if (!completionSession) return false;
-    clearCompletionSession();
+    clearCompletionSession(options);
     return true;
   }
 

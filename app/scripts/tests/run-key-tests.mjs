@@ -506,6 +506,164 @@ defineTest("overlay Tab focus cycle", () => {
   assert.equal(state5.focusList, 1);
 });
 
+defineTest("overlay input modals delegate Enter/Escape to modal-local handlers when target is inside modal", () => {
+  const makeKeyEvent = (key, target) => {
+    let prevented = 0;
+    return {
+      event: {
+        key,
+        target,
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+      },
+      get prevented() {
+        return prevented;
+      },
+    };
+  };
+
+  const baseCtx = () => {
+    const { ctx } = createOverlayContext();
+    Object.assign(ctx, {
+      renameModalEl: null,
+      createModalEl: null,
+      jumpUrlModalEl: null,
+      confirmRenameCalled: 0,
+      confirmCreateCalled: 0,
+      confirmJumpUrlCalled: 0,
+      confirmRename() {
+        this.confirmRenameCalled += 1;
+      },
+      confirmCreate() {
+        this.confirmCreateCalled += 1;
+      },
+      confirmJumpUrl() {
+        this.confirmJumpUrlCalled += 1;
+      },
+      cancelRename() {},
+      cancelCreate() {},
+      cancelJumpUrl() {},
+    });
+    return ctx;
+  };
+
+  const renameInput = {};
+  const renameCtx = baseCtx();
+  renameCtx.renameOpen = true;
+  renameCtx.renameModalEl = { contains: (el) => el === renameInput };
+  const renameEnter = makeKeyEvent("Enter", renameInput);
+  assert.equal(handleOverlayKey(renameEnter.event, renameCtx), true);
+  assert.equal(renameCtx.confirmRenameCalled, 0);
+  assert.equal(renameEnter.prevented, 0);
+  const renameEsc = makeKeyEvent("Escape", renameInput);
+  assert.equal(handleOverlayKey(renameEsc.event, renameCtx), true);
+  assert.equal(renameEsc.prevented, 0);
+
+  const createInput = {};
+  const createCtx = baseCtx();
+  createCtx.createOpen = true;
+  createCtx.createModalEl = { contains: (el) => el === createInput };
+  const createEnter = makeKeyEvent("Enter", createInput);
+  assert.equal(handleOverlayKey(createEnter.event, createCtx), true);
+  assert.equal(createCtx.confirmCreateCalled, 0);
+  assert.equal(createEnter.prevented, 0);
+  const createEsc = makeKeyEvent("Escape", createInput);
+  assert.equal(handleOverlayKey(createEsc.event, createCtx), true);
+  assert.equal(createEsc.prevented, 0);
+
+  const jumpInput = {};
+  const jumpCtx = baseCtx();
+  jumpCtx.jumpUrlOpen = true;
+  jumpCtx.jumpUrlModalEl = { contains: (el) => el === jumpInput };
+  const jumpEnter = makeKeyEvent("Enter", jumpInput);
+  assert.equal(handleOverlayKey(jumpEnter.event, jumpCtx), true);
+  assert.equal(jumpCtx.confirmJumpUrlCalled, 0);
+  assert.equal(jumpEnter.prevented, 0);
+  const jumpEsc = makeKeyEvent("Escape", jumpInput);
+  assert.equal(handleOverlayKey(jumpEsc.event, jumpCtx), true);
+  assert.equal(jumpEsc.prevented, 0);
+});
+
+defineTest("overlay input modals handle Enter when modal is open but target is outside modal", () => {
+  const makeKeyEvent = (key, target) => {
+    let prevented = 0;
+    return {
+      event: {
+        key,
+        target,
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+      },
+      get prevented() {
+        return prevented;
+      },
+    };
+  };
+  const outsideTarget = {};
+
+  const ctx = {
+    ...createOverlayContext().ctx,
+    renameOpen: true,
+    renameModalEl: { contains: () => false },
+    createOpen: false,
+    createModalEl: null,
+    jumpUrlOpen: false,
+    jumpUrlModalEl: null,
+    confirmRenameCalled: 0,
+    confirmRename() {
+      this.confirmRenameCalled += 1;
+    },
+    cancelRename() {},
+  };
+  const enter = makeKeyEvent("Enter", outsideTarget);
+  assert.equal(handleOverlayKey(enter.event, ctx), true);
+  assert.equal(ctx.confirmRenameCalled, 1);
+  assert.equal(enter.prevented, 1);
+});
+
+defineTest("overlay input modals handle Escape when modal is open but target is outside modal", () => {
+  const makeKeyEvent = (key, target) => {
+    let prevented = 0;
+    return {
+      event: {
+        key,
+        target,
+        preventDefault() {
+          prevented += 1;
+        },
+        stopPropagation() {},
+      },
+      get prevented() {
+        return prevented;
+      },
+    };
+  };
+  const outsideTarget = {};
+
+  const ctx = {
+    ...createOverlayContext().ctx,
+    createOpen: true,
+    createModalEl: { contains: () => false },
+    renameOpen: false,
+    renameModalEl: null,
+    jumpUrlOpen: false,
+    jumpUrlModalEl: null,
+    cancelCreateCalled: 0,
+    cancelCreate() {
+      this.cancelCreateCalled += 1;
+    },
+    confirmCreate() {},
+  };
+  const esc = makeKeyEvent("Escape", outsideTarget);
+  assert.equal(handleOverlayKey(esc.event, ctx), true);
+  assert.equal(ctx.cancelCreateCalled, 1);
+  assert.equal(esc.prevented, 1);
+});
+
 defineTest("path completion cycle and separator behavior", async () => {
   const { helpers, state } = createPathCompletionHarness({
     pathInput: "C:\\Users\\toshi\\a",
@@ -537,6 +695,81 @@ defineTest("path completion cycle and separator behavior", async () => {
   assert.equal(state.pathInput, "C:\\Users\\toshi\\adasa\\");
   assert.equal(state.errors.length, 0);
   helpers.clearPathCompletionPreview();
+});
+
+defineTest("path completion input-change ignores programmatic update once, then clears on manual edit", async () => {
+  const { helpers, state } = createPathCompletionHarness({
+    pathInput: "C:\\Users\\toshi\\a",
+    invokeImpl: async (_command, payload) => {
+      if (payload.path === "C:\\Users\\toshi") {
+        return [
+          { path: "C:\\Users\\toshi\\alpha", name: "alpha", type: "dir" },
+          { path: "C:\\Users\\toshi\\atlas", name: "atlas", type: "dir" },
+        ];
+      }
+      return [];
+    },
+  });
+
+  await helpers.handlePathTabCompletion(state.pathInput, 1);
+  assert.equal(state.previewActive, true);
+  assert.equal(state.pathInput, "C:\\Users\\toshi\\alpha");
+
+  // First input-change callback after applyPathInput() should be ignored.
+  helpers.handlePathCompletionInputChange(state.pathInput);
+  assert.equal(state.previewActive, true);
+
+  // Manual edit should terminate the preview session and restore normal list view.
+  state.pathInput = `${state.pathInput}x`;
+  helpers.handlePathCompletionInputChange(state.pathInput);
+  assert.equal(state.previewActive, false);
+  assert.deepEqual(state.filteredEntries, state.entries);
+});
+
+defineTest("path completion clear and separator boundaries", async () => {
+  const { helpers, state } = createPathCompletionHarness({
+    pathInput: "C:\\Users\\toshi\\a",
+    invokeImpl: async (_command, payload) => {
+      if (payload.path === "C:\\Users\\toshi") {
+        return [
+          { path: "C:\\Users\\toshi\\alpha", name: "alpha", type: "dir" },
+          { path: "C:\\Users\\toshi\\atlas", name: "atlas", type: "dir" },
+        ];
+      }
+      return [];
+    },
+  });
+
+  assert.equal(helpers.clearPathCompletionPreview(), false);
+  assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "/"), false);
+  assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "a"), false);
+
+  await helpers.handlePathTabCompletion(state.pathInput, 1);
+  assert.equal(state.previewActive, true);
+  assert.equal(await helpers.handlePathCompletionSeparator(state.pathInput, "¥"), true);
+});
+
+defineTest("path completion clear can restore original typed input (Esc cancel semantics)", async () => {
+  const { helpers, state } = createPathCompletionHarness({
+    pathInput: "C:\\Users\\toshi\\a",
+    invokeImpl: async (_command, payload) => {
+      if (payload.path === "C:\\Users\\toshi") {
+        return [
+          { path: "C:\\Users\\toshi\\alpha", name: "alpha", type: "dir" },
+          { path: "C:\\Users\\toshi\\atlas", name: "atlas", type: "dir" },
+        ];
+      }
+      return [];
+    },
+  });
+
+  await helpers.handlePathTabCompletion(state.pathInput, 1);
+  assert.equal(state.previewActive, true);
+  assert.equal(state.pathInput, "C:\\Users\\toshi\\alpha");
+
+  assert.equal(helpers.clearPathCompletionPreview({ restoreInput: true }), true);
+  assert.equal(state.previewActive, false);
+  assert.equal(state.pathInput, "C:\\Users\\toshi\\a");
 });
 
 defineTest("gdrive path completion is local-only", async () => {
@@ -574,7 +807,7 @@ defineTest("keydown fallback Ctrl+N/Ctrl+Shift+N/C/V", () => {
     assert.equal(calls.paste, 1);
     assert.equal(calls.global, 0);
 
-    const pathInputEl = { contains: () => false };
+    const pathInputEl = { contains: () => false, tagName: "INPUT" };
     globalThis.document = { activeElement: pathInputEl };
     const fallback2 = createKeydownParams({ pathInputEl });
     const onKeyDown2 = createPageKeydownHandler(fallback2.params);
@@ -589,6 +822,57 @@ defineTest("keydown fallback Ctrl+N/Ctrl+Shift+N/C/V", () => {
     const ctrlCNoSelection = createCtrlEvent("C", 67);
     onKeyDown3(ctrlCNoSelection.event);
     assert.equal(fallback3.calls.status.at(-1), "NO_SELECTION");
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
+defineTest("keydown fallback Ctrl+C/X/V respects text inputs (search/other inputs)", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+
+    const searchInputEl = {
+      tagName: "INPUT",
+      contains: () => false,
+      focus() {},
+    };
+    globalThis.document = { activeElement: searchInputEl };
+    const searchCase = createKeydownParams({ searchInputEl });
+    const onKeyDownSearch = createPageKeydownHandler(searchCase.params);
+    const ctrlCSearch = createCtrlEvent("C", 67);
+    const ctrlXSearch = createCtrlEvent("X", 88);
+    const ctrlVSearch = createCtrlEvent("V", 86);
+    onKeyDownSearch(ctrlCSearch.event);
+    onKeyDownSearch(ctrlXSearch.event);
+    onKeyDownSearch(ctrlVSearch.event);
+    assert.equal(ctrlCSearch.prevented, 0);
+    assert.equal(ctrlXSearch.prevented, 0);
+    assert.equal(ctrlVSearch.prevented, 0);
+    assert.equal(searchCase.calls.copy, 0);
+    assert.equal(searchCase.calls.cut, 0);
+    assert.equal(searchCase.calls.paste, 0);
+    assert.equal(searchCase.calls.global, 0);
+
+    const otherInputEl = { tagName: "INPUT", contains: () => false };
+    globalThis.document = { activeElement: otherInputEl };
+    const otherCase = createKeydownParams();
+    const onKeyDownOther = createPageKeydownHandler(otherCase.params);
+    const ctrlCOther = createCtrlEvent("C", 67);
+    const ctrlXOther = createCtrlEvent("X", 88);
+    const ctrlVOther = createCtrlEvent("V", 86);
+    onKeyDownOther(ctrlCOther.event);
+    onKeyDownOther(ctrlXOther.event);
+    onKeyDownOther(ctrlVOther.event);
+    assert.equal(ctrlCOther.prevented, 0);
+    assert.equal(ctrlXOther.prevented, 0);
+    assert.equal(ctrlVOther.prevented, 0);
+    assert.equal(otherCase.calls.copy, 0);
+    assert.equal(otherCase.calls.cut, 0);
+    assert.equal(otherCase.calls.paste, 0);
+    assert.equal(otherCase.calls.global, 0);
   } finally {
     globalThis.document = prevDocument;
     globalThis.window = prevWindow;
@@ -809,6 +1093,67 @@ defineTest("keydown core shortcuts bypass stale overlay flags when target is mai
   }
 });
 
+defineTest("keydown core shortcuts do not fire direct fallbacks when event target is inside overlay", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+    globalThis.document = { activeElement: null };
+    const zipEntry = { path: "C:\\Users\\toshi\\a.zip", name: "a.zip", ext: ".zip", type: "file" };
+    const base = createKeydownParams({
+      entries: [zipEntry],
+      params: {
+        getCreateOpen: () => true,
+      },
+    });
+    const onKeyDown = createPageKeydownHandler(base.params);
+    const overlayTarget = {
+      closest: (sel) => (sel.includes(".modal") ? {} : null),
+    };
+
+    const ctrlF = createCtrlEvent("F", 70);
+    ctrlF.event.target = overlayTarget;
+    onKeyDown(ctrlF.event);
+    assert.equal(ctrlF.prevented, 0);
+    assert.equal(base.calls.searchSet.length, 0);
+
+    const f2 = {
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      key: "F2",
+      code: "F2",
+      keyCode: 113,
+      which: 113,
+      getModifierState: () => false,
+      target: overlayTarget,
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(f2);
+    assert.equal(f2._prevented, 0);
+    assert.equal(base.calls.rename, 0);
+
+    const ctrlAltZ = createKeyEvent({ ctrlKey: true, altKey: true, letter: "Z", keyCode: 90 });
+    ctrlAltZ.event.target = overlayTarget;
+    onKeyDown(ctrlAltZ.event);
+    assert.equal(ctrlAltZ.prevented, 0);
+    assert.equal(base.calls.zipCreate, 0);
+
+    const ctrlAltX = createKeyEvent({ ctrlKey: true, altKey: true, letter: "X", keyCode: 88 });
+    ctrlAltX.event.target = overlayTarget;
+    onKeyDown(ctrlAltX.event);
+    assert.equal(ctrlAltX.prevented, 0);
+    assert.equal(base.calls.zipExtract, 0);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
 defineTest("keydown fallback Ctrl+H / Ctrl+Shift+O (path input allowed, other inputs blocked)", () => {
   const prevDocument = globalThis.document;
   const prevWindow = globalThis.window;
@@ -1016,6 +1361,55 @@ defineTest("keydown fallback Ctrl+, / F1 / Alt+S boundaries", () => {
     onKeyDownPath(f1Path);
     assert.equal(f1Path._prevented, 1);
     assert.equal(pathCase.calls.openKeymap, 1);
+  } finally {
+    globalThis.document = prevDocument;
+    globalThis.window = prevWindow;
+  }
+});
+
+defineTest("keydown fallback Ctrl+, / Ctrl+D / Ctrl+Shift+D are suppressed for overlay targets", () => {
+  const prevDocument = globalThis.document;
+  const prevWindow = globalThis.window;
+  try {
+    globalThis.window = {};
+    globalThis.document = { activeElement: null };
+    const base = createKeydownParams();
+    const onKeyDown = createPageKeydownHandler(base.params);
+    const overlayTarget = {
+      closest: (sel) => (sel.includes(".modal") ? {} : null),
+    };
+
+    const ctrlComma = {
+      ctrlKey: true,
+      altKey: false,
+      shiftKey: false,
+      metaKey: false,
+      code: "Comma",
+      key: ",",
+      keyCode: 188,
+      which: 188,
+      target: overlayTarget,
+      getModifierState: () => false,
+      _prevented: 0,
+      preventDefault() {
+        this._prevented += 1;
+      },
+    };
+    onKeyDown(ctrlComma);
+    assert.equal(ctrlComma._prevented, 0);
+    assert.equal(base.calls.openConfig, 0);
+
+    const ctrlD = createCtrlEvent("D", 68);
+    ctrlD.event.target = overlayTarget;
+    onKeyDown(ctrlD.event);
+    assert.equal(ctrlD.prevented, 0);
+    assert.equal(base.calls.jumpAdd, 0);
+
+    const ctrlShiftD = createKeyEvent({ ctrlKey: true, shiftKey: true, letter: "D", keyCode: 68 });
+    ctrlShiftD.event.target = overlayTarget;
+    onKeyDown(ctrlShiftD.event);
+    assert.equal(ctrlShiftD.prevented, 0);
+    assert.equal(base.calls.jumpAddUrl, 0);
   } finally {
     globalThis.document = prevDocument;
     globalThis.window = prevWindow;

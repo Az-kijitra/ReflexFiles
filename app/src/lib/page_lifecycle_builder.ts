@@ -19,6 +19,8 @@ export function setupPageLifecycleFromParts({ deps, state, handlers }) {
       showError: deps.showError,
       loadDir: deps.loadDir,
       getCurrentPath: state.getCurrentPath,
+      getEntries: state.getEntries,
+      getCurrentPathCapabilities: state.getCurrentPathCapabilities,
       getWatchRefreshTimer: state.getWatchRefreshTimer,
       setWatchRefreshTimer: state.setWatchRefreshTimer,
       setDirStatsTimeoutMs: state.setDirStatsTimeoutMs,
@@ -51,6 +53,12 @@ export function setupPageLifecycleFromParts({ deps, state, handlers }) {
       onClick: handlers.onClick,
       recomputeStatusItems: deps.recomputeStatusItems,
       setUpdateWindowBounds: state.setUpdateWindowBounds,
+      setPasteConfirmOpen: state.setPasteConfirmOpen,
+      setPastePendingPaths: state.setPastePendingPaths,
+      setPasteConflicts: state.setPasteConflicts,
+      setPasteMode: state.setPasteMode,
+      setPasteApplyAll: state.setPasteApplyAll,
+      setPasteConfirmIndex: state.setPasteConfirmIndex,
       t: deps.t,
     })
   );

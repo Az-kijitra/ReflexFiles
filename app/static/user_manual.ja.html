@@ -145,6 +145,7 @@
 <li>直接入力して <strong>Enter</strong> で移動</li>
 <li><strong>Esc</strong> で補完候補を閉じる（候補表示中）/ 入力を破棄して一覧へ戻る</li>
 <li><strong>Ctrl+Space / Ctrl+Shift+Space</strong> で補完候補を前進 / 後退（PATH 入力時）</li>
+<li>補完候補表示中に <strong>Enter</strong> を押すと、現在の候補を確定してそのディレクトリへ移動します（候補表示は終了し、フォーカスは一覧へ戻ります）</li>
 <li>補完候補表示中に <strong>\ / ¥</strong> を入力すると、現在候補のディレクトリを確定して続けて入力できます</li>
 <li><strong>Tab / Shift+Tab</strong> でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）</li>
 <li><strong>Ctrl+Shift+O / Ctrl+H</strong> でジャンプリスト / 履歴を表示</li>
@@ -221,6 +222,13 @@
 <ul>
 <li>ZIP 作成</li>
 <li>ZIP 解凍</li>
+</ul>
+</li>
+<li><strong>ドラッグ&amp;ドロップ（ローカル限定）</strong>
+<ul>
+<li>エクスプローラー → ReflexFiles（ローカルフォルダ表示中にドロップ）</li>
+<li>ReflexFiles → エクスプローラー（ファイルリスト行で <code>Ctrl+Alt + 左クリック</code> 後、そのままドラッグ、コピーのみ）</li>
+<li>Google Drive パス（<code>gdrive://</code>）は対象外</li>
 </ul>
 </li>
 <li><strong>ソート</strong>
@@ -701,7 +709,12 @@
 <li>回避策: アクセス可能なフォルダから移動するか、PATH バーで直接指定してください。</li>
 </ul>
 </li>
-<li>ドラッグ&amp;ドロップは未対応です。</li>
+<li>ドラッグ&amp;ドロップはローカルパスのみ対応です。
+<ul>
+<li><code>gdrive://</code> パスは対象外です。</li>
+<li>エクスプローラーへの書き出しは、ファイルリスト行で <code>Ctrl+Alt + 左クリック</code> して開始します（コピーのみ）。</li>
+</ul>
+</li>
 <li>外部アプリ（VS Code / Git クライアント）は、未設定の場合起動できません。
 <ul>
 <li>回避策: <code>config.toml</code> の <code>external_vscode_path</code> / <code>external_git_client_path</code> を設定してください。</li>

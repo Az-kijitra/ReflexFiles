@@ -7,6 +7,7 @@
   export let treeRoot = null;
   export let treeSelectedPath = "";
   export let treeFocusedIndex = 0;
+  export let pathCompletionPreviewActive = false;
   export let t;
   export let getVisibleTreeNodes;
   export let focusTree;
@@ -18,7 +19,7 @@
 </script>
 
 <div
-  class="tree-panel {isGdriveTree ? 'gdrive-surface' : ''}"
+  class="tree-panel {isGdriveTree ? 'gdrive-surface' : ''} {pathCompletionPreviewActive ? 'path-completion-surface' : ''}"
   tabindex="0"
   role="tree"
   aria-label={t("label.tree")}
@@ -84,6 +85,10 @@
 
   .tree-panel.gdrive-surface {
     background: var(--ui-gdrive-surface);
+  }
+
+  .tree-panel.path-completion-surface {
+    background: var(--ui-path-completion-surface);
   }
 
   .tree-panel:focus-visible {

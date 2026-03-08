@@ -145,9 +145,11 @@ copy, and archive files quickly.</p>
 <ul>
 <li>Type directly and press <strong>Enter</strong> to navigate</li>
 <li><strong>Esc</strong> cancels editing and returns focus to list</li>
-<li><strong>Tab</strong> performs path completion while editing PATH</li>
+<li><strong>Ctrl+Space / Ctrl+Shift+Space</strong> cycles PATH completion candidates forward / backward</li>
+<li>While PATH completion candidates are shown, <strong>Enter</strong> commits the current candidate and navigates to that directory (preview ends and focus returns to list)</li>
+<li>While PATH completion candidates are shown, typing <strong>\</strong> confirms the current directory candidate and continues completion under that directory</li>
 <li><strong>Tab / Shift+Tab</strong> cycles focus (list -&gt; PATH -&gt; tree -&gt; list)</li>
-<li><strong>Ctrl+J / Ctrl+Y</strong> opens Jump List / History</li>
+<li><strong>Ctrl+Shift+O / Ctrl+H</strong> opens Jump List / History</li>
 <li>PATH completion and candidate preview are supported for <strong>local filesystem paths only</strong>.</li>
 <li><code>gdrive://</code> paths are out of scope for PATH completion/candidate preview.</li>
 <li>For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.</li>
@@ -221,6 +223,13 @@ copy, and archive files quickly.</p>
 <ul>
 <li>Create ZIP</li>
 <li>Extract ZIP</li>
+</ul>
+</li>
+<li><strong>Drag and Drop (local-only)</strong>
+<ul>
+<li>Explorer -&gt; ReflexFiles (drop into a local folder view)</li>
+<li>ReflexFiles -&gt; Explorer (<code>Ctrl+Alt + Left Click</code> on a file list row, then drag to Explorer, copy-only)</li>
+<li>Google Drive paths (<code>gdrive://</code>) are not supported</li>
 </ul>
 </li>
 <li><strong>Sorting</strong>
@@ -701,7 +710,12 @@ Each user configures and owns their own Google Cloud project and OAuth client.</
 <li>Workaround: move from an accessible folder or enter path directly in PATH bar.</li>
 </ul>
 </li>
-<li>Drag and drop is not supported yet.</li>
+<li>Drag and drop is available only for local paths.
+<ul>
+<li><code>gdrive://</code> paths are excluded.</li>
+<li>Outbound drag to Explorer starts from the file list (<code>Ctrl+Alt + Left Click</code> on a row) and is copy-only.</li>
+</ul>
+</li>
 <li>External apps (VS Code / Git client) cannot be opened when not configured.
 <ul>
 <li>Workaround: set <code>external_vscode_path</code> / <code>external_git_client_path</code> in <code>config.toml</code>.</li>

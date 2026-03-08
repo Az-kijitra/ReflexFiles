@@ -10,6 +10,16 @@ import {
   buildSelectionFeature,
   buildUndoFeature,
 } from "$lib/page_actions_registry_feature_builders";
+import {
+  DND_OUTBOUND_LOCAL_ONLY_POLICY,
+  endNativeOutboundDrag,
+  evaluateOutboundAppDragCandidate,
+  formatNativeOutboundDragResultForStatus,
+  markNativeOutboundDragSuppress,
+  NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS,
+  NATIVE_OUTBOUND_DND_SUPPRESS_START_MS,
+  tryBeginNativeOutboundDrag,
+} from "$lib/utils/drag_drop_experiment";
 import type { PageActionsRegistryContext } from "$lib/page_actions_registry_features_types";
 
 export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
@@ -114,6 +124,105 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     pushUndoEntry,
   });
 
+  const startExplorerDragCore = async (mode: "copy" | "copy_or_move") => {
+    const entries = ctx.getEntries();
+    const selectedPaths = ctx.getSelectedPaths();
+    const focusedIndex = ctx.getFocusedIndex();
+    const selectedEntries =
+      Array.isArray(selectedPaths) && selectedPaths.length > 0
+        ? selectedPaths
+            .map((path) => entries.find((entry) => entry?.path === path))
+            .filter((entry) => Boolean(entry))
+        : [];
+    const operationEntries =
+      selectedEntries.length > 0
+        ? selectedEntries
+        : focusedIndex >= 0 && focusedIndex < entries.length && entries[focusedIndex]
+          ? [entries[focusedIndex]]
+          : [];
+    const decision = evaluateOutboundAppDragCandidate({
+      policy: DND_OUTBOUND_LOCAL_ONLY_POLICY,
+      selectedEntries: operationEntries.map((entry: any) => ({
+        path: String(entry?.path || ""),
+        provider: entry?.provider ?? entry?.ref?.provider ?? "local",
+      })),
+    });
+    const dndExportReasonLabel = (reason: string) => {
+      switch (String(reason || "")) {
+        case "disabled":
+        case "phase_not_supported":
+          return ctx.t("dnd.export_experimental_disabled");
+        case "no_items":
+          return ctx.t("status.no_selection");
+        case "source_not_local":
+          return ctx.t("dnd.export_local_only");
+        case "mixed_or_invalid_sources":
+          return ctx.t("dnd.export_mixed_selection_not_supported");
+        default:
+          return ctx.t("capability.not_available");
+      }
+    };
+    if (!decision.allowed) {
+      setStatusMessage(
+        ctx.t("status.dnd_export_blocked", { reason: dndExportReasonLabel(decision.reason) }),
+        3500,
+      );
+      return;
+    }
+    setStatusMessage(
+      ctx.t("status.dnd_export_native_ready", { count: decision.acceptedPaths.length }),
+      6000,
+    );
+    try {
+      if (typeof window !== "undefined") {
+        const dragWin = window as Window & {
+          __rf_native_outbound_drag_suppress_until?: number;
+          __rf_native_outbound_drag_inflight?: boolean;
+        };
+        if (!tryBeginNativeOutboundDrag(dragWin)) {
+          setStatusMessage(ctx.t("status.dnd_export_native_busy"), 2500);
+          return;
+        }
+        markNativeOutboundDragSuppress(
+          dragWin,
+          NATIVE_OUTBOUND_DND_SUPPRESS_START_MS
+        );
+      }
+      const result =
+        mode === "copy_or_move"
+          ? await ctx.invoke("shell_start_file_drag_debug_with_effects", {
+              paths: decision.acceptedPaths,
+              effect_mode: "copy_or_move",
+            })
+          : await ctx.invoke("shell_start_file_drag_debug", {
+              paths: decision.acceptedPaths,
+            });
+      const resultText = String(result || "");
+      if (resultText === "none") {
+        setStatusMessage(ctx.t("status.dnd_export_native_canceled"), 3000);
+      } else {
+        const resultLabel = formatNativeOutboundDragResultForStatus(resultText, ctx.t);
+        setStatusMessage(ctx.t("status.dnd_export_native_finished", { result: resultLabel }), 4000);
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      if (typeof window !== "undefined") {
+        const dragWin = window as Window & {
+          __rf_native_outbound_drag_suppress_until?: number;
+          __rf_native_outbound_drag_inflight?: boolean;
+        };
+        endNativeOutboundDrag(dragWin);
+        markNativeOutboundDragSuppress(
+          dragWin,
+          NATIVE_OUTBOUND_DND_SUPPRESS_COOLDOWN_MS
+        );
+      }
+    }
+  };
+
+  const startExplorerDrag = async () => startExplorerDragCore("copy");
+
   const { zipActions, contextMenuActions } = buildContextMenuFeature(ctx, {
     openCreate,
     openEntry,
@@ -135,6 +244,7 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     runExternalApp,
     getExternalApps,
     syncGdriveWorkcopyForEntry,
+    startExplorerDrag,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {

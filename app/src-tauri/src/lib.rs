@@ -6,6 +6,7 @@ mod config_cmds;
 mod config_defaults;
 mod config_io;
 mod config_types;
+mod dragdrop_cmds;
 mod error;
 mod external_apps;
 mod external_apps_cmds;

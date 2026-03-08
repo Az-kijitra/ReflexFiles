@@ -65,9 +65,11 @@ Installation steps depend on the distribution type.
 ### PATH Bar
 - Type directly and press **Enter** to navigate
 - **Esc** cancels editing and returns focus to list
-- **Tab** performs path completion while editing PATH
+- **Ctrl+Space / Ctrl+Shift+Space** cycles PATH completion candidates forward / backward
+- While PATH completion candidates are shown, **Enter** commits the current candidate and navigates to that directory (preview ends and focus returns to list)
+- While PATH completion candidates are shown, typing **\\** confirms the current directory candidate and continues completion under that directory
 - **Tab / Shift+Tab** cycles focus (list -> PATH -> tree -> list)
-- **Ctrl+J / Ctrl+Y** opens Jump List / History
+- **Ctrl+Shift+O / Ctrl+H** opens Jump List / History
 - PATH completion and candidate preview are supported for **local filesystem paths only**.
 - `gdrive://` paths are out of scope for PATH completion/candidate preview.
 - For practical Google Drive workflows, use Google Drive local sync client and operate on the synced local folder in ReflexFiles.
@@ -123,6 +125,10 @@ Supported files open in ReflexViewer.
 - **ZIP**
   - Create ZIP
   - Extract ZIP
+- **Drag and Drop (local-only)**
+  - Explorer -> ReflexFiles (drop into a local folder view)
+  - ReflexFiles -> Explorer (`Ctrl+Alt + Left Click` on a file list row, then drag to Explorer, copy-only)
+  - Google Drive paths (`gdrive://`) are not supported
 - **Sorting**
   - Choose from sort menu
 - **External Apps**
@@ -346,7 +352,9 @@ In **Settings > Advanced**, conflict warnings include:
 ## Known Issues
 - Some system folders may not appear in tree view due to permissions.
   - Workaround: move from an accessible folder or enter path directly in PATH bar.
-- Drag and drop is not supported yet.
+- Drag and drop is available only for local paths.
+  - `gdrive://` paths are excluded.
+  - Outbound drag to Explorer starts from the file list (`Ctrl+Alt + Left Click` on a row) and is copy-only.
 - External apps (VS Code / Git client) cannot be opened when not configured.
   - Workaround: set `external_vscode_path` / `external_git_client_path` in `config.toml`.
 - In folders with huge numbers of items, automatic tree expansion may be limited.

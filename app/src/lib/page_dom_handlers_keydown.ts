@@ -255,7 +255,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
 
     // WebView/IME differences occasionally break keymap matching for these basic shortcuts.
     // Keep a direct fallback at the top-level keydown entry.
-    if (!hasBlockingOverlay) {
+    if (!hasBlockingOverlay && !isOverlayDomTarget) {
       if (isCtrlComma) {
         event.preventDefault();
         params.openConfigFile();
@@ -326,7 +326,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("C", 67)) {
-        if (isPathInputActive) return;
+        if (isAnyInputActive) return;
         event.preventDefault();
         if (!hasOperationTargets) {
           params.setStatusMessage(params.t("status.no_selection"));
@@ -339,7 +339,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("X", 88)) {
-        if (isPathInputActive) return;
+        if (isAnyInputActive) return;
         event.preventDefault();
         if (!hasOperationTargets) {
           params.setStatusMessage(params.t("status.no_selection"));
@@ -352,7 +352,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
         return;
       }
       if (isCtrlLetter("V", 86)) {
-        if (isPathInputActive) return;
+        if (isAnyInputActive) return;
         event.preventDefault();
         if (devKeyDebug) {
           params.setStatusMessage("DBG Ctrl+V");
