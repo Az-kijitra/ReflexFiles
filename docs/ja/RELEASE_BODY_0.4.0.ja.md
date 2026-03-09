@@ -16,8 +16,8 @@ ReflexFiles v0.4.0 では、ローカル限定ドラッグ&ドロップの正式
   - `npm audit --audit-level=high` が通るよう lockfile を更新
 
 ## インストーラー
-- `ReflexFiles_0.4.0_x64-setup.exe`
-- SHA256: `TBD（リリースビルド後に記入）`
+- `ReflexFIles_0.4.0_x64-setup.exe`
+- SHA256: `C3E26197CAE3642E2BD168092FA7A6B2F3E420B9B0529E2A07A212ACC6C86A25`
 
 ## 補足
 - 対応OS: Windows 10/11

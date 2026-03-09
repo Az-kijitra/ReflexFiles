@@ -16,8 +16,8 @@ ReflexFiles v0.4.0 formalizes local drag-and-drop support, hardens keyboard beha
   - refreshed npm lockfile so `npm audit --audit-level=high` passes
 
 ## Installer
-- `ReflexFiles_0.4.0_x64-setup.exe`
-- SHA256: `TBD (fill after release build)`
+- `ReflexFIles_0.4.0_x64-setup.exe`
+- SHA256: `C3E26197CAE3642E2BD168092FA7A6B2F3E420B9B0529E2A07A212ACC6C86A25`
 
 ## Notes
 - Windows 10/11

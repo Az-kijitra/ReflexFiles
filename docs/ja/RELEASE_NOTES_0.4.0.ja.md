@@ -44,8 +44,8 @@
 - リリース日: `2026-03-09`
 
 ## ビルド成果物（NSIS）
-- ファイル: `リリースビルド時に記入`
-- SHA256: `リリースビルド時に記入`
+- ファイル: `ReflexFIles_0.4.0_x64-setup.exe`
+- SHA256: `C3E26197CAE3642E2BD168092FA7A6B2F3E420B9B0529E2A07A212ACC6C86A25`
 
 ## RELEASE_NOTE_BODY
 ```md
@@ -72,6 +72,6 @@ ReflexFiles v0.4.0 は、ローカル限定ドラッグ&ドロップの正式採
 - Google Drive のドラッグ&ドロップは非対応です。
 
 ### ビルド成果物（NSIS）
-- ファイル: `TBD`
-- SHA256: `TBD`
+- ファイル: `ReflexFIles_0.4.0_x64-setup.exe`
+- SHA256: `C3E26197CAE3642E2BD168092FA7A6B2F3E420B9B0529E2A07A212ACC6C86A25`
 ```

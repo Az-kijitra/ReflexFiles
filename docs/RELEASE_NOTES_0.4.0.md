@@ -44,8 +44,8 @@ This release focuses on formalizing local drag-and-drop support, hardening keybo
 - Release date: `2026-03-09`
 
 ## Build Artifact (NSIS)
-- File: `TBD during release build`
-- SHA256: `TBD during release build`
+- File: `ReflexFIles_0.4.0_x64-setup.exe`
+- SHA256: `C3E26197CAE3642E2BD168092FA7A6B2F3E420B9B0529E2A07A212ACC6C86A25`
 
 ## RELEASE_NOTE_BODY
 ```md
@@ -72,6 +72,6 @@ ReflexFiles v0.4.0 formalizes local drag-and-drop support, hardens keyboard beha
 - Google Drive drag-and-drop is not supported.
 
 ### Build Artifact (NSIS)
-- File: `TBD`
-- SHA256: `TBD`
+- File: `ReflexFIles_0.4.0_x64-setup.exe`
+- SHA256: `C3E26197CAE3642E2BD168092FA7A6B2F3E420B9B0529E2A07A212ACC6C86A25`
 ```
