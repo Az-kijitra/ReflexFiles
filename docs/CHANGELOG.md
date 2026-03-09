@@ -7,6 +7,42 @@ https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-09
+
+### Added
+- Local-only drag and drop was formally adopted:
+  - `Explorer -> ReflexFiles` import
+  - `ReflexFiles -> Explorer` export via `Ctrl+Alt + Left Click` (copy-only)
+- Lightweight drag-and-drop regression runner (`npm run test:dnd`) was added and integrated into `quality`.
+- Smoke E2E coverage was expanded for high-value shortcuts:
+  - `Ctrl+Shift+N`
+  - `Ctrl+F`
+  - `F2`
+  - `Ctrl+Alt+Z`
+  - `Ctrl+Alt+X`
+  - `Ctrl+Shift+D`
+
+### Changed
+- PATH completion UX was refined:
+  - `Enter` behavior was fixed/documented as commit + navigate
+  - candidate status labels were shortened
+  - preview/cancel feedback was made more visible and consistent
+  - preview surface is now applied consistently across list/tree
+- Drag-and-drop terminology and status messages were normalized in EN/JA.
+- Outbound Explorer drag remains copy-only by design; unstable move experiments were removed from user-facing paths.
+
+### Fixed
+- Readonly Google Drive stub builds no longer fail due to gated `gdrive_real` type references.
+- Keyboard fallback leaks around overlay/modal targets were fixed for:
+  - `Ctrl+,`
+  - `Ctrl+D`
+  - `Ctrl+Shift+D`
+  - text-input `Ctrl+C/X/V` behavior
+- NPM dependency lockfile was refreshed to clear `npm audit --audit-level=high` failures.
+
+### Security
+- NPM audit gate was restored to passing state by updating resolved frontend dependency versions in `package-lock.json`.
+
 ## [0.3.0] - 2026-02-22
 
 ### Added
