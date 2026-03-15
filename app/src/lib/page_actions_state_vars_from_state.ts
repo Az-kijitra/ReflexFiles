@@ -4,9 +4,10 @@
 export function buildPageActionsStateVarsFromState(params) {
   const { state, statusTimer } = params;
 
-  const activePane = params.getActivePane
-    ? params.getActivePane()
-    : state.activePaneId === "right" && state.layoutMode === "dual" ? state.rightPane : state;
+  // In dual-pane mode, callers MUST provide getActivePane (DOM-focus-based).
+  // Falling back to activePaneId is intentionally removed: it can be stale or
+  // incorrect, causing actions to silently target the wrong pane.
+  const activePane = params.getActivePane ? params.getActivePane() : state;
 
   return {
     pastePendingPaths: state.pastePendingPaths,

@@ -78,6 +78,7 @@
   import { createKeymapBindingsState } from "$lib/page_keymap_bindings_state";
   import { createListFocusMovers } from "$lib/page_list_focus";
   import { selectRangeByIndex } from "$lib/utils/selection";
+  import { isRightPaneFocused } from "$lib/pane_focus_utils";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
@@ -616,13 +617,7 @@
   // Helper: check if the right pane is active based on actual DOM focus
   function isDualRightFocused() {
     if (state.layoutMode !== "dual") return false;
-    const activeEl = document.activeElement;
-    if (!activeEl) return false;
-    return (
-      (!!rightShellRefs.listEl &&
-        (activeEl === rightShellRefs.listEl || !!rightShellRefs.listEl.contains?.(activeEl))) ||
-      (!!rightShellRefs.pathInputEl && activeEl === rightShellRefs.pathInputEl)
-    );
+    return isRightPaneFocused(rightShellRefs);
   }
 
   // Wrap actions.loadDir with DOM-focus-based dual-pane routing
@@ -634,10 +629,12 @@
     return _leftLoadDir(path);
   };
 
-  // Wrap actions.focusList with activePaneId-based routing (intentional focus target)
+  // Wrap actions.focusList with DOM-focus-based routing.
+  // isDualRightFocused() checks actual document.activeElement, so pressing Enter
+  // in the left PATH bar (focus on left pathInputEl) always targets the left list.
   const _baseFocusList = actions.focusList;
   actions.focusList = () => {
-    if (state.layoutMode === "dual" && state.activePaneId === "right") {
+    if (state.layoutMode === "dual" && isDualRightFocused()) {
       rightShellRefs.listEl?.focus({ preventScroll: true });
     } else {
       _baseFocusList();

@@ -1,4 +1,5 @@
 import { buildPageMountDomHandlersFromVars } from "./page_mount_dom_handlers_from_vars";
+import { isRightPaneFocused } from "./pane_focus_utils";
 
 /**
  * @param {{
@@ -42,18 +43,11 @@ export function buildPageMountDomHandlersInputsFromState(params) {
     typeof params.handlers === "function" ? params.handlers : () => params.handlers;
 
   // Determine which pane is active based on actual DOM focus (not activePaneId).
-  // This is the single source of truth for keyboard routing in dual-pane mode.
   function isRightPaneActive() {
     if (params.state.layoutMode !== "dual") return false;
     const rightRefs = getRightRefs?.();
     if (!rightRefs) return false;
-    const activeEl = document.activeElement;
-    if (!activeEl) return false;
-    return (
-      (!!rightRefs.listEl &&
-        (activeEl === rightRefs.listEl || !!rightRefs.listEl.contains?.(activeEl))) ||
-      (!!rightRefs.pathInputEl && activeEl === rightRefs.pathInputEl)
-    );
+    return isRightPaneFocused(rightRefs);
   }
 
   return buildPageMountDomHandlersFromVars({
