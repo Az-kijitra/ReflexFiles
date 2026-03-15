@@ -4,8 +4,12 @@
   const {
     state = $bindable(),
     refs = $bindable(),
+    rightRefs = $bindable(),
     viewProps,
     overlayBindings,
+    rightPaneViewProps = null,
+    onActivateLeft = () => {},
+    onActivateRight = () => {},
   } = $props();
 </script>
 
@@ -21,8 +25,20 @@
   bind:anchorIndex={state.anchorIndex}
   bind:treeEl={refs.treeEl}
   bind:treeBodyEl={refs.treeBodyEl}
+  bind:rightPathInput={state.rightPane.pathInput}
+  bind:rightPathInputEl={rightRefs.pathInputEl}
+  bind:rightListEl={rightRefs.listEl}
+  bind:rightListBodyEl={rightRefs.listBodyEl}
+  bind:rightFocusedIndex={state.rightPane.focusedIndex}
+  bind:rightAnchorIndex={state.rightPane.anchorIndex}
+  bind:rightDropdownOpen={state.dropdownOpen}
   showTree={state.showTree}
+  layoutMode={state.layoutMode}
+  activePaneId={state.activePaneId}
   statusItems={state.statusItems}
   {viewProps}
   {overlayBindings}
+  {rightPaneViewProps}
+  {onActivateLeft}
+  {onActivateRight}
 />

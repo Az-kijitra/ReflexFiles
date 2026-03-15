@@ -35,6 +35,7 @@ export function createPageViewRuntimeBundle(params) {
 
   return {
     overlayBindings: overlayRuntime.bindings,
+    getOverlayState: overlayRuntime.getState,
     getViewProps: () =>
       createViewRuntime(
         buildViewRuntimeInputsFromState({

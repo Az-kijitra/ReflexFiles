@@ -51,12 +51,16 @@
   import { applyDropdownEffects, applyListLayoutEffects } from "$lib/page_effects_apply";
   import { createPageErrorHandler } from "$lib/page_error_handler";
   import { autofocus, createListNameFormatter, createTranslator } from "$lib/page_helpers";
+  import { createDirHelpers } from "$lib/page_dir";
   import { setupPageInitFromState } from "$lib/page_init_runtime";
   import { buildInitPageRuntimeInputsFromPageState } from "$lib/page_init_runtime_inputs_from_page_state";
   import { setupPageActionsRuntimeFromState } from "$lib/page_actions_runtime_from_state";
   import { buildPageViewRuntimeBundleInputsFromState } from "$lib/page_view_runtime_bundle_inputs_from_state";
   import { createPageStateDefaults } from "$lib/page_state_defaults";
   import { createPageViewRuntimeBundle } from "$lib/page_view_runtime_bundle";
+  import { createListLayoutHelpers } from "$lib/page_list_layout";
+  import { createViewRuntime } from "$lib/page_view_runtime";
+  import { buildViewRuntimeInputsFromState } from "$lib/page_view_runtime_inputs_from_state";
   import { createPageMountRuntime } from "$lib/page_mount_runtime";
   import { buildPageMountRuntimeInputsFromPageState } from "$lib/page_mount_runtime_inputs_from_page_state";
   import {
@@ -72,6 +76,8 @@
   import { trapModalTab } from "$lib/page_trap";
   import { createPageActionPlaceholders } from "$lib/page_action_placeholders";
   import { createKeymapBindingsState } from "$lib/page_keymap_bindings_state";
+  import { createListFocusMovers } from "$lib/page_list_focus";
+  import { selectRangeByIndex } from "$lib/utils/selection";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
@@ -188,6 +194,14 @@
     treeEl: null,
     /** @type {HTMLElement | null} */
     treeBodyEl: null,
+    /** @type {HTMLInputElement | null} */
+    pathInputEl: null,
+  });
+  let rightShellRefs = $state({
+    /** @type {HTMLElement | null} */
+    listEl: null,
+    /** @type {HTMLElement | null} */
+    listBodyEl: null,
     /** @type {HTMLInputElement | null} */
     pathInputEl: null,
   });
@@ -378,12 +392,113 @@
       })
     );
 
+  // Register Tab handler BEFORE lifecycle keydown handler so stopImmediatePropagation works
+  onMount(() => {
+    function handleDualModeTab(event) {
+      if (state.layoutMode !== "dual") return;
+
+      // Sync activePaneId with actual DOM focus for ALL key events
+      // This ensures Enter, Backspace, etc. all operate on the correct pane
+      const activeEl = document.activeElement;
+      if (activeEl) {
+        const inRight =
+          (rightShellRefs.listEl && (activeEl === rightShellRefs.listEl || rightShellRefs.listEl.contains(activeEl))) ||
+          (rightShellRefs.pathInputEl && activeEl === rightShellRefs.pathInputEl);
+        const inLeft =
+          (shellRefs.listEl && (activeEl === shellRefs.listEl || shellRefs.listEl.contains(activeEl))) ||
+          (shellRefs.pathInputEl && activeEl === shellRefs.pathInputEl);
+        if (inRight) state.activePaneId = "right";
+        else if (inLeft) state.activePaneId = "left";
+      }
+
+      if (event.key !== "Tab" || event.altKey || event.metaKey) return;
+      const isInModal = typeof activeEl?.closest === "function" && activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu");
+      if (isInModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      if (event.ctrlKey) {
+        const newPaneId = state.activePaneId === "left" ? "right" : "left";
+        state.activePaneId = newPaneId;
+        if (newPaneId === "right") {
+          rightShellRefs.listEl?.focus({ preventScroll: true });
+        } else {
+          shellRefs.listEl?.focus({ preventScroll: true });
+        }
+        return;
+      }
+
+      const leftListEl = shellRefs.listEl;
+      const leftPathEl = shellRefs.pathInputEl;
+      const rightListEl = rightShellRefs.listEl;
+      const rightPathEl = rightShellRefs.pathInputEl;
+
+      const inLeft =
+        (leftListEl && (activeEl === leftListEl || leftListEl.contains?.(activeEl))) ||
+        (leftPathEl && (activeEl === leftPathEl || leftPathEl.contains?.(activeEl)));
+      const inRight =
+        (rightListEl && (activeEl === rightListEl || rightListEl.contains?.(activeEl))) ||
+        (rightPathEl && (activeEl === rightPathEl || rightPathEl.contains?.(activeEl)));
+
+      if (inLeft) state.activePaneId = "left";
+      else if (inRight) state.activePaneId = "right";
+
+      const paneId = inRight ? "right" : "left";
+      const listEl = paneId === "right" ? rightListEl : leftListEl;
+      const pathEl = paneId === "right" ? rightPathEl : leftPathEl;
+
+      const isListFocused = listEl && (activeEl === listEl || listEl.contains?.(activeEl));
+      const isPathFocused = pathEl && (activeEl === pathEl || pathEl.contains?.(activeEl));
+
+      if (!event.shiftKey) {
+        if (isListFocused) {
+          pathEl?.focus({ preventScroll: true });
+          /** @type {any} */ (pathEl)?.select?.();
+        } else {
+          listEl?.focus({ preventScroll: true });
+        }
+      } else {
+        if (isPathFocused) {
+          listEl?.focus({ preventScroll: true });
+        } else {
+          pathEl?.focus({ preventScroll: true });
+          /** @type {any} */ (pathEl)?.select?.();
+        }
+      }
+    }
+    // Sync activePaneId on pointer events so mouse-based selection uses the correct pane.
+    // pointerdown fires before click/focus, ensuring activePaneId is set before selection actions run.
+    function handleDualModePointerDown(event) {
+      if (state.layoutMode !== "dual") return;
+      const target = /** @type {Node | null} */ (event.target);
+      if (!target) return;
+      if (
+        (rightShellRefs.listEl && rightShellRefs.listEl.contains(target)) ||
+        (rightShellRefs.pathInputEl && rightShellRefs.pathInputEl.contains(target))
+      ) {
+        state.activePaneId = "right";
+      } else if (
+        (shellRefs.listEl && shellRefs.listEl.contains(target)) ||
+        (shellRefs.pathInputEl && shellRefs.pathInputEl.contains(target))
+      ) {
+        state.activePaneId = "left";
+      }
+    }
+    window.addEventListener("keydown", handleDualModeTab, { capture: true });
+    window.addEventListener("pointerdown", handleDualModePointerDown, { capture: true });
+    return () => {
+      window.removeEventListener("keydown", handleDualModeTab, { capture: true });
+      window.removeEventListener("pointerdown", handleDualModePointerDown, { capture: true });
+    };
+  });
+
   const pageMountInputs = createPageMountRuntime({
     onMount,
     inputs: buildPageMountRuntimeInputsFromPageState({
       state: () => state,
       shellRefs: () => shellRefs,
       overlayRefs: () => overlayRefs,
+      rightRefs: () => rightShellRefs,
       handlers: pageMountHandlers,
       actions: {
         setStatusMessage: actions.setStatusMessage,
@@ -450,8 +565,118 @@
     },
     cacheGetDirStats,
     cacheSetDirStats,
+    getActivePane: () => isDualRightFocused() ? state.rightPane : state,
   });
   showErrorImpl = showErrorAction;
+
+  // Right pane directory loading (uses its own loadSeq via createDirHelpers)
+  const rightDirHelpers = createDirHelpers({
+    invoke,
+    getShowHidden: () => state.showHidden,
+    getSortKey: () => state.sortKey,
+    getSortOrder: () => state.sortOrder,
+    setEntries: (v) => { state.rightPane.entries = v; },
+    setCurrentPath: (v) => { state.rightPane.currentPath = v; },
+    setPathInput: (v) => { state.rightPane.pathInput = v; },
+    scheduleWatch: () => {},
+    setSelectedPaths: (v) => { state.rightPane.selectedPaths = v; },
+    setFocusedIndex: (v) => { state.rightPane.focusedIndex = v; },
+    setAnchorIndex: (v) => { state.rightPane.anchorIndex = v; },
+    getPathHistory: () => state.pathHistory,
+    setPathHistory: (v) => { state.pathHistory = v; },
+    scheduleUiSave: () => actions.scheduleUiSave(),
+    getShowTree: () => false,
+    buildTreeRoot: async () => {},
+    clearTree: () => {},
+    setLoading: (v) => { state.rightPane.loading = v; },
+    setError: (v) => { state.rightPane.error = v; },
+    showError,
+  });
+
+  // Right pane list layout helpers (fixes "only 1 item shown" issue)
+  const rightListLayoutHelpers = createListLayoutHelpers({
+    getListEl: () => rightShellRefs.listEl,
+    getListBodyEl: () => rightShellRefs.listBodyEl,
+    getListCols: () => state.rightPane.listCols,
+    getListRows: () => state.rightPane.listRows,
+    getVisibleColStart: () => state.rightPane.visibleColStart,
+    getVisibleColEnd: () => state.rightPane.visibleColEnd,
+    getFilteredCount: () => (state.rightPane.filteredEntries.length || state.rightPane.entries.length),
+    getShowSize: () => state.showSize,
+    getShowTime: () => state.showTime,
+    setListRows: (v) => { state.rightPane.listRows = v; },
+    setListCols: (v) => { state.rightPane.listCols = v; },
+    setNameMaxChars: (v) => { state.rightPane.nameMaxChars = v; },
+    setVisibleColStart: (v) => { state.rightPane.visibleColStart = v; },
+    setVisibleColEnd: (v) => { state.rightPane.visibleColEnd = v; },
+    setOverflowLeft: (v) => { state.rightPane.overflowLeft = v; },
+    setOverflowRight: (v) => { state.rightPane.overflowRight = v; },
+  });
+
+  // Helper: check if the right pane is active based on actual DOM focus
+  function isDualRightFocused() {
+    if (state.layoutMode !== "dual") return false;
+    const activeEl = document.activeElement;
+    if (!activeEl) return false;
+    return (
+      (!!rightShellRefs.listEl &&
+        (activeEl === rightShellRefs.listEl || !!rightShellRefs.listEl.contains?.(activeEl))) ||
+      (!!rightShellRefs.pathInputEl && activeEl === rightShellRefs.pathInputEl)
+    );
+  }
+
+  // Wrap actions.loadDir with DOM-focus-based dual-pane routing
+  const _leftLoadDir = actions.loadDir;
+  actions.loadDir = (path) => {
+    if (state.layoutMode === "dual" && isDualRightFocused()) {
+      return rightDirHelpers.loadDir(path);
+    }
+    return _leftLoadDir(path);
+  };
+
+  // Wrap actions.focusList with activePaneId-based routing (intentional focus target)
+  const _baseFocusList = actions.focusList;
+  actions.focusList = () => {
+    if (state.layoutMode === "dual" && state.activePaneId === "right") {
+      rightShellRefs.listEl?.focus({ preventScroll: true });
+    } else {
+      _baseFocusList();
+    }
+  };
+
+  // Right-pane focus movers (cursor key navigation)
+  const rightFocusMovers = createListFocusMovers({
+    getEntries: () => state.rightPane.entries,
+    getFilteredEntries: () => state.rightPane.filteredEntries.length ? state.rightPane.filteredEntries : state.rightPane.entries,
+    getFocusedIndex: () => state.rightPane.focusedIndex,
+    getAnchorIndex: () => state.rightPane.anchorIndex ?? null,
+    getListRows: () => state.rightPane.listRows,
+    setFocusedIndex: (v) => { state.rightPane.focusedIndex = v; },
+    selectRange: (from, to) => {
+      const result = selectRangeByIndex(state.rightPane.entries, from, to);
+      state.rightPane.selectedPaths = result.selectedPaths;
+      state.rightPane.focusedIndex = result.focusedIndex;
+      state.rightPane.anchorIndex = result.anchorIndex;
+    },
+    ensureColumnVisible: rightListLayoutHelpers.ensureColumnVisible,
+  });
+
+  const _baseMoveByRow = actions.moveFocusByRow;
+  actions.moveFocusByRow = (delta, useRange) => {
+    if (isDualRightFocused()) {
+      return rightFocusMovers.moveFocusByRow(delta, useRange);
+    }
+    return _baseMoveByRow(delta, useRange);
+  };
+
+  const _baseMoveByCol = actions.moveFocusByColumn;
+  actions.moveFocusByColumn = (delta, useRange) => {
+    if (isDualRightFocused()) {
+      return rightFocusMovers.moveFocusByColumn(delta, useRange);
+    }
+    return _baseMoveByCol(delta, useRange);
+  };
+
   $effect(() => actions.recomputeSearch());
   $effect(() => actions.recomputeDropdownItems());
   $effect(() => actions.recomputeStatusItems());
@@ -563,12 +788,24 @@
 
   $effect(() => setupContextMenuKeydown(state.contextMenuOpen, actions.handleContextMenuKey));
 
+  // Left pane: wrap only the selection-writing actions to ensure activePaneId="left".
+  // Using a spread object (not Proxy) to avoid interfering with Svelte 5 internals.
+  const leftPageActions = {
+    ...pageActions,
+    toggleSelection: (...args) => { state.activePaneId = "left"; return pageActions.toggleSelection(...args); },
+    selectRange: (...args) => { state.activePaneId = "left"; return pageActions.selectRange(...args); },
+    setSelected: (...args) => { state.activePaneId = "left"; return pageActions.setSelected(...args); },
+    clearSelection: (...args) => { state.activePaneId = "left"; return pageActions.clearSelection(...args); },
+    invertSelection: (...args) => { state.activePaneId = "left"; return pageActions.invertSelection(...args); },
+    openContextMenu: (...args) => { state.activePaneId = "left"; return pageActions.openContextMenu(...args); },
+  };
+
   const viewRuntime = createPageViewRuntimeBundle(
     buildPageViewRuntimeBundleInputsFromState({
       state: () => state,
       shellRefs: () => shellRefs,
       overlayRefs: () => overlayRefs,
-      pageActions,
+      pageActions: leftPageActions,
       pageActionGroups,
       actions,
       deps: { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
@@ -588,11 +825,241 @@
   const overlayBindings = viewRuntime.overlayBindings;
   const viewProps = $derived(viewRuntime.getViewProps());
 
+  // Right pane list layout effect
+  $effect(() => applyListLayoutEffects({
+    listBodyEl: rightShellRefs.listBodyEl,
+    listEl: rightShellRefs.listEl,
+    updateListRows: rightListLayoutHelpers.updateListRows,
+    updateOverflowMarkers: rightListLayoutHelpers.updateOverflowMarkers,
+    updateVisibleColumns: rightListLayoutHelpers.updateVisibleColumns,
+    getActualColumnSpan: rightListLayoutHelpers.getActualColumnSpan,
+  }));
+
+  // Right pane: proxy wraps pageActions to ensure activePaneId="right" before each call
+  const rightPageActions = new Proxy(pageActions, {
+    get(target, prop) {
+      const value = target[prop];
+      if (typeof value === "function") {
+        return (...args) => {
+          state.activePaneId = "right";
+          return value(...args);
+        };
+      }
+      return value;
+    },
+  });
+
+  function activateRight(fn) {
+    return (...args) => {
+      state.activePaneId = "right";
+      return fn(...args);
+    };
+  }
+
+  // Right pane full view runtime (same functionality as left pane)
+  const rightPaneViewProps = $derived(
+    createViewRuntime(
+      buildViewRuntimeInputsFromState({
+        state: {
+          // Pane-specific fields from rightPane
+          currentPath: state.rightPane.currentPath,
+          loading: state.rightPane.loading,
+          filteredEntries: state.rightPane.filteredEntries,
+          entries: state.rightPane.entries,
+          pathCompletionPreviewActive: state.rightPane.pathCompletionPreviewActive,
+          overflowLeft: state.rightPane.overflowLeft,
+          overflowRight: state.rightPane.overflowRight,
+          visibleColStart: state.rightPane.visibleColStart,
+          visibleColEnd: state.rightPane.visibleColEnd,
+          listRows: state.rightPane.listRows,
+          selectedPaths: state.rightPane.selectedPaths,
+          dropdownItems: state.dropdownItems,
+          searchActive: state.rightPane.searchActive,
+          searchError: state.rightPane.searchError,
+          error: state.rightPane.error,
+          // Global fields (shared UI state)
+          menuOpen: state.menuOpen,
+          pathHistory: state.pathHistory,
+          showTree: false,
+          treeLoading: state.treeLoading,
+          treeRoot: state.treeRoot,
+          treeSelectedPath: state.treeSelectedPath,
+          treeFocusedIndex: state.treeFocusedIndex,
+          showSize: state.showSize,
+          showTime: state.showTime,
+          ui_file_icon_mode: state.ui_file_icon_mode,
+          sortMenuOpen: state.sortMenuOpen,
+          aboutOpen: state.aboutOpen,
+          deleteConfirmOpen: state.deleteConfirmOpen,
+          deleteTargets: state.deleteTargets,
+          deleteError: state.deleteError,
+          pasteConfirmOpen: state.pasteConfirmOpen,
+          pasteConflicts: state.pasteConflicts,
+          createOpen: state.createOpen,
+          createError: state.createError,
+          jumpUrlOpen: state.jumpUrlOpen,
+          renameOpen: state.renameOpen,
+          renameError: state.renameError,
+          propertiesOpen: state.propertiesOpen,
+          propertiesData: state.propertiesData,
+          dirStatsInFlight: state.dirStatsInFlight,
+          zipModalOpen: state.zipModalOpen,
+          zipMode: state.zipMode,
+          zipTargets: state.zipTargets,
+          zipPasswordAttempts: state.zipPasswordAttempts,
+          zipOverwriteConfirmed: state.zipOverwriteConfirmed,
+          zipError: state.zipError,
+          contextMenuOpen: state.contextMenuOpen,
+          contextMenuPos: state.contextMenuPos,
+          contextMenuIndex: state.contextMenuIndex,
+          failureModalOpen: state.failureModalOpen,
+          failureModalTitle: state.failureModalTitle,
+          failureItems: state.failureItems,
+          jumpList: state.jumpList,
+        },
+        treeEl: null,
+        pageActions: rightPageActions,
+        pageActionGroups,
+        menu: {
+          toggleMenu: actions.toggleMenu,
+          getMenuItems: actions.getMenuItems,
+          closeMenu: actions.closeMenu,
+        },
+        list: {
+          loadDir: activateRight(actions.loadDir),
+          focusList: () => rightShellRefs.listEl?.focus({ preventScroll: true }),
+          handlePathTabCompletion: activateRight(actions.handlePathTabCompletion),
+          handlePathCompletionSeparator: activateRight(actions.handlePathCompletionSeparator),
+          handlePathCompletionInputChange: activateRight(actions.handlePathCompletionInputChange),
+          clearPathCompletionPreview: activateRight(actions.clearPathCompletionPreview),
+        },
+        tree: {
+          focusTree: () => {},
+          focusTreeTop: () => {},
+          selectTreeNode: () => {},
+          toggleTreeNode: () => {},
+        },
+        keymap: { matchesAction: actions.matchesAction },
+        sort: {
+          setSort: activateRight(actions.setSort),
+          handleSortMenuKey: activateRight(actions.handleSortMenuKey),
+        },
+        deps: { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
+        dirStats: { clearDirStatsCache },
+        meta: {
+          formatName: formatNameForList,
+          formatSize,
+          formatModified,
+          MENU_GROUPS,
+          ABOUT_URL,
+          ABOUT_LICENSE,
+          ZIP_PASSWORD_MAX_ATTEMPTS,
+          t,
+        },
+        overlay: viewRuntime.getOverlayState(),
+      })
+    ).viewProps
+  );
+
+  // Keep right pane filteredEntries in sync with entries (no search for right pane yet)
+  $effect(() => {
+    state.rightPane.filteredEntries = state.rightPane.entries;
+  });
+
+  // Update right pane path capabilities when currentPath changes
+  $effect(() => {
+    const path = String(state.rightPane.currentPath || "").trim();
+    if (!path) {
+      state.rightPane.currentPathCapabilities = {
+        can_read: true, can_create: true, can_rename: true, can_copy: true,
+        can_move: true, can_delete: true, can_archive_create: true, can_archive_extract: true,
+      };
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fsGetCapabilities } = await import("$lib/utils/tauri_fs");
+        const capabilities = await fsGetCapabilities(path);
+        if (cancelled) return;
+        if (state.rightPane.currentPath === path) {
+          state.rightPane.currentPathCapabilities = {
+            can_read: Boolean(capabilities?.can_read ?? true),
+            can_create: Boolean(capabilities?.can_create ?? true),
+            can_rename: Boolean(capabilities?.can_rename ?? true),
+            can_copy: Boolean(capabilities?.can_copy ?? true),
+            can_move: Boolean(capabilities?.can_move ?? true),
+            can_delete: Boolean(capabilities?.can_delete ?? true),
+            can_archive_create: Boolean(capabilities?.can_archive_create ?? true),
+            can_archive_extract: Boolean(capabilities?.can_archive_extract ?? true),
+          };
+        }
+      } catch {
+        // ignore capability errors for right pane
+      }
+    })();
+    return () => { cancelled = true; };
+  });
+
+  // Force single-column layout in dual mode for left pane
+  $effect(() => {
+    if (state.layoutMode === "dual") {
+      state.listCols = 1;
+      state.rightPane.listCols = 1;
+    }
+  });
+
+  // F3 key to toggle dual/single pane mode
+  $effect(() => {
+    function handleDualPaneToggle(event) {
+      const isF3 =
+        !event.ctrlKey && !event.altKey && !event.metaKey &&
+        (event.key === "F3" || event.code === "F3" || event.keyCode === 114);
+      if (!isF3) return;
+      const activeEl = document.activeElement;
+      if (!activeEl) return;
+      const isInInput = activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA";
+      const isInModal =
+        typeof activeEl.closest === "function" &&
+        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
+      if (isInInput || isInModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const next = state.layoutMode === "dual" ? "single" : "dual";
+      state.layoutMode = next;
+      if (next === "dual") {
+        state.activePaneId = "left";
+        if (!state.rightPane.currentPath && state.currentPath) {
+          rightDirHelpers.loadDir(state.currentPath);
+        }
+      }
+    }
+    window.addEventListener("keydown", handleDualPaneToggle, { capture: true });
+    return () => window.removeEventListener("keydown", handleDualPaneToggle, { capture: true });
+  });
+
   const pageShellProps = $derived({
     showTree: state.showTree,
     statusItems: state.statusItems,
     viewProps,
     overlayBindings,
+    layoutMode: state.layoutMode,
+    activePaneId: state.activePaneId,
+    rightPaneViewProps: state.layoutMode === "dual" ? rightPaneViewProps : null,
+    onActivateLeft: () => {
+      state.activePaneId = "left";
+      const activeEl = document.activeElement;
+      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
+        shellRefs.listEl?.focus({ preventScroll: true });
+      }
+    },
+    onActivateRight: () => {
+      state.activePaneId = "right";
+      const activeEl = document.activeElement;
+      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
+        rightShellRefs.listEl?.focus({ preventScroll: true });
+      }
+    },
   });
 
   function normalizeSettingsConfig(config) {
@@ -1645,6 +2112,7 @@
 <PageShellBindings
   bind:state={state}
   bind:refs={shellRefs}
+  bind:rightRefs={rightShellRefs}
   {...pageShellProps}
 />
 

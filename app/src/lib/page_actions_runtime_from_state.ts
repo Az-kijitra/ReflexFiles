@@ -55,6 +55,7 @@ import { setupMenuRuntime } from "./page_menu_runtime";
  *   setDirStatsRequestId: (value: number) => void;
  *   cacheGetDirStats: (path: string) => any;
  *   cacheSetDirStats: (path: string, stats: any) => void;
+ *   getActivePane?: () => any;
  * }} params
  */
 export function setupPageActionsRuntimeFromState(params) {
@@ -66,6 +67,7 @@ export function setupPageActionsRuntimeFromState(params) {
     state,
     statusTimer: params.statusTimer,
     setStatusTimer: params.setStatusTimer,
+    getActivePane: params.getActivePane,
     refs: () => ({
       deleteModalEl: overlayRefs.deleteModalEl,
       renameInputEl: overlayRefs.renameInputEl,

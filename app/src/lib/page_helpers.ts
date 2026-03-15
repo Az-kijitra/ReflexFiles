@@ -38,10 +38,13 @@ export function autofocus(node) {
   };
   focus();
   requestAnimationFrame(focus);
-  setTimeout(focus, 10);
+  let timer = setTimeout(focus, 10);
   return {
     update() {
       focus();
+    },
+    destroy() {
+      clearTimeout(timer);
     },
   };
 }

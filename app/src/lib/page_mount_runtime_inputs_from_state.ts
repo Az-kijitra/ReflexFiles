@@ -57,6 +57,9 @@ export function buildPageMountRuntimeInputsFromState(params) {
         contextMenuEl: params.overlayRefs.contextMenuEl,
         menuBarEl: params.shellRefs.menuBarEl,
       }),
+      rightRefs: params.rightRefs
+        ? () => (typeof params.rightRefs === "function" ? params.rightRefs() : params.rightRefs)
+        : undefined,
       handlers: params.handlers,
       helpers: params.helpers,
       constants: params.constants,

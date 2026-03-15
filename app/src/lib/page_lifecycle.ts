@@ -168,8 +168,7 @@ export async function setupPageLifecycle(ctx) {
     if (!currentPath) return;
     if (
       changed === currentPath ||
-      changed.startsWith(currentPath + "\\") ||
-      currentPath.startsWith(changed + "\\")
+      changed.startsWith(currentPath + "\\")
     ) {
       const existing = ctx.getWatchRefreshTimer();
       if (existing) {
@@ -406,6 +405,11 @@ export async function setupPageLifecycle(ctx) {
   const unlistenResize = await win.onResized(() => updateWindowBounds());
 
   return () => {
+    const pendingRefresh = ctx.getWatchRefreshTimer?.();
+    if (pendingRefresh) {
+      clearTimeout(pendingRefresh);
+      ctx.setWatchRefreshTimer?.(null);
+    }
     if (unlistenFsChanged) {
       unlistenFsChanged();
     }

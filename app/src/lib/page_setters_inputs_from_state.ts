@@ -9,6 +9,10 @@ import { buildPageSettersInputsFromGroups } from "./page_setters_inputs_from_gro
 export function buildPageSettersInputsFromState(params) {
   const { state, setStatusTimer } = params;
 
+  const getActivePane = params.getActivePane
+    ? params.getActivePane
+    : () => state.activePaneId === "right" && state.layoutMode === "dual" ? state.rightPane : state;
+
   return buildPageSettersInputsFromGroups({
     paste: {
       setPasteConfirmOpen: (value) => {
@@ -110,13 +114,13 @@ export function buildPageSettersInputsFromState(params) {
     },
     selection: {
       setFocusedIndex: (value) => {
-        state.focusedIndex = value;
+        getActivePane().focusedIndex = value;
       },
       setSelected: (paths) => {
-        state.selectedPaths = paths;
+        getActivePane().selectedPaths = paths;
       },
       setAnchorIndex: (value) => {
-        state.anchorIndex = value;
+        getActivePane().anchorIndex = value;
       },
     },
     contextMenu: {
@@ -149,7 +153,7 @@ export function buildPageSettersInputsFromState(params) {
     },
     failure: {
       setError: (value) => {
-        state.error = value;
+        getActivePane().error = value;
       },
       setFailureModalOpen: (value) => {
         state.failureModalOpen = value;

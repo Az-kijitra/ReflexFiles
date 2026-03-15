@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"$effect\\\\|focusedIndex\" /c/Users/toshi/git/ReflexFiles/app/src/routes/+page.svelte)",
+      "Bash(grep -rn loadDir /c/Users/toshi/git/ReflexFiles/app/src/lib/page_actions_setup*.ts)",
+      "Bash(grep -n \"buildPageSettersInputsFromState\\\\|setupPageSetters\" /c/Users/toshi/git/ReflexFiles/app/src/lib/*.ts)"
+    ]
+  }
+}

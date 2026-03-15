@@ -3,6 +3,7 @@
   import PathBar from "$lib/components/PathBar.svelte";
   import TreePanel from "$lib/components/TreePanel.svelte";
   import FileList from "$lib/components/FileList.svelte";
+  import PaneView from "$lib/components/PaneView.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
   import PageOverlaysBindings from "$lib/components/PageOverlaysBindings.svelte";
 
@@ -10,6 +11,8 @@
   export let overlayBindings;
   export let statusItems;
   export let showTree;
+  export let layoutMode = "single";
+  export let activePaneId = "left";
 
   export let menuBarEl = null;
   export let pathInput = "";
@@ -22,38 +25,82 @@
   export let anchorIndex = null;
   export let treeEl = null;
   export let treeBodyEl = null;
+
+  // Right pane bindings (dual mode only)
+  export let rightPathInput = "";
+  export let rightPathInputEl = null;
+  export let rightListEl = null;
+  export let rightListBodyEl = null;
+  export let rightFocusedIndex = 0;
+  export let rightAnchorIndex = null;
+  export let rightDropdownOpen = false;
+  export let rightPaneViewProps = null;
+  export let onActivateLeft = () => {};
+  export let onActivateRight = () => {};
 </script>
 
 <main class="container">
   <MenuBar bind:menuBarEl {...viewProps.menuProps} />
-
-  <PathBar
-    bind:pathInput
-    bind:pathInputEl
-    bind:dropdownMode
-    bind:dropdownOpen
-    {...viewProps.pathBarProps}
-  />
 
   <PageOverlaysBindings
     {overlayBindings}
     overlayProps={viewProps.overlayProps}
   />
 
-  <div class="content">
-    {#if showTree}
-      <TreePanel bind:treeEl bind:treeBodyEl {...viewProps.treeProps} />
-    {/if}
+  {#if layoutMode === "dual" && rightPaneViewProps}
+    <div class="content dual">
+      <PaneView
+        bind:listEl
+        bind:listBodyEl
+        bind:pathInputEl
+        bind:pathInput
+        bind:focusedIndex
+        bind:anchorIndex
+        bind:dropdownOpen
+        pathBarProps={viewProps.pathBarProps}
+        fileListProps={viewProps.fileListProps}
+        isActive={activePaneId === "left"}
+        onActivate={onActivateLeft}
+      />
+      <div class="pane-divider"></div>
+      <PaneView
+        bind:listEl={rightListEl}
+        bind:listBodyEl={rightListBodyEl}
+        bind:pathInputEl={rightPathInputEl}
+        bind:pathInput={rightPathInput}
+        bind:focusedIndex={rightFocusedIndex}
+        bind:anchorIndex={rightAnchorIndex}
+        bind:dropdownOpen={rightDropdownOpen}
+        pathBarProps={rightPaneViewProps.pathBarProps}
+        fileListProps={rightPaneViewProps.fileListProps}
+        isActive={activePaneId === "right"}
+        onActivate={onActivateRight}
+      />
+    </div>
+  {:else}
+    <PathBar
+      bind:pathInput
+      bind:pathInputEl
+      bind:dropdownMode
+      bind:dropdownOpen
+      {...viewProps.pathBarProps}
+    />
 
-  <FileList
-    bind:listEl
-    bind:listBodyEl
-    bind:focusedIndex
-    bind:anchorIndex
-    bind:dropdownOpen
-    {...viewProps.fileListProps}
-  />
-  </div>
+    <div class="content">
+      {#if showTree}
+        <TreePanel bind:treeEl bind:treeBodyEl {...viewProps.treeProps} />
+      {/if}
+
+      <FileList
+        bind:listEl
+        bind:listBodyEl
+        bind:focusedIndex
+        bind:anchorIndex
+        bind:dropdownOpen
+        {...viewProps.fileListProps}
+      />
+    </div>
+  {/if}
 
   <StatusBar {statusItems} />
 </main>
@@ -93,6 +140,16 @@
     gap: 3px;
     flex: 1;
     min-height: 0;
+  }
+
+  .content.dual {
+    gap: 0;
+  }
+
+  .pane-divider {
+    width: 3px;
+    background: var(--ui-border);
+    flex-shrink: 0;
   }
 
   :global(.error) {

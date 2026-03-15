@@ -47,8 +47,11 @@ export function createDirHelpers(params) {
     showError,
   } = params;
 
+  let loadSeq = 0;
+
   /** @param {string} path */
   async function loadDir(path) {
+    const seq = ++loadSeq;
     setLoading(true);
     setError("");
     try {
@@ -66,6 +69,7 @@ export function createDirHelpers(params) {
             sortKey: getSortKey(),
             sortOrder: getSortOrder(),
           });
+      if (seq !== loadSeq) return;
       setEntries(items);
       setCurrentPath(path);
       setPathInput(path);
@@ -84,9 +88,12 @@ export function createDirHelpers(params) {
         clearTree();
       }
     } catch (err) {
+      if (seq !== loadSeq) return;
       showError(err);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq) {
+        setLoading(false);
+      }
     }
   }
 

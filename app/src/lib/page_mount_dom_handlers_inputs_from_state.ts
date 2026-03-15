@@ -18,6 +18,13 @@ import { buildPageMountDomHandlersFromVars } from "./page_mount_dom_handlers_fro
  *     contextMenuEl: HTMLElement | null;
  *     menuBarEl: HTMLElement | null;
  *   });
+ *   rightRefs?: {
+ *     listEl: HTMLElement | null;
+ *     pathInputEl: HTMLInputElement | null;
+ *   } | (() => {
+ *     listEl: HTMLElement | null;
+ *     pathInputEl: HTMLInputElement | null;
+ *   });
  *   handlers: Record<string, any> | (() => Record<string, any>);
  *   helpers: object | (() => object);
  *   constants: { KEYMAP_ACTIONS: Record<string, string> };
@@ -25,15 +32,40 @@ import { buildPageMountDomHandlersFromVars } from "./page_mount_dom_handlers_fro
  */
 export function buildPageMountDomHandlersInputsFromState(params) {
   const getRefs = typeof params.refs === "function" ? params.refs : () => params.refs;
+  const getRightRefs =
+    params.rightRefs
+      ? typeof params.rightRefs === "function"
+        ? params.rightRefs
+        : () => params.rightRefs
+      : null;
   const getHandlers =
     typeof params.handlers === "function" ? params.handlers : () => params.handlers;
+
+  // Determine which pane is active based on actual DOM focus (not activePaneId).
+  // This is the single source of truth for keyboard routing in dual-pane mode.
+  function isRightPaneActive() {
+    if (params.state.layoutMode !== "dual") return false;
+    const rightRefs = getRightRefs?.();
+    if (!rightRefs) return false;
+    const activeEl = document.activeElement;
+    if (!activeEl) return false;
+    return (
+      (!!rightRefs.listEl &&
+        (activeEl === rightRefs.listEl || !!rightRefs.listEl.contains?.(activeEl))) ||
+      (!!rightRefs.pathInputEl && activeEl === rightRefs.pathInputEl)
+    );
+  }
 
   return buildPageMountDomHandlersFromVars({
     state: () => {
       const refs = getRefs();
+      const isDual = params.state.layoutMode === "dual";
+      const isRight = isRightPaneActive();
+      const rightRefs = isRight && getRightRefs ? getRightRefs() : null;
+      const ap = isRight ? params.state.rightPane : params.state;
       return {
-        listEl: refs.listEl,
-        pathInputEl: refs.pathInputEl,
+        listEl: (isRight && rightRefs?.listEl) ? rightRefs.listEl : refs.listEl,
+        pathInputEl: (isRight && rightRefs?.pathInputEl) ? rightRefs.pathInputEl : refs.pathInputEl,
         treeEl: refs.treeEl,
         dropdownEl: refs.dropdownEl,
         contextMenuEl: refs.contextMenuEl,
@@ -48,17 +80,17 @@ export function buildPageMountDomHandlersInputsFromState(params) {
         createOpen: params.state.createOpen,
         propertiesOpen: params.state.propertiesOpen,
         contextMenuOpen: params.state.contextMenuOpen,
-        showTree: params.state.showTree,
+        showTree: isDual ? false : params.state.showTree,
         showHidden: params.state.showHidden,
         showSize: params.state.showSize,
         showTime: params.state.showTime,
-        searchActive: params.state.searchActive,
-        currentPath: params.state.currentPath,
+        searchActive: ap.searchActive,
+        currentPath: ap.currentPath,
         dropdownMode: params.state.dropdownMode,
-        entries: params.state.entries,
-        focusedIndex: params.state.focusedIndex,
-        listRows: params.state.listRows,
-        selectedPaths: params.state.selectedPaths,
+        entries: ap.entries,
+        focusedIndex: ap.focusedIndex,
+        listRows: ap.listRows,
+        selectedPaths: ap.selectedPaths,
         jumpList: params.state.jumpList,
         pathHistory: params.state.pathHistory,
         menuOpen: params.state.menuOpen,
@@ -67,6 +99,7 @@ export function buildPageMountDomHandlersInputsFromState(params) {
     },
     actions: () => {
       const handlers = getHandlers();
+      const getAp = () => isRightPaneActive() ? params.state.rightPane : params.state;
       return {
         matchesAction: handlers.matchesAction,
         handleSortMenuKey: handlers.handleSortMenuKey,
@@ -90,7 +123,7 @@ export function buildPageMountDomHandlersInputsFromState(params) {
         selectAll: handlers.selectAll,
         setSelected: handlers.setSelected,
         setAnchorIndex: (value) => {
-          params.state.anchorIndex = value;
+          getAp().anchorIndex = value;
         },
         updateListRows: handlers.updateListRows,
         scheduleUiSave: handlers.scheduleUiSave,
@@ -132,10 +165,10 @@ export function buildPageMountDomHandlersInputsFromState(params) {
           params.state.dropdownOpen = value;
         },
         setSearchActive: (value) => {
-          params.state.searchActive = value;
+          getAp().searchActive = value;
         },
         setPathInput: (value) => {
-          params.state.pathInput = value;
+          getAp().pathInput = value;
         },
         setShowHidden: (value) => {
           params.state.showHidden = value;
