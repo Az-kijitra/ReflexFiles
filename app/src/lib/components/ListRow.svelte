@@ -49,6 +49,7 @@
   }}
 >
   <div class="name">
+    <span class="mark" aria-hidden="true">{selected ? '[x]' : '[ ]'}</span>
     {#if entryIcon}
       <span class="icon">{entryIcon}</span>
     {/if}
@@ -146,6 +147,19 @@
     gap: 6px;
     min-width: 0;
     overflow: hidden;
+  }
+
+  .name .mark {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: center;
+    font-size: 11px;
+    color: var(--ui-muted);
+    letter-spacing: -0.5px;
+  }
+
+  .row.selected .name .mark {
+    color: var(--ui-fg);
   }
 
   .name .icon {

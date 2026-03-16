@@ -614,27 +614,46 @@
     setOverflowRight: (v) => { state.rightPane.overflowRight = v; },
   });
 
-  // Helper: check if the right pane is active based on actual DOM focus
+  // Helper: check if the right pane has DOM focus
   function isDualRightFocused() {
     if (state.layoutMode !== "dual") return false;
     return isRightPaneFocused(rightShellRefs);
   }
 
-  // Wrap actions.loadDir with DOM-focus-based dual-pane routing
+  // Helper: check if the left pane has DOM focus
+  function isDualLeftFocused() {
+    if (state.layoutMode !== "dual") return false;
+    return isRightPaneFocused(shellRefs);
+  }
+
+  // Tracks which pane owns the currently-open dropdown.
+  // Set at the moment the dropdown opens, while DOM focus is still on the pane element.
+  let dropdownOwnerPaneId = $state("left");
+
+  // Routing decision: should this action go to the right pane?
+  // - DOM focus in right pane → right
+  // - DOM focus in left pane → left
+  // - Dropdown open → use dropdownOwnerPaneId (recorded at open time, before focus moves to overlay)
+  // - DOM focus outside both panes (other overlay) → use activePaneId fallback
+  function shouldRouteToRightPane() {
+    if (state.layoutMode !== "dual") return false;
+    if (isDualRightFocused()) return true;
+    if (isDualLeftFocused()) return false;
+    if (state.dropdownOpen) return dropdownOwnerPaneId === "right";
+    return state.activePaneId === "right";
+  }
+
+  // Wrap actions.loadDir with dual-pane routing
   const _leftLoadDir = actions.loadDir;
   actions.loadDir = (path) => {
-    if (state.layoutMode === "dual" && isDualRightFocused()) {
-      return rightDirHelpers.loadDir(path);
-    }
+    if (shouldRouteToRightPane()) return rightDirHelpers.loadDir(path);
     return _leftLoadDir(path);
   };
 
-  // Wrap actions.focusList with DOM-focus-based routing.
-  // isDualRightFocused() checks actual document.activeElement, so pressing Enter
-  // in the left PATH bar (focus on left pathInputEl) always targets the left list.
+  // Wrap actions.focusList with dual-pane routing
   const _baseFocusList = actions.focusList;
   actions.focusList = () => {
-    if (state.layoutMode === "dual" && isDualRightFocused()) {
+    if (shouldRouteToRightPane()) {
       rightShellRefs.listEl?.focus({ preventScroll: true });
     } else {
       _baseFocusList();
@@ -761,6 +780,13 @@
 
   $effect(() => applyListLayoutEffects(listEffectConfig));
   $effect(() => applyDropdownEffects(dropdownEffectConfig));
+  // Record which pane owns the dropdown at the moment it opens.
+  // applyDropdownEffects calls focusDropdownOnOpen which does `await tick()` before
+  // moving DOM focus to the overlay — so at this point the pane element still has focus.
+  $effect(() => {
+    if (!state.dropdownOpen) return;
+    dropdownOwnerPaneId = isDualRightFocused() ? "right" : "left";
+  });
   $effect(() =>
     applyThemeEffect(
       themeEffectConfig.uiConfigLoaded,
