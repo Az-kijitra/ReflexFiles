@@ -19,6 +19,8 @@ export function createPageStateDefaults() {
     failureItems: [],
     selectedPaths: [],
     lastClipboard: { paths: [], cut: false },
+    clipboardPreviewVisible: false,
+    clipboardItemsMeta: [] as Array<{ path: string; name: string; modified: string | null; isDir: boolean }>,
     undoStack: [],
     redoStack: [],
     windowBounds: { x: 0, y: 0, width: 0, height: 0, maximized: false },

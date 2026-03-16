@@ -82,6 +82,7 @@
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
+  import ClipboardPreview from "$lib/components/ClipboardPreview.svelte";
 
   const defaults = createPageStateDefaults();
 
@@ -811,6 +812,72 @@
 
   $effect(() => setupContextMenuKeydown(state.contextMenuOpen, actions.handleContextMenuKey));
 
+  // ── Clipboard preview ────────────────────────────────────────────────────
+  // Captures per-item metadata (name, modified, isDir) at copy/cut time so the
+  // preview can show timestamps even after the user navigates away.
+  function captureClipboardMeta() {
+    const paths = state.lastClipboard.paths;
+    const srcEntries =
+      state.layoutMode === "dual" && state.activePaneId === "right"
+        ? state.rightPane.entries
+        : state.entries;
+    state.clipboardItemsMeta = paths.map((p) => {
+      const name = p.split(/[\\\/]/).pop() || p;
+      const entry = srcEntries.find((e) => e.path === p);
+      return { path: p, name, modified: entry?.modified ?? null, isDir: entry?.is_dir ?? false };
+    });
+    state.clipboardPreviewVisible = true;
+  }
+
+  // Detect copy/cut: watch lastClipboard for changes.
+  // Uses $effect instead of wrapping pageActions because the keyboard dispatch
+  // chain reads from pageActionGroups.selection (a snapshot), not pageActions.
+  let _clipboardEffectInitialized = false;
+  $effect(() => {
+    const clip = state.lastClipboard; // establish reactive dependency
+    if (!_clipboardEffectInitialized) {
+      _clipboardEffectInitialized = true;
+      return; // skip initial stored value
+    }
+    if (clip.paths.length > 0) {
+      captureClipboardMeta();
+    }
+  });
+
+  // Dismiss preview when paste is initiated.
+  // pageActionGroups.selection is a plain object — patching it is read each call
+  // because pageMountHandlers() rebuilds handlers lazily on every dispatch.
+  const _origPasteInGroup = pageActionGroups.selection.pasteItems;
+  pageActionGroups.selection.pasteItems = async (...args) => {
+    state.clipboardPreviewVisible = false;
+    return _origPasteInGroup(...args);
+  };
+
+  // ESC dismisses the clipboard preview (if no other modal is open)
+  $effect(() => {
+    function handleEscPreview(e) {
+      if (
+        e.key === "Escape" &&
+        state.clipboardPreviewVisible &&
+        !state.deleteConfirmOpen &&
+        !state.pasteConfirmOpen &&
+        !state.createOpen &&
+        !state.renameOpen &&
+        !state.propertiesOpen &&
+        !state.zipModalOpen &&
+        !state.aboutOpen &&
+        !state.jumpUrlOpen &&
+        !settingsOpen
+      ) {
+        state.clipboardPreviewVisible = false;
+        e.stopPropagation();
+      }
+    }
+    window.addEventListener("keydown", handleEscPreview);
+    return () => window.removeEventListener("keydown", handleEscPreview);
+  });
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Left pane: wrap only the selection-writing actions to ensure activePaneId="left".
   // Using a spread object (not Proxy) to avoid interfering with Svelte 5 internals.
   const leftPageActions = {
@@ -1060,6 +1127,13 @@
     window.addEventListener("keydown", handleDualPaneToggle, { capture: true });
     return () => window.removeEventListener("keydown", handleDualPaneToggle, { capture: true });
   });
+
+  // Active pane's entries — used by ClipboardPreview to detect paste conflicts
+  const clipboardPreviewEntries = $derived(
+    state.layoutMode === "dual" && state.activePaneId === "right"
+      ? state.rightPane.filteredEntries
+      : state.filteredEntries
+  );
 
   const pageShellProps = $derived({
     showTree: state.showTree,
@@ -2138,6 +2212,15 @@
   bind:rightRefs={rightShellRefs}
   {...pageShellProps}
 />
+
+{#if state.clipboardPreviewVisible && state.clipboardItemsMeta.length > 0}
+  <ClipboardPreview
+    lastClipboard={state.lastClipboard}
+    clipboardItemsMeta={state.clipboardItemsMeta}
+    currentEntries={clipboardPreviewEntries}
+    onClose={() => { state.clipboardPreviewVisible = false; }}
+  />
+{/if}
 
 {#if settingsOpen}
   <SettingsModal
