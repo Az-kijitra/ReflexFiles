@@ -39,6 +39,9 @@ mod utils;
 mod viewer_cmds;
 mod watch;
 
+mod git_cmds;
+mod git_ops;
+
 mod config;
 mod types;
 pub(crate) use log::{log_error, log_event};

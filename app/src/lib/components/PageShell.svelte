@@ -127,6 +127,7 @@
 
   .container {
     padding: 2px;
+    padding-right: calc(2px + var(--git-panel-offset, 0px));
     height: 100vh;
     display: flex;
     flex-direction: column;

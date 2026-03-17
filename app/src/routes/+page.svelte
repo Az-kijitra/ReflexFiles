@@ -83,6 +83,8 @@
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
   import ClipboardPreview from "$lib/components/ClipboardPreview.svelte";
+  import GitPanel from "$lib/components/GitPanel.svelte";
+  import { gitGetStatus, getEntryGitBadge } from "$lib/utils/tauri_git";
 
   const defaults = createPageStateDefaults();
 
@@ -644,11 +646,32 @@
     return state.activePaneId === "right";
   }
 
-  // Wrap actions.loadDir with dual-pane routing
+  // ── Git status refresh helpers ────────────────────────────────────────────
+  async function refreshLeftGitStatus(path) {
+    try {
+      state.gitStatus = await gitGetStatus(path || state.currentPath);
+    } catch {
+      state.gitStatus = null;
+    }
+  }
+  async function refreshRightGitStatus(path) {
+    try {
+      state.rightPane.gitStatus = await gitGetStatus(path || state.rightPane.currentPath);
+    } catch {
+      state.rightPane.gitStatus = null;
+    }
+  }
+
+  // Wrap actions.loadDir with dual-pane routing + git refresh
   const _leftLoadDir = actions.loadDir;
-  actions.loadDir = (path) => {
-    if (shouldRouteToRightPane()) return rightDirHelpers.loadDir(path);
-    return _leftLoadDir(path);
+  actions.loadDir = async (path) => {
+    if (shouldRouteToRightPane()) {
+      await rightDirHelpers.loadDir(path);
+      void refreshRightGitStatus(path);
+      return;
+    }
+    await _leftLoadDir(path);
+    void refreshLeftGitStatus(path);
   };
 
   // Wrap actions.focusList with dual-pane routing
@@ -913,7 +936,21 @@
     })
   );
   const overlayBindings = viewRuntime.overlayBindings;
-  const viewProps = $derived(viewRuntime.getViewProps());
+
+  // Inject resolveGitBadge into left-pane fileListProps
+  const viewProps = $derived.by(() => {
+    const base = viewRuntime.getViewProps();
+    const gs = state.gitStatus;
+    return {
+      ...base,
+      fileListProps: {
+        ...base.fileListProps,
+        resolveGitBadge: gs?.is_repo
+          ? (entry) => getEntryGitBadge(entry.path, gs.repo_root, gs.statuses, entry.entry_type === "dir")
+          : null,
+      },
+    };
+  });
 
   // Right pane list layout effect
   $effect(() => applyListLayoutEffects({
@@ -947,8 +984,8 @@
   }
 
   // Right pane full view runtime (same functionality as left pane)
-  const rightPaneViewProps = $derived(
-    createViewRuntime(
+  const rightPaneViewProps = $derived.by(() => {
+    const base = createViewRuntime(
       buildViewRuntimeInputsFromState({
         state: {
           // Pane-specific fields from rightPane
@@ -1048,12 +1085,37 @@
         },
         overlay: viewRuntime.getOverlayState(),
       })
-    ).viewProps
-  );
+    ).viewProps;
+    // Inject resolveGitBadge for right pane
+    const gs = state.rightPane.gitStatus;
+    return {
+      ...base,
+      fileListProps: {
+        ...base.fileListProps,
+        resolveGitBadge: gs?.is_repo
+          ? (entry) => getEntryGitBadge(entry.path, gs.repo_root, gs.statuses, entry.entry_type === "dir")
+          : null,
+      },
+    };
+  });
 
   // Keep right pane filteredEntries in sync with entries (no search for right pane yet)
   $effect(() => {
     state.rightPane.filteredEntries = state.rightPane.entries;
+  });
+
+  // Auto-refresh git status when the left pane's current path changes
+  $effect(() => {
+    const path = state.currentPath;
+    if (!path) { state.gitStatus = null; return; }
+    void refreshLeftGitStatus(path);
+  });
+
+  // Auto-refresh git status when the right pane's current path changes
+  $effect(() => {
+    const path = state.rightPane.currentPath;
+    if (!path) { state.rightPane.gitStatus = null; return; }
+    void refreshRightGitStatus(path);
   });
 
   // Update right pane path capabilities when currentPath changes
@@ -1098,6 +1160,38 @@
       state.rightPane.listCols = 1;
     }
   });
+
+  // Ctrl+G to toggle git panel
+  $effect(() => {
+    function handleGitPanelToggle(event) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== "g" && event.key !== "G") return;
+      const activeEl = document.activeElement;
+      if (activeEl?.tagName === "INPUT" || activeEl?.tagName === "TEXTAREA") return;
+      const isInModal =
+        typeof activeEl?.closest === "function" &&
+        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
+      if (isInModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (state.gitPanelOpen) { void closeGitPanel(); } else { void openGitPanel(); }
+    }
+    window.addEventListener("keydown", handleGitPanelToggle, { capture: true });
+    return () => window.removeEventListener("keydown", handleGitPanelToggle, { capture: true });
+  });
+
+  // ── Git panel CSS offset ──────────────────────────────────────────────────
+  // When the panel is open, push the main content left by the panel width via a
+  // CSS custom property so the panel never overlaps either pane.
+  $effect(() => {
+    document.documentElement.style.setProperty(
+      "--git-panel-offset",
+      state.gitPanelOpen ? "300px" : "0px"
+    );
+  });
+
+  function openGitPanel()  { state.gitPanelOpen = true; }
+  function closeGitPanel() { state.gitPanelOpen = false; }
 
   // F3 key to toggle dual/single pane mode
   $effect(() => {
@@ -2219,6 +2313,23 @@
     clipboardItemsMeta={state.clipboardItemsMeta}
     currentEntries={clipboardPreviewEntries}
     onClose={() => { state.clipboardPreviewVisible = false; }}
+  />
+{/if}
+
+{#if state.gitPanelOpen}
+  <GitPanel
+    gitStatus={state.activePaneId === "right" ? state.rightPane.gitStatus : state.gitStatus}
+    currentPath={state.activePaneId === "right" ? state.rightPane.currentPath : state.currentPath}
+    onClose={closeGitPanel}
+    onRefresh={() => {
+      if (state.activePaneId === "right") {
+        void refreshRightGitStatus();
+        void rightDirHelpers.loadDir(state.rightPane.currentPath);
+      } else {
+        void refreshLeftGitStatus();
+        void _leftLoadDir(state.currentPath);
+      }
+    }}
   />
 {/if}
 

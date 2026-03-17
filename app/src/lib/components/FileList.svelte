@@ -37,6 +37,7 @@
   export let t;
   export let selectedPaths = [];
   export let resolveGdriveWorkcopyBadge;
+  export let resolveGitBadge = null;
   export let openContextMenu;
   export let selectRange;
   export let toggleSelection;
@@ -60,6 +61,16 @@
   /** @param {import("$lib/types").Entry} entry */
   function getEntryIndex(entry) {
     return entries.findIndex((item) => item.path === entry.path);
+  }
+
+  /** @param {import("$lib/types").Entry} entry */
+  function getGitBadge(entry) {
+    if (typeof resolveGitBadge !== "function") return "";
+    try {
+      return String(resolveGitBadge(entry) || "");
+    } catch {
+      return "";
+    }
   }
 
   /** @param {import("$lib/types").Entry} entry */
@@ -245,6 +256,7 @@
           {formatName}
           {formatSize}
           {formatModified}
+          gitBadge={getGitBadge(entry)}
           gdriveWorkcopyBadge={getGdriveWorkcopyBadge(entry)}
           gdriveWorkcopyLocalTitle={t("list.gdrive_workcopy_local")}
           gdriveWorkcopyDirtyTitle={t("list.gdrive_workcopy_dirty")}

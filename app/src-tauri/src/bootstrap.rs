@@ -114,7 +114,15 @@ pub fn run() {
             crate::gdrive_edit_cmds::gdrive_delete_edit_workcopy,
             crate::gdrive_edit_cmds::gdrive_cleanup_edit_workcopies,
             crate::watch::fs_watch_start,
-            crate::watch::fs_watch_stop
+            crate::watch::fs_watch_stop,
+            crate::git_cmds::git_get_status,
+            crate::git_cmds::git_list_branches,
+            crate::git_cmds::git_checkout,
+            crate::git_cmds::git_create_branch,
+            crate::git_cmds::git_stage,
+            crate::git_cmds::git_unstage,
+            crate::git_cmds::git_commit,
+            crate::git_cmds::git_clone
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

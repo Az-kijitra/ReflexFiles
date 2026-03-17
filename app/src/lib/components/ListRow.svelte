@@ -10,6 +10,8 @@
   export let formatSize;
   export let formatModified;
   export let gdriveWorkcopyBadge = "";
+  /** Git status badge: "M" modified, "S" staged, "D" deleted, "?" untracked, "!" conflict, "" clean */
+  export let gitBadge = "";
   export let gdriveWorkcopyLocalTitle = "";
   export let gdriveWorkcopyDirtyTitle = "";
   export let overflowLeft = false;
@@ -50,6 +52,9 @@
 >
   <div class="name">
     <span class="mark" aria-hidden="true">{selected ? '[x]' : '[ ]'}</span>
+    {#if gitBadge}
+      <span class="git-badge git-badge-{gitBadge === '!' ? 'conflict' : gitBadge === 'S' ? 'staged' : gitBadge === 'M' ? 'modified' : gitBadge === 'D' ? 'deleted' : 'untracked'}" aria-hidden="true">{gitBadge}</span>
+    {/if}
     {#if entryIcon}
       <span class="icon">{entryIcon}</span>
     {/if}
@@ -173,6 +178,21 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .git-badge {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    width: 1.3em;
+    text-align: center;
+    border-radius: 2px;
+    line-height: 1.5;
+  }
+  .git-badge-modified  { color: #d08800; }
+  .git-badge-staged    { color: #1a8a1a; }
+  .git-badge-deleted   { color: #c0392b; }
+  .git-badge-untracked { color: var(--ui-muted); }
+  .git-badge-conflict  { color: #c0392b; background: #fde8e8; border-radius: 2px; }
 
   .gdrive-workcopy-badge {
     margin-left: 4px;

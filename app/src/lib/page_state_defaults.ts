@@ -19,6 +19,8 @@ export function createPageStateDefaults() {
     failureItems: [],
     selectedPaths: [],
     lastClipboard: { paths: [], cut: false },
+    gitStatus: null as import("$lib/utils/tauri_git").GitRepoStatus | null,
+    gitPanelOpen: false,
     clipboardPreviewVisible: false,
     clipboardItemsMeta: [] as Array<{ path: string; name: string; modified: string | null; isDir: boolean }>,
     undoStack: [],
@@ -153,6 +155,7 @@ export function createPageStateDefaults() {
       overflowLeft: false,
       overflowRight: false,
       pathCompletionPreviewActive: false,
+      gitStatus: null as import("$lib/utils/tauri_git").GitRepoStatus | null,
     },
   };
 }
