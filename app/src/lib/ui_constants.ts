@@ -271,7 +271,6 @@
       "paste.body": "{count} item(s) already exist in the destination.",
       "paste.empty_clipboard": "Clipboard has no files",
       "paste.nothing": "Nothing to paste",
-      "paste.destination_not_writable": "This Google Drive folder is not writable",
       "paste.apply_all": "Apply to all",
       "paste.overwrite": "Overwrite",
       "paste.keep_both": "Keep both",
@@ -408,101 +407,8 @@
       "settings.restore_failed": "Restore failed: {error}",
       "settings.restore_ready": "Config restored from backup",
       "settings.restore_confirm": "Restore latest config backup? Current config will be overwritten.",
-      "settings.gdrive.title": "Google Drive (Phased Preview)",
-      "settings.gdrive.help":
-        "Personal-use setup only. Keep real credentials out of the public repository.",
-      "settings.gdrive.persist_notice":
-        "Saved locally: client_id, redirect_uri, account ID. client_secret is stored only in OS secure credential storage (not in config.toml). callback URL is not saved.",
-      "settings.gdrive.phase": "Auth phase",
-      "settings.gdrive.phase_signed_out": "Signed out",
-      "settings.gdrive.phase_pending": "Pending callback",
-      "settings.gdrive.phase_authorized": "Authorized",
-      "settings.gdrive.backend_mode": "Backend mode",
-      "settings.gdrive.backend_mode_stub": "Stub (virtual test data)",
-      "settings.gdrive.backend_mode_real": "Real Google Drive API",
-      "settings.gdrive.account_id_current": "Current account",
-      "settings.gdrive.granted_scopes": "Granted scopes",
-      "settings.gdrive.write_scope": "Write scope granted",
-      "settings.gdrive.refresh_persisted": "Refresh token persisted",
-      "settings.gdrive.access_token_expires": "Access token expires at",
-      "settings.gdrive.last_scope_insufficient": "Last scope-insufficient error",
-      "settings.gdrive.last_write_conflict": "Last write conflict",
-      "settings.gdrive.last_refresh_error": "Last token refresh error",
-      "settings.gdrive.last_refresh_error_at": "Last token refresh error time",
-      "settings.gdrive.token_store": "Token store backend",
-      "settings.gdrive.token_store_available": "Token store available",
-      "settings.gdrive.last_error": "Last auth error",
-      "settings.gdrive.conflict_help_title": "Write-back conflict recovery",
-      "settings.gdrive.conflict_help":
-        "If write-back is blocked by conflict, re-open from Google Drive, merge local changes into the latest copy, then write back again.",
-      "settings.gdrive.conflict_help_recent":
-        "Recent write-back conflict detected. Re-open from Google Drive, merge local changes into latest copy, then write back again.",
-      "settings.gdrive.refresh_status": "Refresh Auth Status",
-      "settings.gdrive.sign_out": "Sign Out",
-      "settings.gdrive.client_id": "OAuth client_id",
-      "settings.gdrive.client_id_help": "Paste your own Google OAuth desktop client ID.",
-      "settings.gdrive.client_secret_optional": "OAuth client_secret (optional)",
-      "settings.gdrive.client_secret_help":
-        "Only needed if Google requires it during token exchange. If entered and sign-in succeeds, it is stored in OS secure credential storage. Never commit real secrets.",
-      "settings.gdrive.redirect_uri": "OAuth redirect_uri",
-      "settings.gdrive.redirect_uri_help": "Must match redirect URI configured in your Google Cloud client.",
-      "settings.gdrive.start_sign_in": "Start Sign-In",
-      "settings.gdrive.callback_url": "Callback URL",
-      "settings.gdrive.callback_url_help":
-        "Paste the full callback URL after browser sign-in (contains state and code).",
-      "settings.gdrive.account_id": "Account ID (email)",
-      "settings.gdrive.account_id_help": "Google account email used for this authorization.",
-      "settings.gdrive.refresh_token_optional": "Refresh token (optional)",
-      "settings.gdrive.refresh_token_help":
-        "Optional manual mode. Leave empty for automatic token exchange.",
-      "settings.gdrive.complete_sign_in": "Complete Sign-In",
-      "settings.gdrive.placeholder_client_id":
-        "1234567890-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
-      "settings.gdrive.placeholder_redirect_uri": "http://127.0.0.1:45123/oauth2/callback",
-      "settings.gdrive.placeholder_callback_url":
-        "http://127.0.0.1:45123/oauth2/callback?state=...&code=...",
-      "settings.gdrive.placeholder_account_id": "user@example.com",
-      "settings.gdrive.busy": "Google Drive auth operation in progress...",
-      "settings.gdrive.callback_missing": "Callback URL is required.",
-      "settings.gdrive.callback_parse_error":
-        "Callback URL must contain both state and code query parameters.",
-      "settings.gdrive.token_exchange_network_error":
-        "Network error while contacting Google token endpoint.",
-      "settings.gdrive.token_exchange_failed": "Google token exchange failed.",
-      "settings.gdrive.token_exchange_failed_with_detail":
-        "Google token exchange failed: {detail}",
-      "settings.gdrive.token_exchange_requires_client_secret":
-        'Google requested client_secret. Set "OAuth client_secret (optional)" then retry Complete Sign-In.',
-      "settings.gdrive.token_exchange_no_access_token":
-        "Google token response did not include access_token.",
-      "settings.gdrive.client_or_redirect_required": "client_id and redirect_uri are required.",
-      "settings.gdrive.account_required": "Account ID is required.",
-      "settings.gdrive.started_opened": "OAuth session started. Browser opened for sign-in.",
-      "settings.gdrive.callback_auto_captured":
-        "Callback URL captured automatically. Review account/secret fields and run Complete Sign-In.",
-      "settings.gdrive.complete_done": "Google Drive auth session updated.",
-      "settings.gdrive.complete_done_manual":
-        "Google Drive auth session updated (manual token mode).",
-      "settings.gdrive.sign_out_done": "Google Drive auth session cleared.",
-      "settings.gdrive.stub_notice":
-        "This build uses stub data for gdrive:// paths. Real Google Drive file listing is not active yet.",
-      "settings.gdrive.workcopy.title": "Local Workcopy Maintenance",
-      "settings.gdrive.workcopy.help":
-        "Manage local Google Drive workcopies used for external editing and manual write-back.",
-      "settings.gdrive.workcopy.refresh": "Refresh List",
-      "settings.gdrive.workcopy.cleanup": "Cleanup",
-      "settings.gdrive.workcopy.busy": "Workcopy maintenance in progress...",
-      "settings.gdrive.workcopy.empty": "No local Google Drive workcopies found.",
-      "settings.gdrive.workcopy.delete": "Delete",
-      "settings.gdrive.workcopy.status_missing": "Missing local file",
-      "settings.gdrive.workcopy.status_dirty": "Local changes pending upload",
-      "settings.gdrive.workcopy.status_local": "Local copy in sync",
-      "settings.gdrive.workcopy.delete_done": "Deleted local workcopy: {name}",
-      "settings.gdrive.workcopy.cleanup_done":
-        "Cleanup completed. Removed files: {files}, bytes: {bytes}",
       "settings.shortcut_conflicts": "Shortcut conflicts",
       "settings.no_shortcut_conflicts": "No known global shortcut conflicts detected.",
-      "settings.shortcut_conflict_google_drive": "May trigger Google Drive global shortcut.",
       "settings.shortcut_conflict_task_manager": "Conflicts with Windows Task Manager shortcut.",
       "settings.shortcut_conflict_input_switch": "May conflict with input language switch shortcut.",
       "settings.shortcut_conflict_display_driver": "May conflict with display driver hotkeys.",
@@ -560,7 +466,6 @@
       "context.open_cmd": "Open in Terminal",
       "context.open_vscode": "Open in VS Code",
       "context.open_git_client": "Open in Git Client",
-      "context.gdrive_write_back": "Write Back to Google Drive",
       "context.open_parent": "Open Parent",
       "context.copy": "Copy",
       "context.duplicate": "Duplicate",
@@ -606,17 +511,6 @@
       "status.no_parent": "No parent",
       "status.same_path": "Skipped: source and destination are the same",
       "status.jump_added": "Added to jump list",
-      "status.gdrive_workcopy_opened":
-        "Opened local workcopy for Google Drive file: {name} (not uploaded automatically)",
-      "status.gdrive_writeback_only": "Write-back is available only for Google Drive files.",
-      "status.gdrive_workcopy_missing":
-        "No local workcopy found for {name}. Open it in an external app first.",
-      "status.gdrive_writeback_done": "Uploaded local workcopy to Google Drive: {name}",
-      "status.gdrive_writeback_no_change": "No local changes to upload: {name}",
-      "status.gdrive_writeback_conflict":
-        "Upload blocked by conflict on Google Drive: {name}. Re-open from Google Drive, merge changes, then write back again. Open Settings with Ctrl+, for conflict guidance.",
-      "status.gdrive_writeback_unknown":
-        "Write-back finished with unknown result: {name}",
       "dnd.export_experimental_disabled": "Drag export experiment is disabled",
       "dnd.export_local_only": "Drag export is available only for local items",
       "dnd.export_mixed_selection_not_supported": "Mixed/non-local selection is not supported",
@@ -675,8 +569,6 @@
       "history.delete": "Del",
       "label.path": "PATH",
       "label.list": "File List",
-      "list.gdrive_workcopy_local": "Local Google Drive workcopy exists",
-      "list.gdrive_workcopy_dirty": "Local changes pending upload to Google Drive",
       "label.tree": "Tree View",
       "keymap.windows_like": "Windows-like",
       "keymap.vim_like": "Vim-like",
@@ -800,7 +692,6 @@
       "paste.body": "{count}件が既に存在します。",
       "paste.empty_clipboard": "クリップボードにファイルがありません",
       "paste.nothing": "貼り付ける項目がありません",
-      "paste.destination_not_writable": "この Google Drive フォルダには書き込めません",
       "paste.apply_all": "すべてに適用",
       "paste.overwrite": "上書き",
       "paste.keep_both": "別名保存",
@@ -936,105 +827,8 @@
       "settings.restore_failed": "復元に失敗しました: {error}",
       "settings.restore_ready": "バックアップから設定を復元しました",
       "settings.restore_confirm": "最新の設定バックアップを復元しますか？現在の config.toml は上書きされます。",
-      "settings.gdrive.title": "Google Drive（段階プレビュー）",
-      "settings.gdrive.help":
-        "個人利用前提の設定です。公開リポジトリに実資格情報を含めないでください。",
-      "settings.gdrive.persist_notice":
-        "ローカル保存: client_id / redirect_uri / アカウントID。client_secret は config.toml には保存せず、OSの安全な資格情報ストアのみに保存します。コールバックURLは保存しません。",
-      "settings.gdrive.phase": "認証フェーズ",
-      "settings.gdrive.phase_signed_out": "未サインイン",
-      "settings.gdrive.phase_pending": "コールバック待ち",
-      "settings.gdrive.phase_authorized": "認証済み",
-      "settings.gdrive.backend_mode": "バックエンド種別",
-      "settings.gdrive.backend_mode_stub": "スタブ（テスト用仮想データ）",
-      "settings.gdrive.backend_mode_real": "実 Google Drive API",
-      "settings.gdrive.account_id_current": "現在のアカウント",
-      "settings.gdrive.granted_scopes": "許可スコープ",
-      "settings.gdrive.write_scope": "書き込みスコープ許可",
-      "settings.gdrive.refresh_persisted": "refresh token 保存済み",
-      "settings.gdrive.access_token_expires": "アクセストークン有効期限",
-      "settings.gdrive.last_scope_insufficient": "直近のスコープ不足エラー",
-      "settings.gdrive.last_write_conflict": "直近の書き戻し競合",
-      "settings.gdrive.last_refresh_error": "直近のトークン更新エラー",
-      "settings.gdrive.last_refresh_error_at": "直近のトークン更新エラー時刻",
-      "settings.gdrive.token_store": "トークン保存バックエンド",
-      "settings.gdrive.token_store_available": "トークン保存の利用可否",
-      "settings.gdrive.last_error": "直近の認証エラー",
-      "settings.gdrive.conflict_help_title": "書き戻し競合の対処",
-      "settings.gdrive.conflict_help":
-        "書き戻しが競合で止まった場合は、Google Drive から開き直し、最新コピーにローカル変更をマージしてから再書き戻ししてください。",
-      "settings.gdrive.conflict_help_recent":
-        "直近で書き戻し競合が発生しています。Google Drive から開き直し、最新コピーにローカル変更をマージしてから再書き戻ししてください。",
-      "settings.gdrive.refresh_status": "認証状態を更新",
-      "settings.gdrive.sign_out": "サインアウト",
-      "settings.gdrive.client_id": "OAuth クライアント ID",
-      "settings.gdrive.client_id_help":
-        "ご自身の Google OAuth デスクトップ クライアント ID を入力します。",
-      "settings.gdrive.client_secret_optional": "OAuth クライアント シークレット（任意）",
-      "settings.gdrive.client_secret_help":
-        "Google 側が token 交換時に要求した場合のみ使います。入力して認証が成功すると、OSの安全な資格情報ストアへ保存します。実シークレットは絶対にコミットしないでください。",
-      "settings.gdrive.redirect_uri": "OAuth リダイレクト URI",
-      "settings.gdrive.redirect_uri_help":
-        "Google Cloud のOAuthクライアント設定と完全一致させてください。",
-      "settings.gdrive.start_sign_in": "サインイン開始",
-      "settings.gdrive.callback_url": "コールバック URL",
-      "settings.gdrive.callback_url_help":
-        "ブラウザ認証後に取得したURL（state/code付き）を貼り付けます。",
-      "settings.gdrive.account_id": "アカウント ID（メールアドレス）",
-      "settings.gdrive.account_id_help": "この認証で使うGoogleアカウントのメールアドレス。",
-      "settings.gdrive.refresh_token_optional": "リフレッシュ トークン（任意）",
-      "settings.gdrive.refresh_token_help":
-        "手動モード用です。空欄なら自動token交換を試行します。",
-      "settings.gdrive.complete_sign_in": "サインイン完了",
-      "settings.gdrive.placeholder_client_id":
-        "1234567890-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com",
-      "settings.gdrive.placeholder_redirect_uri": "http://127.0.0.1:45123/oauth2/callback",
-      "settings.gdrive.placeholder_callback_url":
-        "http://127.0.0.1:45123/oauth2/callback?state=...&code=...",
-      "settings.gdrive.placeholder_account_id": "user@example.com",
-      "settings.gdrive.busy": "Google Drive 認証処理を実行中です...",
-      "settings.gdrive.callback_missing": "コールバックURLを入力してください。",
-      "settings.gdrive.callback_parse_error":
-        "コールバックURLには state と code の両方が必要です。",
-      "settings.gdrive.token_exchange_network_error":
-        "Google token endpoint への通信に失敗しました。",
-      "settings.gdrive.token_exchange_failed": "Google token 交換に失敗しました。",
-      "settings.gdrive.token_exchange_failed_with_detail":
-        "Google token 交換に失敗しました: {detail}",
-      "settings.gdrive.token_exchange_requires_client_secret":
-        "Google 側が client_secret を要求しました。OAuth client_secret（任意）を入力して再実行してください。",
-      "settings.gdrive.token_exchange_no_access_token":
-        "Google token 応答に access_token が含まれていません。",
-      "settings.gdrive.client_or_redirect_required":
-        "client_id と redirect_uri を入力してください。",
-      "settings.gdrive.account_required": "アカウントIDを入力してください。",
-      "settings.gdrive.started_opened":
-        "OAuth セッションを開始し、サインイン用ブラウザを開きました。",
-      "settings.gdrive.callback_auto_captured":
-        "コールバックURLを自動取得しました。アカウント/シークレットを確認して「サインイン完了」を実行してください。",
-      "settings.gdrive.complete_done": "Google Drive 認証セッションを更新しました。",
-      "settings.gdrive.complete_done_manual":
-        "Google Drive 認証セッションを更新しました（手動トークンモード）。",
-      "settings.gdrive.sign_out_done": "Google Drive 認証セッションを解除しました。",
-      "settings.gdrive.stub_notice":
-        "このビルドの gdrive:// はスタブ表示です。実 Google Drive ファイル一覧はまだ有効化されていません。",
-      "settings.gdrive.workcopy.title": "ローカル作業コピー管理",
-      "settings.gdrive.workcopy.help":
-        "外部編集と手動書き戻しで使う Google Drive のローカル作業コピーを管理します。",
-      "settings.gdrive.workcopy.refresh": "一覧を更新",
-      "settings.gdrive.workcopy.cleanup": "クリーンアップ",
-      "settings.gdrive.workcopy.busy": "作業コピー管理を実行中です...",
-      "settings.gdrive.workcopy.empty": "ローカル作業コピーはありません。",
-      "settings.gdrive.workcopy.delete": "削除",
-      "settings.gdrive.workcopy.status_missing": "ローカルファイルが見つかりません",
-      "settings.gdrive.workcopy.status_dirty": "未アップロードのローカル変更あり",
-      "settings.gdrive.workcopy.status_local": "ローカルコピーは同期済み",
-      "settings.gdrive.workcopy.delete_done": "ローカル作業コピーを削除しました: {name}",
-      "settings.gdrive.workcopy.cleanup_done":
-        "クリーンアップ完了。削除ファイル数: {files}, 削除バイト数: {bytes}",
       "settings.shortcut_conflicts": "ショートカット競合",
       "settings.no_shortcut_conflicts": "既知のグローバルショートカット競合はありません。",
-      "settings.shortcut_conflict_google_drive": "Google Drive のグローバルショートカットと競合する可能性があります。",
       "settings.shortcut_conflict_task_manager": "Windows のタスクマネージャー起動キーと競合します。",
       "settings.shortcut_conflict_input_switch": "入力言語切替ショートカットと競合する可能性があります。",
       "settings.shortcut_conflict_display_driver": "ディスプレイドライバのホットキーと競合する可能性があります。",
@@ -1092,7 +886,6 @@
       "context.open_cmd": "ターミナルを開く",
       "context.open_vscode": "VS Codeで開く",
       "context.open_git_client": "Gitクライアントで開く",
-      "context.gdrive_write_back": "Google Driveへ書き戻し",
       "context.open_parent": "親フォルダを開く",
       "context.copy": "コピー",
       "context.duplicate": "複製",
@@ -1137,20 +930,6 @@
       "status.no_parent": "親フォルダなし",
       "status.same_path": "同じ場所のためスキップしました",
       "status.jump_added": "ジャンプリストに追加しました",
-      "status.gdrive_workcopy_opened":
-        "Google Drive ファイルをローカル作業コピーで開きました: {name}（自動アップロードはされません）",
-      "status.gdrive_writeback_only":
-        "書き戻しは Google Drive ファイルでのみ実行できます。",
-      "status.gdrive_workcopy_missing":
-        "{name} のローカル作業コピーがありません。先に外部アプリで開いてください。",
-      "status.gdrive_writeback_done":
-        "ローカル作業コピーを Google Drive に書き戻しました: {name}",
-      "status.gdrive_writeback_no_change":
-        "書き戻すローカル変更がありません: {name}",
-      "status.gdrive_writeback_conflict":
-        "Google Drive 側の競合により書き戻しを中止しました: {name}。Google Drive から開き直して差分をマージし、再度書き戻してください。Ctrl+, で設定を開くと競合対処ガイドを確認できます。",
-      "status.gdrive_writeback_unknown":
-        "書き戻し結果を確認できませんでした: {name}",
       "dnd.export_experimental_disabled": "ドラッグ転送実験は無効です",
       "dnd.export_local_only": "ドラッグ転送はローカル項目でのみ利用できます",
       "dnd.export_mixed_selection_not_supported": "混在/非ローカル選択は未対応です",
@@ -1210,8 +989,6 @@
       "history.delete": "削除",
       "label.path": "PATH",
       "label.list": "ファイル一覧",
-      "list.gdrive_workcopy_local": "Google Drive のローカル作業コピーがあります",
-      "list.gdrive_workcopy_dirty": "Google Drive へ未反映のローカル変更があります",
       "label.tree": "ツリー表示",
       "keymap.windows_like": "Windows風",
       "keymap.vim_like": "Vim風",

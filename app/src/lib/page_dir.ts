@@ -1,5 +1,3 @@
-import { toGdriveResourceRef } from "$lib/utils/resource_ref";
-
 /**
  * @param {object} params
  * @param {(command: string, payload?: Record<string, unknown>) => Promise<unknown>} params.invoke
@@ -55,20 +53,12 @@ export function createDirHelpers(params) {
     setLoading(true);
     setError("");
     try {
-      const gdriveRef = toGdriveResourceRef(path);
-      const items = gdriveRef
-        ? await invoke("fs_list_dir_by_ref", {
-            resourceRef: gdriveRef,
-            showHidden: getShowHidden(),
-            sortKey: getSortKey(),
-            sortOrder: getSortOrder(),
-          })
-        : await invoke("fs_list_dir", {
-            path,
-            showHidden: getShowHidden(),
-            sortKey: getSortKey(),
-            sortOrder: getSortOrder(),
-          });
+      const items = await invoke("fs_list_dir", {
+        path,
+        showHidden: getShowHidden(),
+        sortKey: getSortKey(),
+        sortOrder: getSortOrder(),
+      });
       if (seq !== loadSeq) return;
       setEntries(items);
       setCurrentPath(path);

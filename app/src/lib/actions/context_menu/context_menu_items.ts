@@ -43,7 +43,6 @@ import {
  * @param {(err: unknown) => void} actions.showError
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
- * @param {(entry: import("$lib/types").Entry | null) => void} [actions.syncGdriveWorkcopyForEntry]
  * @param {() => Promise<void>} [actions.startExplorerDrag]
  * @param {() => void} closeContextMenu
  */
@@ -67,7 +66,6 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     showError,
     runExternalApp,
     getExternalApps,
-    syncGdriveWorkcopyForEntry,
     startExplorerDrag,
   } = actions;
 
@@ -119,18 +117,6 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
   async function onContextExplorerDragExperimental() {
     closeContextMenu();
     await startExplorerDrag?.();
-  }
-
-  function onContextGdriveWriteBack() {
-    const selected = ctx.getSelectedPaths();
-    if (selected.length !== 1) return;
-    const target = ctx.getEntries().find((e) => e.path === selected[0]);
-    if (!target || target.type === "dir") {
-      closeContextMenu();
-      return;
-    }
-    syncGdriveWorkcopyForEntry?.(target);
-    closeContextMenu();
   }
 
   /** @param {import("$lib/types").ExternalAppConfig} app */
@@ -264,10 +250,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canCreateInCurrentPath = currentPathSupports("can_create");
     const canPasteIntoCurrentPath =
       currentPathSupports("can_copy") || currentPathSupports("can_move");
-    const currentPath = String(ctx.getCurrentPath?.() || "").trim().toLowerCase();
-    const pasteCapabilityReason = currentPath.startsWith("gdrive://")
-      ? ctx.t("paste.destination_not_writable")
-      : capabilityReason;
+    const pasteCapabilityReason = capabilityReason;
     const allSelectedSupport = (capabilityKey) =>
       hasSelection &&
       hasAllSelectedEntries &&
@@ -313,12 +296,6 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         ? !!getParentPath(selected[0])
         : !!getParentPath(ctx.getCurrentPath()));
     const selectedEntry = isSingle ? entries.find((e) => e.path === selected[0]) : null;
-    const isGdriveFile =
-      isSingle &&
-      !!selectedEntry &&
-      selectedEntry.type === "file" &&
-      (selectedEntry?.ref?.provider === "gdrive" ||
-        String(selectedEntry?.path || "").startsWith("gdrive://"));
     const isZip = !!selectedEntry && selectedEntry.ext?.toLowerCase() === ".zip";
     const canCopySelection = allSelectedSupport("can_copy");
     const canMoveSelection = allSelectedSupport("can_move");
@@ -395,13 +372,6 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         visible: isSingle && !!selectedEntry && selectedEntry.type !== "dir",
         action: () => onContextOpenExternalApp(app),
       })),
-      {
-        id: "ctx-gdrive-write-back",
-        label: ctx.t("context.gdrive_write_back"),
-        enabled: isGdriveFile,
-        visible: isGdriveFile,
-        action: onContextGdriveWriteBack,
-      },
       {
         id: "ctx-open-parent",
         label: ctx.t("context.open_parent"),
