@@ -260,6 +260,8 @@ export function handleListKey(event, ctx) {
     return true;
   }
   if (ctx.matchesAction(event, "select_toggle")) {
+    const activeTag = (active as any)?.tagName;
+    if (activeTag === "INPUT" || activeTag === "TEXTAREA") return false;
     event.preventDefault();
     ctx.toggleSelection(ctx.focusedIndex, true);
     return true;

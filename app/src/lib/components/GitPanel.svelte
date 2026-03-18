@@ -329,7 +329,8 @@
   }
 </script>
 
-<div class="git-panel" role="complementary" aria-label="Git panel">
+<div class="git-panel" role="complementary" aria-label="Git panel"
+     onkeydown={(e) => e.stopPropagation()}>
   <!-- Header -->
   <div class="panel-header">
     <span class="panel-title">Git</span>

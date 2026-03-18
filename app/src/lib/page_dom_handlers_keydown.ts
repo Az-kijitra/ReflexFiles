@@ -97,7 +97,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
     };
     const hasOperationTargets =
       params.getSelectedPaths().length > 0 || Boolean(params.getEntries()[params.getFocusedIndex()]);
-    const isAnyInputActive = Boolean(activeElement && (activeElement as any).tagName === "INPUT");
+    const isAnyInputActive = Boolean(activeElement && ((activeElement as any).tagName === "INPUT" || (activeElement as any).tagName === "TEXTAREA"));
     const searchInputEl = params.getSearchInputEl?.();
     const isSearchInputActive =
       Boolean(searchInputEl && activeElement === searchInputEl) ||
