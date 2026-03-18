@@ -110,7 +110,8 @@ pub fn run() {
             crate::git_cmds::git_add_worktree,
             crate::git_cmds::git_remove_worktree,
             crate::winmerge_cmds::winmerge_compare_files,
-            crate::winmerge_cmds::winmerge_compare_git_head
+            crate::winmerge_cmds::winmerge_compare_git_head,
+            crate::git_cmds::git_log_graph
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

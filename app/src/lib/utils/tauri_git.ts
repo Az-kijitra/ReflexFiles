@@ -67,6 +67,10 @@ export function gitClone(url: string, dest: string): Promise<void> {
   return invoke("git_clone", { url, dest });
 }
 
+export function gitLogGraph(path: string, maxCount = 150): Promise<string> {
+  return invoke("git_log_graph", { path, maxCount });
+}
+
 export function gitListWorktrees(path: string): Promise<GitWorktree[]> {
   return invoke("git_list_worktrees", { path });
 }

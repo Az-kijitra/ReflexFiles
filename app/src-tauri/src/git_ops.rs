@@ -277,6 +277,26 @@ pub fn git_remove_worktree(path: &str, worktree_path: &str) -> Result<(), String
     run_git(&repo_root, &["worktree", "remove", "--force", worktree_path]).map(|_| ())
 }
 
+pub fn git_log_graph(path: &str, max_count: u32) -> Result<String, String> {
+    if !Path::new(path).exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    let repo_root = find_repo_root(path).ok_or_else(|| "Not a git repository".to_string())?;
+    let limit = format!("-{}", max_count);
+    run_git(
+        &repo_root,
+        &[
+            "log",
+            "--graph",
+            "--oneline",
+            "--all",
+            "--decorate",
+            "--color=never",
+            &limit,
+        ],
+    )
+}
+
 pub fn git_clone(url: &str, dest: &str) -> Result<(), String> {
     let output = Command::new("git")
         .args(["clone", url, dest])

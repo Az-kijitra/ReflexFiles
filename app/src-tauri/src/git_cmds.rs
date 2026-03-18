@@ -52,3 +52,8 @@ pub fn git_add_worktree(path: String, worktree_path: String, branch: String, new
 pub fn git_remove_worktree(path: String, worktree_path: String) -> Result<(), String> {
     crate::git_ops::git_remove_worktree(&path, &worktree_path)
 }
+
+#[tauri::command]
+pub fn git_log_graph(path: String, max_count: u32) -> Result<String, String> {
+    crate::git_ops::git_log_graph(&path, max_count)
+}

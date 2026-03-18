@@ -10,6 +10,7 @@
     gitListWorktrees,
     gitAddWorktree,
     gitRemoveWorktree,
+    gitLogGraph,
   } from "$lib/utils/tauri_git";
 
   /** @type {import("$lib/utils/tauri_git").GitRepoStatus | null} */
@@ -28,7 +29,7 @@
   export let onOpenPath = null;
 
   // ── Local state ────────────────────────────────────────────────────────────
-  let tab = "changes"; // "changes" | "branches" | "clone" | "worktrees"
+  let tab = "changes"; // "changes" | "branches" | "log" | "clone" | "worktrees"
 
   /** @type {import("$lib/utils/tauri_git").GitBranch[]} */
   let branches = [];
@@ -61,6 +62,10 @@
   let wtBusy = false;
   let wtError = "";
 
+  let logLines = /** @type {string[]} */ ([]);
+  let logLoading = false;
+  let logError = "";
+
   // ── Derived ────────────────────────────────────────────────────────────────
   $: stagedFiles   = (gitStatus?.statuses ?? []).filter(s => s.xy[0] !== " " && s.xy[0] !== "?");
   $: unstagedFiles = (gitStatus?.statuses ?? []).filter(s => s.xy[1] !== " " && s.xy !== "??");
@@ -79,6 +84,9 @@
     }
     if (t === "worktrees") {
       await loadWorktrees();
+    }
+    if (t === "log") {
+      await loadLog();
     }
   }
 
@@ -212,6 +220,62 @@
     }
   }
 
+  // ── Log ─────────────────────────────────────────────────────────────────────
+  async function loadLog() {
+    logLoading = true;
+    logError = "";
+    try {
+      const raw = await gitLogGraph(currentPath);
+      logLines = raw.split("\n").filter(l => l.length > 0);
+    } catch (e) {
+      logError = String(e);
+    } finally {
+      logLoading = false;
+    }
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  /** Colorize one log line: graph chars, hash, refs, message */
+  function colorizeLogLine(line) {
+    // Split: graph prefix | hash | rest
+    const graphMatch = line.match(/^([^a-f0-9]*)([a-f0-9]{7,})?(.*)$/);
+    if (!graphMatch) return escHtml(line);
+    const graph = graphMatch[1] ?? "";
+    const hash  = graphMatch[2] ?? "";
+    const rest  = graphMatch[3] ?? "";
+
+    // Process graph characters one by one to avoid span-tag corruption
+    let coloredGraph = "";
+    for (const ch of graph) {
+      switch (ch) {
+        case "*": coloredGraph += '<span class="lg-node">*</span>'; break;
+        case "|": coloredGraph += '<span class="lg-pipe">│</span>'; break;
+        case "/": coloredGraph += '<span class="lg-pipe">/</span>'; break;
+        case "\\": coloredGraph += '<span class="lg-pipe">\\</span>'; break;
+        case "-": coloredGraph += '<span class="lg-pipe">─</span>'; break;
+        default:  coloredGraph += escHtml(ch);
+      }
+    }
+
+    // Color (HEAD -> branch, tag: v1.0) refs inside parentheses
+    const coloredRest = escHtml(rest).replace(
+      /\(([^)]+)\)/g,
+      (_, refs) => {
+        const inner = refs.replace(/([^,\s]+)/g, (r) => {
+          if (r.includes("HEAD")) return `<span class="lg-head">${r}</span>`;
+          if (r.startsWith("tag:")) return `<span class="lg-tag">${r}</span>`;
+          return `<span class="lg-ref">${r}</span>`;
+        });
+        return `(${inner})`;
+      }
+    );
+
+    return `${coloredGraph}<span class="lg-hash">${escHtml(hash)}</span>${coloredRest}`;
+  }
+
   // ── Worktrees ───────────────────────────────────────────────────────────────
   async function loadWorktrees() {
     worktreesLoading = true;
@@ -285,6 +349,9 @@
       </button>
       <button class="tab" class:active={tab === "branches"} onclick={() => switchTab("branches")}>
         Branches
+      </button>
+      <button class="tab" class:active={tab === "log"} onclick={() => switchTab("log")}>
+        Log
       </button>
       <button class="tab" class:active={tab === "clone"} onclick={() => switchTab("clone")}>
         Clone
@@ -400,6 +467,24 @@
               {newBranchBusy ? "Creating..." : "Create & switch"}
             </button>
           </div>
+        {/if}
+      </div>
+    {/if}
+
+    <!-- ── Log tab ── -->
+    {#if tab === "log"}
+      <div class="tab-body log-body">
+        {#if logError}
+          <div class="error-msg">{logError}</div>
+        {:else if logLoading}
+          <div class="loading-msg">Loading log...</div>
+        {:else if logLines.length === 0}
+          <div class="empty-msg">No commits found.</div>
+        {:else}
+          <div class="log-toolbar">
+            <button class="action-btn" onclick={loadLog}>↺ Refresh</button>
+          </div>
+          <pre class="log-pre">{#each logLines as line}{@html colorizeLogLine(line) + "\n"}{/each}</pre>
         {/if}
       </div>
     {/if}
@@ -751,6 +836,37 @@
     font-size: 10px;
     color: var(--ui-muted);
   }
+
+  .log-body {
+    padding: 0;
+    gap: 0;
+  }
+
+  .log-toolbar {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--ui-border);
+    flex-shrink: 0;
+  }
+
+  .log-pre {
+    flex: 1;
+    overflow: auto;
+    margin: 0;
+    padding: 6px 8px;
+    font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--ui-fg);
+    white-space: pre;
+    min-height: 0;
+  }
+
+  :global(.lg-node) { color: #f0c040; font-weight: 700; }
+  :global(.lg-pipe) { color: #5599cc; }
+  :global(.lg-hash) { color: #c0a060; }
+  :global(.lg-ref)  { color: #4caf70; }
+  :global(.lg-head) { color: #e05050; font-weight: 700; }
+  :global(.lg-tag)  { color: #cc88cc; }
 
   .wt-row {
     display: flex;
