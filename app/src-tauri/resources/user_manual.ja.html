@@ -73,6 +73,7 @@
 </ul>
 <hr>
 <h2>画面構成</h2>
+<h3>シングルペインモード（既定）</h3>
 <ol>
 <li><strong>メニューバー</strong></li>
 <li><strong>PATH バー</strong></li>
@@ -80,6 +81,14 @@
 <li><strong>ファイル一覧（複数列表示）</strong></li>
 <li><strong>ステータスバー</strong></li>
 </ol>
+<h3>デュアルペインモード（F3 で切替）</h3>
+<ol>
+<li><strong>メニューバー</strong></li>
+<li><strong>左ペイン</strong> — PATH バー + ファイル一覧</li>
+<li><strong>右ペイン</strong> — PATH バー + ファイル一覧</li>
+<li><strong>ステータスバー</strong></li>
+</ol>
+<p>デュアルペインモードではツリービューは非表示になります。各ペインは独立して操作できます。</p>
 <hr>
 <h2>初めての使い方（3分で分かる）</h2>
 <ol>
@@ -147,7 +156,11 @@
 <li><strong>Ctrl+Space / Ctrl+Shift+Space</strong> で補完候補を前進 / 後退（PATH 入力時）</li>
 <li>補完候補表示中に <strong>Enter</strong> を押すと、現在の候補を確定してそのディレクトリへ移動します（候補表示は終了し、フォーカスは一覧へ戻ります）</li>
 <li>補完候補表示中に <strong>\ / ¥</strong> を入力すると、現在候補のディレクトリを確定して続けて入力できます</li>
-<li><strong>Tab / Shift+Tab</strong> でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）</li>
+<li><strong>Tab / Shift+Tab</strong> でフォーカス移動（ファイル一覧 → PATH → ツリー → 一覧）
+<ul>
+<li>デュアルペインモードでは <strong>Ctrl+Tab</strong> でアクティブペインを切替えます</li>
+</ul>
+</li>
 <li><strong>Ctrl+Shift+O / Ctrl+H</strong> でジャンプリスト / 履歴を表示</li>
 <li>PATH補完および候補表示は、<strong>ローカルファイルシステムのパスのみ</strong>を対象とします。</li>
 <li><code>gdrive://</code> パスは PATH補完/候補表示の対象外です。</li>
@@ -193,6 +206,14 @@
 <li>クリック / キーボードで展開・移動</li>
 <li>ファイル一覧と連動</li>
 <li>表示/非表示の切り替え（View メニュー / Ctrl+Shift+B）</li>
+</ul>
+</li>
+<li><strong>デュアルペインレイアウト</strong>
+<ul>
+<li><strong>F3</strong> でシングル/デュアルペインを切替え</li>
+<li><strong>Ctrl+Tab</strong> でアクティブペインを切替え</li>
+<li>各ペインが独立したパス・選択状態で操作可能</li>
+<li>デュアルペインモード中はツリービューは非表示</li>
 </ul>
 </li>
 <li><strong>検索</strong>
@@ -465,6 +486,16 @@
 <td>Ctrl+Alt+X</td>
 </tr>
 <tr>
+<td>レイアウト</td>
+<td>デュアル/シングルペイン切替</td>
+<td>F3</td>
+</tr>
+<tr>
+<td>レイアウト</td>
+<td>アクティブペイン切替</td>
+<td>Ctrl+Tab</td>
+</tr>
+<tr>
 <td>外部アプリ</td>
 <td>エクスプローラーで開く</td>
 <td>Ctrl+Alt+E</td>
@@ -700,6 +731,13 @@
 <li>対象ファイルを選択</li>
 <li><strong>ZIP 作成</strong> を実行</li>
 <li>生成された ZIP を外部アプリで開く / 送付する</li>
+</ol>
+<h3>例4: 2つのフォルダ間でファイルをコピーする（デュアルペイン）</h3>
+<ol>
+<li><strong>F3</strong> でデュアルペインモードに切替え</li>
+<li>左右各ペインをコピー元・コピー先フォルダに移動</li>
+<li>コピー元ペインでファイルを選択し <strong>Ctrl+C</strong></li>
+<li><strong>Ctrl+Tab</strong> でコピー先ペインに切替え、<strong>Ctrl+V</strong> でペースト</li>
 </ol>
 <hr>
 <h2>既知の問題</h2>

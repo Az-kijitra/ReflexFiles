@@ -1413,10 +1413,6 @@
     settingsReporting = false;
     settingsReportMessage = "";
     settingsReportIsError = false;
-    settingsGdriveAuthError = "";
-    settingsGdriveAuthMessage = "";
-    settingsGdriveWorkcopyError = "";
-    settingsGdriveWorkcopyMessage = "";
     try {
       const config = await invoke("config_get");
       settingsInitial = normalizeSettingsConfig(config || {});
