@@ -71,6 +71,8 @@ pub struct AppConfig {
     pub external_git_client_path: String,
     #[serde(rename = "external_vscode_path", alias = "vscode_path")]
     pub external_vscode_path: String,
+    #[serde(rename = "external_winmerge_path")]
+    pub external_winmerge_path: String,
     #[serde(rename = "external_terminal_profile", alias = "terminal_profile")]
     pub external_terminal_profile: String,
     #[serde(

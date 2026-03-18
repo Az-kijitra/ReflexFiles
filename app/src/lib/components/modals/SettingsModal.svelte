@@ -47,6 +47,7 @@
     perf_dir_stats_timeout_ms: Number(initial.perf_dir_stats_timeout_ms ?? 3000),
     external_vscode_path: initial.external_vscode_path ?? "",
     external_git_client_path: initial.external_git_client_path ?? "",
+    external_winmerge_path: initial.external_winmerge_path ?? "",
     external_terminal_profile: initial.external_terminal_profile ?? "",
     external_terminal_profile_cmd: initial.external_terminal_profile_cmd ?? "",
     external_terminal_profile_powershell: initial.external_terminal_profile_powershell ?? "",
@@ -70,6 +71,7 @@
       perf_dir_stats_timeout_ms: clampTimeoutMs(values?.perf_dir_stats_timeout_ms),
       external_vscode_path: String(values?.external_vscode_path || "").trim(),
       external_git_client_path: String(values?.external_git_client_path || "").trim(),
+      external_winmerge_path: String(values?.external_winmerge_path || "").trim(),
       external_terminal_profile: String(values?.external_terminal_profile || "").trim(),
       external_terminal_profile_cmd: String(values?.external_terminal_profile_cmd || "").trim(),
       external_terminal_profile_powershell: String(
@@ -276,6 +278,16 @@
           <span>{t("settings.external_git_client_path")}</span>
           <input type="text" bind:value={draft.external_git_client_path} />
           <small>{t("settings.desc.external_git_client_path")}</small>
+        </label>
+
+        <label class="settings-row">
+          <span>WinMerge path</span>
+          <input
+            type="text"
+            bind:value={draft.external_winmerge_path}
+            placeholder="C:\Program Files\WinMerge\WinMergeU.exe"
+          />
+          <small>Path to WinMergeU.exe. Leave blank to auto-detect from standard install locations.</small>
         </label>
 
         <div class="settings-diagnostics">

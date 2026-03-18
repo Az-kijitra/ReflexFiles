@@ -21,6 +21,18 @@ pub struct GitRepoStatus {
 }
 
 #[derive(Serialize)]
+pub struct GitWorktree {
+    /// Absolute path of the worktree directory (forward-slash separators)
+    pub path: String,
+    /// Branch checked out in this worktree (empty if detached HEAD)
+    pub branch: String,
+    /// True for the main worktree (the original repository)
+    pub is_main: bool,
+    /// True if this is a bare worktree
+    pub is_bare: bool,
+}
+
+#[derive(Serialize)]
 pub struct GitBranch {
     pub name: String,
     pub is_current: bool,
@@ -196,6 +208,73 @@ pub fn git_unstage(path: &str, file_paths: &[String]) -> Result<(), String> {
 pub fn git_commit(path: &str, message: &str) -> Result<(), String> {
     let repo_root = find_repo_root(path).ok_or_else(|| "Not a git repository".to_string())?;
     run_git(&repo_root, &["commit", "-m", message]).map(|_| ())
+}
+
+pub fn git_list_worktrees(path: &str) -> Result<Vec<GitWorktree>, String> {
+    if !Path::new(path).exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    let repo_root = find_repo_root(path).ok_or_else(|| "Not a git repository".to_string())?;
+    let output = run_git(&repo_root, &["worktree", "list", "--porcelain"])?;
+
+    let mut worktrees: Vec<GitWorktree> = Vec::new();
+    let mut cur_path: Option<String> = None;
+    let mut cur_branch = String::new();
+    let mut cur_bare = false;
+    let mut count: usize = 0;
+
+    let mut flush = |worktrees: &mut Vec<GitWorktree>,
+                     path: &mut Option<String>,
+                     branch: &mut String,
+                     bare: &mut bool,
+                     count: &mut usize| {
+        if let Some(p) = path.take() {
+            worktrees.push(GitWorktree {
+                path: p,
+                branch: branch.clone(),
+                is_main: *count == 0,
+                is_bare: *bare,
+            });
+            *count += 1;
+            *branch = String::new();
+            *bare = false;
+        }
+    };
+
+    for line in output.lines() {
+        if line.starts_with("worktree ") {
+            flush(&mut worktrees, &mut cur_path, &mut cur_branch, &mut cur_bare, &mut count);
+            cur_path = Some(line[9..].trim().replace('\\', "/").to_string());
+        } else if line.starts_with("branch ") {
+            let refs = line[7..].trim();
+            cur_branch = refs.strip_prefix("refs/heads/").unwrap_or(refs).to_string();
+        } else if line == "bare" {
+            cur_bare = true;
+        }
+    }
+    flush(&mut worktrees, &mut cur_path, &mut cur_branch, &mut cur_bare, &mut count);
+
+    Ok(worktrees)
+}
+
+pub fn git_add_worktree(path: &str, worktree_path: &str, branch: &str, new_branch: bool) -> Result<(), String> {
+    if !Path::new(path).exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    let repo_root = find_repo_root(path).ok_or_else(|| "Not a git repository".to_string())?;
+    if new_branch {
+        run_git(&repo_root, &["worktree", "add", "-b", branch, worktree_path]).map(|_| ())
+    } else {
+        run_git(&repo_root, &["worktree", "add", worktree_path, branch]).map(|_| ())
+    }
+}
+
+pub fn git_remove_worktree(path: &str, worktree_path: &str) -> Result<(), String> {
+    if !Path::new(path).exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    let repo_root = find_repo_root(path).ok_or_else(|| "Not a git repository".to_string())?;
+    run_git(&repo_root, &["worktree", "remove", "--force", worktree_path]).map(|_| ())
 }
 
 pub fn git_clone(url: &str, dest: &str) -> Result<(), String> {

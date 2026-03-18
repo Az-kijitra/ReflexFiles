@@ -22,6 +22,17 @@ export interface GitBranch {
   is_remote: boolean;
 }
 
+export interface GitWorktree {
+  /** Absolute path of the worktree directory */
+  path: string;
+  /** Branch checked out (empty if detached HEAD) */
+  branch: string;
+  /** True for the main worktree */
+  is_main: boolean;
+  /** True if bare */
+  is_bare: boolean;
+}
+
 // ── Tauri command wrappers ────────────────────────────────────────────────────
 
 export function gitGetStatus(path: string): Promise<GitRepoStatus> {
@@ -54,6 +65,18 @@ export function gitCommit(path: string, message: string): Promise<void> {
 
 export function gitClone(url: string, dest: string): Promise<void> {
   return invoke("git_clone", { url, dest });
+}
+
+export function gitListWorktrees(path: string): Promise<GitWorktree[]> {
+  return invoke("git_list_worktrees", { path });
+}
+
+export function gitAddWorktree(path: string, worktreePath: string, branch: string, newBranch: boolean): Promise<void> {
+  return invoke("git_add_worktree", { path, worktreePath, branch, newBranch });
+}
+
+export function gitRemoveWorktree(path: string, worktreePath: string): Promise<void> {
+  return invoke("git_remove_worktree", { path, worktreePath });
 }
 
 // ── Badge logic ───────────────────────────────────────────────────────────────

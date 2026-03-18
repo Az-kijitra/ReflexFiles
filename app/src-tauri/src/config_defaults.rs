@@ -39,6 +39,7 @@ pub fn default_app_config() -> AppConfig {
         external_apps: Vec::new(),
         external_git_client_path: String::new(),
         external_vscode_path: String::new(),
+        external_winmerge_path: String::new(),
         external_terminal_profile: String::new(),
         external_terminal_profile_cmd: String::new(),
         external_terminal_profile_powershell: String::new(),
@@ -135,6 +136,7 @@ pub fn normalize_config(mut config: AppConfig) -> AppConfig {
 
     config.external_vscode_path = normalize_executable_path(&config.external_vscode_path);
     config.external_git_client_path = normalize_executable_path(&config.external_git_client_path);
+    config.external_winmerge_path = normalize_executable_path(&config.external_winmerge_path);
     config.external_terminal_profile =
         normalize_single_line(&config.external_terminal_profile, 256);
     config.external_terminal_profile_cmd =

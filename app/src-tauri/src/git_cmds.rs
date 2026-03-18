@@ -37,3 +37,18 @@ pub fn git_commit(path: String, message: String) -> Result<(), String> {
 pub fn git_clone(url: String, dest: String) -> Result<(), String> {
     crate::git_ops::git_clone(&url, &dest)
 }
+
+#[tauri::command]
+pub fn git_list_worktrees(path: String) -> Result<Vec<crate::git_ops::GitWorktree>, String> {
+    crate::git_ops::git_list_worktrees(&path)
+}
+
+#[tauri::command]
+pub fn git_add_worktree(path: String, worktree_path: String, branch: String, new_branch: bool) -> Result<(), String> {
+    crate::git_ops::git_add_worktree(&path, &worktree_path, &branch, new_branch)
+}
+
+#[tauri::command]
+pub fn git_remove_worktree(path: String, worktree_path: String) -> Result<(), String> {
+    crate::git_ops::git_remove_worktree(&path, &worktree_path)
+}

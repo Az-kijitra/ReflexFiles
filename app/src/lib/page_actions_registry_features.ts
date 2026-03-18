@@ -97,6 +97,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     openUserManual,
     openAbout,
     closeAbout,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   } = buildExternalFeature(ctx, { setStatusMessage, showError });
 
   const {
@@ -241,6 +243,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     runExternalApp,
     getExternalApps,
     startExplorerDrag,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {

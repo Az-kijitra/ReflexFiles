@@ -1,6 +1,7 @@
 import { getParentPath } from "$lib/utils/path";
 import { STATUS_LONG_MS, STATUS_SHORT_MS } from "$lib/ui_durations";
 import { formatError } from "$lib/utils/error_format";
+import { winmergeCompareFiles, winmergeCompareGitHead } from "$lib/utils/tauri_winmerge";
 const VIEWER_SUPPORTED_EXTS = new Set([
   "md", "markdown",
   "png", "jpg", "jpeg", "bmp",
@@ -313,6 +314,22 @@ export function createExternalActions(ctx, helpers) {
     }
   }
 
+  async function compareWithWinMerge(path1, path2) {
+    try {
+      await winmergeCompareFiles(path1, path2);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  async function compareWithWinMergeGitHead(path) {
+    try {
+      await winmergeCompareGitHead(path);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
   return {
     getExternalApps,
     getTargetEntry,
@@ -333,5 +350,7 @@ export function createExternalActions(ctx, helpers) {
     openAbout,
     closeAbout,
     closeViewer,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   };
 }

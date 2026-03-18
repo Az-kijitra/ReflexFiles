@@ -198,6 +198,7 @@ fn localize_config_comments_to_en(mut text: String) -> String {
         ("# --- 外部ツール ---\n", "# --- External Tools ---\n"),
         ("# Git クライアントのパス。\n", "# Git client path.\n"),
         ("# VSCode のパス。\n", "# VS Code path.\n"),
+        ("# WinMerge のパス。\n", "# WinMerge path.\n"),
         (
             "# ターミナルプロファイル名。空で既定。\n",
             "# Terminal profile name (empty uses default profile).\n",
@@ -381,6 +382,11 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     out.push_str(&format!(
         "external_vscode_path = {}\n\n",
         toml_string(&config.external_vscode_path)
+    ));
+    out.push_str("# WinMerge のパス。\n");
+    out.push_str(&format!(
+        "external_winmerge_path = {}\n\n",
+        toml_string(&config.external_winmerge_path)
     ));
     let terminal_profile_names = detect_terminal_profile_names();
 

@@ -7,6 +7,9 @@
     gitUnstage,
     gitCommit,
     gitClone,
+    gitListWorktrees,
+    gitAddWorktree,
+    gitRemoveWorktree,
   } from "$lib/utils/tauri_git";
 
   /** @type {import("$lib/utils/tauri_git").GitRepoStatus | null} */
@@ -21,8 +24,11 @@
   /** Called after a branch switch / commit / clone so the pane can reload */
   export let onRefresh;
 
+  /** Called when user clicks "Open Left" / "Open Right" for a worktree path */
+  export let onOpenPath = null;
+
   // ── Local state ────────────────────────────────────────────────────────────
-  let tab = "changes"; // "changes" | "branches" | "clone"
+  let tab = "changes"; // "changes" | "branches" | "clone" | "worktrees"
 
   /** @type {import("$lib/utils/tauri_git").GitBranch[]} */
   let branches = [];
@@ -45,6 +51,16 @@
   let stageError = "";
   let stageBusy = false;
 
+  /** @type {import("$lib/utils/tauri_git").GitWorktree[]} */
+  let worktrees = [];
+  let worktreesLoading = false;
+  let worktreesError = "";
+  let wtPath = "";
+  let wtBranch = "";
+  let wtNewBranch = false;
+  let wtBusy = false;
+  let wtError = "";
+
   // ── Derived ────────────────────────────────────────────────────────────────
   $: stagedFiles   = (gitStatus?.statuses ?? []).filter(s => s.xy[0] !== " " && s.xy[0] !== "?");
   $: unstagedFiles = (gitStatus?.statuses ?? []).filter(s => s.xy[1] !== " " && s.xy !== "??");
@@ -60,6 +76,9 @@
     tab = t;
     if (t === "branches" && branches.length === 0) {
       await loadBranches();
+    }
+    if (t === "worktrees") {
+      await loadWorktrees();
     }
   }
 
@@ -193,6 +212,47 @@
     }
   }
 
+  // ── Worktrees ───────────────────────────────────────────────────────────────
+  async function loadWorktrees() {
+    worktreesLoading = true;
+    worktreesError = "";
+    try {
+      worktrees = await gitListWorktrees(currentPath);
+    } catch (e) {
+      worktreesError = String(e);
+    } finally {
+      worktreesLoading = false;
+    }
+  }
+
+  async function addWorktree() {
+    if (!wtPath.trim()) { wtError = "Path required."; return; }
+    if (!wtBranch.trim()) { wtError = "Branch required."; return; }
+    wtError = "";
+    wtBusy = true;
+    try {
+      await gitAddWorktree(currentPath, wtPath.trim(), wtBranch.trim(), wtNewBranch);
+      wtPath = "";
+      wtBranch = "";
+      wtNewBranch = false;
+      await loadWorktrees();
+    } catch (e) {
+      wtError = String(e);
+    } finally {
+      wtBusy = false;
+    }
+  }
+
+  async function removeWorktree(path) {
+    worktreesError = "";
+    try {
+      await gitRemoveWorktree(currentPath, path);
+      await loadWorktrees();
+    } catch (e) {
+      worktreesError = String(e);
+    }
+  }
+
   function statusLabel(xy) {
     if (!xy) return "";
     const x = xy[0], y = xy[1] ?? " ";
@@ -228,6 +288,9 @@
       </button>
       <button class="tab" class:active={tab === "clone"} onclick={() => switchTab("clone")}>
         Clone
+      </button>
+      <button class="tab" class:active={tab === "worktrees"} onclick={() => switchTab("worktrees")}>
+        Worktrees
       </button>
     </div>
 
@@ -354,6 +417,56 @@
         <button class="primary-btn" onclick={doClone} disabled={cloneBusy || !cloneUrl.trim() || !cloneDest.trim()}>
           {cloneBusy ? "Cloning..." : "Clone"}
         </button>
+      </div>
+    {/if}
+
+    <!-- ── Worktrees tab ── -->
+    {#if tab === "worktrees"}
+      <div class="tab-body">
+        {#if worktreesError}
+          <div class="error-msg">{worktreesError}</div>
+        {/if}
+        {#if worktreesLoading}
+          <div class="loading-msg">Loading worktrees...</div>
+        {:else}
+          <div class="file-list">
+            {#each worktrees as wt (wt.path)}
+              <div class="wt-row">
+                <div class="wt-info">
+                  <span class="wt-branch">{wt.branch || "(detached)"}</span>
+                  {#if wt.is_main}<span class="wt-badge">main</span>{/if}
+                  <span class="wt-path" title={wt.path}>{wt.path.split("/").pop() || wt.path}</span>
+                </div>
+                <div class="wt-actions">
+                  {#if onOpenPath}
+                    <button class="mini-btn" onclick={() => onOpenPath(wt.path.replace(/\//g, "\\"), "left")}>L</button>
+                    <button class="mini-btn" onclick={() => onOpenPath(wt.path.replace(/\//g, "\\"), "right")}>R</button>
+                  {/if}
+                  {#if !wt.is_main}
+                    <button class="mini-btn danger" onclick={() => removeWorktree(wt.path)}>✕</button>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+
+          <!-- Add worktree -->
+          <div class="commit-section">
+            <div class="section-label">Add worktree</div>
+            <input class="text-input" type="text" placeholder="Path (e.g. C:\repos\feature)" bind:value={wtPath} />
+            <input class="text-input" type="text" placeholder="Branch name" bind:value={wtBranch} style="margin-top:4px" />
+            <label class="checkbox-row">
+              <input type="checkbox" bind:checked={wtNewBranch} />
+              Create new branch
+            </label>
+            {#if wtError}
+              <div class="error-msg">{wtError}</div>
+            {/if}
+            <button class="primary-btn" onclick={addWorktree} disabled={wtBusy || !wtPath.trim() || !wtBranch.trim()}>
+              {wtBusy ? "Adding..." : "Add worktree"}
+            </button>
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -637,5 +750,72 @@
   .hint {
     font-size: 10px;
     color: var(--ui-muted);
+  }
+
+  .wt-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--ui-border-muted, var(--ui-border));
+    gap: 4px;
+  }
+  .wt-row:last-child { border-bottom: none; }
+
+  .wt-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    flex: 1;
+  }
+
+  .wt-branch {
+    font-size: 11px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wt-path {
+    font-size: 10px;
+    color: var(--ui-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wt-badge {
+    font-size: 9px;
+    padding: 1px 4px;
+    background: var(--ui-accent, #0078d4);
+    color: #fff;
+    border-radius: 2px;
+    align-self: flex-start;
+  }
+
+  .wt-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+  }
+
+  .mini-btn.danger {
+    color: var(--ui-error, #c0392b);
+    border-color: var(--ui-error, #c0392b);
+  }
+  .mini-btn.danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ui-error, #c0392b) 12%, transparent);
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--ui-fg);
+    cursor: pointer;
+    margin-top: 2px;
   }
 </style>

@@ -44,6 +44,8 @@ import {
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
  * @param {() => Promise<void>} [actions.startExplorerDrag]
+ * @param {(path1: string, path2: string) => void} [actions.compareWithWinMerge]
+ * @param {(path: string) => void} [actions.compareWithWinMergeGitHead]
  * @param {() => void} closeContextMenu
  */
 export function createContextMenuItems(ctx, actions, closeContextMenu) {
@@ -67,6 +69,8 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     runExternalApp,
     getExternalApps,
     startExplorerDrag,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   } = actions;
 
   function dndExportReasonLabel(reason) {
@@ -111,6 +115,20 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
 
   function onContextOpenGitClient() {
     openInGitClient();
+    closeContextMenu();
+  }
+
+  function onContextWinMergeCompareSelected() {
+    const selected = ctx.getSelectedPaths();
+    if (selected.length !== 2) return;
+    compareWithWinMerge?.(selected[0], selected[1]);
+    closeContextMenu();
+  }
+
+  function onContextWinMergeGitHead() {
+    const selected = ctx.getSelectedPaths();
+    if (selected.length !== 1) return;
+    compareWithWinMergeGitHead?.(selected[0]);
     closeContextMenu();
   }
 
@@ -304,6 +322,12 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canRenameSingle = isSingle && singleSupports(selectedEntry, "can_rename");
     const canExtractZip = isZip && singleSupports(selectedEntry, "can_archive_extract");
     const extApps = getExternalApps ? getExternalApps() : [];
+    // WinMerge conditions
+    const isTwoFiles =
+      selected.length === 2 &&
+      selectedEntries.length === 2 &&
+      selectedEntries.every((e) => e?.type === "file");
+    const isSingleFile = isSingle && !!selectedEntry && selectedEntry.type === "file";
     const dndExperimentPolicy =
       typeof window !== "undefined" && typeof window.localStorage !== "undefined"
         ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
@@ -365,6 +389,20 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         enabled: isSingle,
         visible: isSingle,
         action: onContextOpenGitClient,
+      },
+      {
+        id: "ctx-winmerge-compare-selected",
+        label: "Compare selected with WinMerge",
+        enabled: isTwoFiles,
+        visible: isTwoFiles,
+        action: onContextWinMergeCompareSelected,
+      },
+      {
+        id: "ctx-winmerge-git-head",
+        label: "Compare with git HEAD (WinMerge)",
+        enabled: isSingleFile,
+        visible: isSingleFile,
+        action: onContextWinMergeGitHead,
       },
       ...extApps.map((app) => ({
         label: app.name,

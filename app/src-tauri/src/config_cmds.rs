@@ -404,6 +404,7 @@ pub fn config_save_preferences(
     perf_dir_stats_timeout_ms: Option<u64>,
     external_vscode_path: Option<String>,
     external_git_client_path: Option<String>,
+    external_winmerge_path: Option<String>,
     external_terminal_profile: Option<String>,
     external_terminal_profile_cmd: Option<String>,
     external_terminal_profile_powershell: Option<String>,
@@ -428,6 +429,9 @@ pub fn config_save_preferences(
     }
     if let Some(value) = external_git_client_path {
         config.external_git_client_path = normalize_executable_path(&value);
+    }
+    if let Some(value) = external_winmerge_path {
+        config.external_winmerge_path = normalize_executable_path(&value);
     }
     if let Some(value) = external_terminal_profile {
         config.external_terminal_profile = normalize_single_line(&value, 256);

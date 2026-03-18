@@ -74,6 +74,7 @@
   import ClipboardPreview from "$lib/components/ClipboardPreview.svelte";
   import GitPanel from "$lib/components/GitPanel.svelte";
   import { gitGetStatus, getEntryGitBadge } from "$lib/utils/tauri_git";
+  import { winmergeCompareFiles } from "$lib/utils/tauri_winmerge";
 
   const defaults = createPageStateDefaults();
 
@@ -1153,6 +1154,35 @@
     return () => window.removeEventListener("keydown", handleDualPaneToggle, { capture: true });
   });
 
+  // Ctrl+W: cross-pane WinMerge comparison (dual mode only)
+  $effect(() => {
+    function handleWinMergeCrossPane(event) {
+      const isCtrlW =
+        event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey &&
+        (event.key === "w" || event.key === "W");
+      if (!isCtrlW) return;
+      if (state.layoutMode !== "dual") return;
+      const activeEl = document.activeElement;
+      if (!activeEl) return;
+      const isInInput = activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA";
+      const isInModal =
+        typeof activeEl.closest === "function" &&
+        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
+      if (isInInput || isInModal) return;
+      const leftSelected = state.selectedPaths;
+      const rightSelected = state.rightPane.selectedPaths;
+      if (leftSelected.length === 1 && rightSelected.length === 1) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void winmergeCompareFiles(leftSelected[0], rightSelected[0]).catch((err) => {
+          actions.showError(err);
+        });
+      }
+    }
+    window.addEventListener("keydown", handleWinMergeCrossPane, { capture: true });
+    return () => window.removeEventListener("keydown", handleWinMergeCrossPane, { capture: true });
+  });
+
   // Active pane's entries — used by ClipboardPreview to detect paste conflicts
   const clipboardPreviewEntries = $derived(
     state.layoutMode === "dual" && state.activePaneId === "right"
@@ -1195,6 +1225,7 @@
       perf_dir_stats_timeout_ms: Math.max(500, Number(config?.perf_dir_stats_timeout_ms || 3000)),
       external_vscode_path: String(config?.external_vscode_path || ""),
       external_git_client_path: String(config?.external_git_client_path || ""),
+      external_winmerge_path: String(config?.external_winmerge_path || ""),
       external_terminal_profile: String(config?.external_terminal_profile || ""),
       external_terminal_profile_cmd: String(config?.external_terminal_profile_cmd || ""),
       external_terminal_profile_powershell: String(
@@ -1223,6 +1254,10 @@
       externalGitClientPath:
         base.external_git_client_path !== next.external_git_client_path
           ? next.external_git_client_path
+          : null,
+      externalWinmergePath:
+        base.external_winmerge_path !== next.external_winmerge_path
+          ? next.external_winmerge_path
           : null,
       externalTerminalProfile:
         base.external_terminal_profile !== next.external_terminal_profile
@@ -1268,7 +1303,7 @@
       return t("settings.validation_timeout_range");
     }
 
-    const pathValues = [values?.external_vscode_path, values?.external_git_client_path];
+    const pathValues = [values?.external_vscode_path, values?.external_git_client_path, values?.external_winmerge_path];
     for (const raw of pathValues) {
       const value = String(raw || "");
       if (value.length > SETTINGS_PATH_MAX_LEN) {
@@ -1858,6 +1893,13 @@
       } else {
         void refreshLeftGitStatus();
         void _leftLoadDir(state.currentPath);
+      }
+    }}
+    onOpenPath={(path, side) => {
+      if (side === "right") {
+        void rightDirHelpers.loadDir(path);
+      } else {
+        void _leftLoadDir(path);
       }
     }}
   />

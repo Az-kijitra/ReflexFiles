@@ -32,6 +32,8 @@ mod watch;
 
 mod git_cmds;
 mod git_ops;
+mod winmerge_cmds;
+mod winmerge_ops;
 
 mod config;
 mod types;
