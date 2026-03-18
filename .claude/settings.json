@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find /c/Users/toshi/git/ReflexFiles/app/src -name *tree* -o -name *Tree*)",
-      "Bash(ls /c/Users/toshi/git/ReflexFiles/app/src-tauri/src/*.rs)",
-      "Bash(ls /c/Users/toshi/git/ReflexFiles/app/src/lib/page_actions_context_menu*.ts)"
-    ]
-  }
-}
