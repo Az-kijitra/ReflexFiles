@@ -28,3 +28,5 @@ app/.env.*
 
 # Generated local large-file test data
 testdata/generated/
+
+.claude/
