@@ -135,7 +135,6 @@
 | rollup | 4.56.0 | MIT | dev | required |
 | sade | 1.8.1 | MIT | dev | required |
 | safe-buffer | 5.1.2 | MIT | dev | required |
-| selenium-webdriver | 4.40.0 | Apache-2.0 | dev | required |
 | set-cookie-parser | 2.7.2 | MIT | dev | required |
 | setimmediate | 1.0.5 | MIT | dev | required |
 | sirv | 3.0.2 | MIT | dev | required |

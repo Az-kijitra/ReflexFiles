@@ -21,11 +21,20 @@ Installation steps depend on the distribution type.
 ---
 
 ## Screen Layout
+### Single-pane mode (default)
 1. **Menu bar**
 2. **PATH bar**
-3. **Tree view (left pane)**
+3. **Tree view (left panel)**
 4. **File list (multi-column)**
 5. **Status bar**
+
+### Dual-pane mode (F3 to toggle)
+1. **Menu bar**
+2. **Left pane** — PATH bar + file list
+3. **Right pane** — PATH bar + file list
+4. **Status bar**
+
+Tree view is hidden in dual-pane mode. Each pane navigates independently.
 
 ---
 
@@ -37,13 +46,13 @@ Installation steps depend on the distribution type.
 3. **Navigate by PATH**
    - Enter a path in PATH bar and press **Enter**.
 4. **Search**
-   - Press `/` to show Search bar and type a query.
+   - Press **Ctrl+F** to show Search bar and type a query.
 5. **Copy / Paste**
    - Use **Ctrl+C** and **Ctrl+V**.
 6. **Bookmark frequently used locations**
-   - Press **Ctrl+Shift+J** to add to Jump List, **Ctrl+J** to open it.
+   - Press **Ctrl+D** to add to Jump List, **Ctrl+Shift+O** to open it.
 7. **Open folder history**
-   - Press **Ctrl+Shift+Y**.
+   - Press **Ctrl+H**.
 
 ---
 
@@ -68,7 +77,8 @@ Installation steps depend on the distribution type.
 - **Ctrl+Space / Ctrl+Shift+Space** cycles PATH completion candidates forward / backward
 - While PATH completion candidates are shown, **Enter** commits the current candidate and navigates to that directory (preview ends and focus returns to list)
 - While PATH completion candidates are shown, typing **\\** confirms the current directory candidate and continues completion under that directory
-- **Tab / Shift+Tab** cycles focus (list -> PATH -> tree -> list)
+- **Tab / Shift+Tab** cycles focus within a pane (list → PATH → tree → list)
+  - In dual-pane mode, **Ctrl+Tab** switches the active pane instead
 - **Ctrl+Shift+O / Ctrl+H** opens Jump List / History
 - PATH completion and candidate preview are supported for **local filesystem paths only**.
 - `gdrive://` paths are out of scope for PATH completion/candidate preview.
@@ -108,8 +118,13 @@ Supported files open in ReflexViewer.
   - Expand/move by mouse or keyboard
   - Linked with file list
   - Show/hide toggle (View menu / Ctrl+Shift+B)
+- **Dual-Pane Layout**
+  - Toggle single/dual pane with **F3**
+  - Switch active pane with **Ctrl+Tab**
+  - Each pane navigates independently with its own path and selection state
+  - Tree view is hidden in dual-pane mode
 - **Search**
-  - Press `/` to open Search bar
+  - Press **Ctrl+F** to open Search bar
   - Substring and regex search
 - **History / Jump List**
   - History: previously visited paths
@@ -153,39 +168,40 @@ The table below is the default **Windows-like** profile.
 | Navigation | Up/Down/Left/Right | Up / Down / Left / Right |
 | Navigation | Page move | PageUp / PageDown |
 | Action | Undo | Ctrl+Z |
-| Action | Redo | Ctrl+Shift+Z |
+| Action | Redo | Ctrl+Y |
 | Selection | Toggle selection | Space |
 | Selection | Select all | Ctrl+A |
 | Selection | Clear selection | Esc |
 | Action | Open | Enter |
 | Action | Force open with associated app | Shift+Enter |
-| Action | Parent folder | Backspace |
-| Action | Search | / |
+| Action | Parent folder | Alt+Up / Backspace |
+| Action | Search | Ctrl+F |
 | Action | Refresh | F5 |
 | Action | Properties | Alt+Enter |
 | Action | Open config file | Ctrl+, |
 | Action | Exit | Ctrl+Q |
 | View | Toggle tree view | Ctrl+Shift+B |
-| View | Toggle hidden files | Ctrl+H |
+| View | Toggle hidden files | Ctrl+Shift+H |
 | View | Toggle size column | Ctrl+Shift+S |
 | View | Toggle time column | Ctrl+Shift+T |
-| Action | Sort menu | S |
-| Action | Focus PATH | Ctrl+L |
+| Action | Sort menu | Alt+S |
+| Action | Focus PATH | Alt+D |
 | Action | Focus cycle (list/PATH/tree) | Tab / Shift+Tab |
-| Action | PATH completion | Tab |
+| Action | PATH completion | Ctrl+Space / Ctrl+Shift+Space |
 | Action | Keymap | F1 |
-| History | Open history | Ctrl+Y |
-| Jump List | Open jump list | Ctrl+J |
-| Jump List | Add current path to jump list | Ctrl+Shift+J |
-| Jump List | Add URL to jump list | Ctrl+Shift+U |
+| History | Open history | Ctrl+H |
+| Jump List | Open jump list | Ctrl+Shift+O |
+| Jump List | Add current path to jump list | Ctrl+D |
+| Jump List | Add URL to jump list | Ctrl+Shift+D |
 | File | Copy | Ctrl+C |
 | File | Cut | Ctrl+X |
 | File | Paste | Ctrl+V |
 | File | Delete | Delete |
 | File | Rename | F2 |
-| File | Create new | Ctrl+N |
-| File | Duplicate | Ctrl+D |
-| File | Add date prefix | Ctrl+Shift+D |
+| File | Create new file | Ctrl+N |
+| File | Create new folder | Ctrl+Shift+N |
+| File | Duplicate | Ctrl+Shift+C |
+| File | Add date prefix | Ctrl+Alt+D |
 | ZIP | Create ZIP | Ctrl+Alt+Z |
 | ZIP | Extract ZIP | Ctrl+Alt+X |
 | External app | Open in Explorer | Ctrl+Alt+E |
@@ -195,6 +211,8 @@ The table below is the default **Windows-like** profile.
 | External app | Open in WSL profile | Ctrl+Alt+3 |
 | External app | Open in VS Code | Ctrl+Alt+V |
 | External app | Open in Git client | Ctrl+Alt+Shift+G |
+| Layout | Toggle dual/single pane | F3 |
+| Layout | Switch active pane | Ctrl+Tab |
 
 > You can customize key bindings in config.
 
@@ -346,6 +364,12 @@ In **Settings > Advanced**, conflict warnings include:
 1. Select target files
 2. Run **Create ZIP**
 3. Open/send the generated ZIP
+
+### Example 4: Copy files between two folders (dual-pane)
+1. Press **F3** to enable dual-pane mode
+2. Navigate each pane to source and destination folders
+3. Select files in source pane, press **Ctrl+C**
+4. Switch to destination pane with **Ctrl+Tab**, press **Ctrl+V**
 
 ---
 

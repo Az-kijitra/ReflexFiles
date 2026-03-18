@@ -7,6 +7,18 @@ https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+### Added
+- Dual-pane layout: press **F3** to toggle single/dual pane, **Ctrl+Tab** to switch active pane. Each pane navigates independently.
+
+### Removed
+- Selenium-based E2E test suite (`app/e2e/`, `app/scripts/e2e/`, `.github/workflows/e2e-tauri.yml`) removed. Tests were written for single-pane mode only and had not been updated to reflect the dual-pane layout.
+
+### Fixed
+- `getPasteConflicts` now performs case-insensitive file name comparison on Windows.
+- `loadDir` race condition resolved with a `loadSeq` counter so stale directory responses are discarded.
+- `watchRefreshTimer` cleanup was missing on unmount; removed ancestor-path FS watch trigger to prevent spurious refreshes.
+- `autofocus` helper now returns a `destroy()` function to clear the pending timer on teardown.
+
 ## [0.4.0] - 2026-03-09
 
 ### Added
