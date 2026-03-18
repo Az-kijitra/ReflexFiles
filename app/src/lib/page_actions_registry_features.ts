@@ -81,11 +81,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const {
     getExternalApps,
     getTargetEntry,
-    resolveGdriveWorkcopyBadge,
-    refreshGdriveWorkcopyBadges,
     runExternalApp,
     openEntry,
-    syncGdriveWorkcopyForEntry,
     openFocusedOrSelected,
     openParentForSelection,
     openInExplorer,
@@ -100,6 +97,8 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     openUserManual,
     openAbout,
     closeAbout,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   } = buildExternalFeature(ctx, { setStatusMessage, showError });
 
   const {
@@ -243,8 +242,9 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     showError,
     runExternalApp,
     getExternalApps,
-    syncGdriveWorkcopyForEntry,
     startExplorerDrag,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   });
   const { openZipCreate, openZipExtract, runZipAction, closeZipModal } = zipActions;
   const {
@@ -308,13 +308,12 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
   const areOperationEntriesLocal = () =>
     getOperationEntries().every((entry) => {
       const provider = String(entry?.ref?.provider || "").toLowerCase();
-      return provider === "local" || !String(entry?.path || "").startsWith("gdrive://");
+      return provider === "local" || !provider;
     });
   const canDuplicateTargets = () => canCopyTargets() && areOperationEntriesLocal();
   const isLocalLikeEntry = (entry: any) => {
     const provider = String(entry?.ref?.provider || "").toLowerCase();
-    const path = String(entry?.path || "");
-    return provider === "local" || (!provider && !path.startsWith("gdrive://")) || !path.startsWith("gdrive://");
+    return provider === "local" || !provider;
   };
   const canPrefixDateTargets = () => allEntriesSupport(getOperationEntries(), "can_rename");
   const canCutTargets = () => allEntriesSupport(getOperationEntries(), "can_move");
@@ -449,8 +448,6 @@ export function buildPageActionsFeatures(ctx: PageActionsRegistryContext) {
     onContextDelete,
     onContextProperties,
     getExternalApps,
-    resolveGdriveWorkcopyBadge,
-    refreshGdriveWorkcopyBadges,
     runExternalApp,
     getTargetEntry,
   };

@@ -9,6 +9,11 @@ import { buildPageSettersInputsFromGroups } from "./page_setters_inputs_from_gro
 export function buildPageSettersInputsFromState(params) {
   const { state, setStatusTimer } = params;
 
+  // In dual-pane mode, callers MUST provide getActivePane (DOM-focus-based).
+  // Falling back to activePaneId is intentionally removed: it can be stale or
+  // incorrect, causing setters to silently write to the wrong pane.
+  const getActivePane = params.getActivePane ?? (() => state);
+
   return buildPageSettersInputsFromGroups({
     paste: {
       setPasteConfirmOpen: (value) => {
@@ -110,13 +115,13 @@ export function buildPageSettersInputsFromState(params) {
     },
     selection: {
       setFocusedIndex: (value) => {
-        state.focusedIndex = value;
+        getActivePane().focusedIndex = value;
       },
       setSelected: (paths) => {
-        state.selectedPaths = paths;
+        getActivePane().selectedPaths = paths;
       },
       setAnchorIndex: (value) => {
-        state.anchorIndex = value;
+        getActivePane().anchorIndex = value;
       },
     },
     contextMenu: {
@@ -149,7 +154,7 @@ export function buildPageSettersInputsFromState(params) {
     },
     failure: {
       setError: (value) => {
-        state.error = value;
+        getActivePane().error = value;
       },
       setFailureModalOpen: (value) => {
         state.failureModalOpen = value;

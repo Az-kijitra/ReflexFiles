@@ -11,7 +11,6 @@ pub enum EntryType {
 #[serde(rename_all = "lowercase")]
 pub enum StorageProvider {
     Local,
-    Gdrive,
     #[serde(other)]
     Unknown,
 }

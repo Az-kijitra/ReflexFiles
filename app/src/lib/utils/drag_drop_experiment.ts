@@ -77,7 +77,6 @@ function isWindowsAbsoluteOrUnc(path: string): boolean {
 
 function isLocalLikePath(path: string): boolean {
   if (!path) return false;
-  if (path.startsWith("gdrive://")) return false;
   return isWindowsAbsoluteOrUnc(path);
 }
 
@@ -102,9 +101,6 @@ function canAcceptInboundToDestination(
   destinationPath: string,
   caps?: ProviderCapabilities | null,
 ): DragDropDecision["reason"] | "ok" {
-  if (destinationProvider === "gdrive" || destinationPath.startsWith("gdrive://")) {
-    return "destination_not_local";
-  }
   if (caps && (!caps.can_create || !caps.can_copy)) {
     return "destination_capability_denied";
   }
@@ -172,7 +168,7 @@ export function evaluateOutboundAppDragCandidate(params: {
   const rejectedPaths: string[] = [];
   for (const entry of params.selectedEntries) {
     const path = normalizeWindowsLikePath(String(entry.path || ""));
-    const isLocal = (entry.provider ?? (path.startsWith("gdrive://") ? "gdrive" : "local")) === "local";
+    const isLocal = (entry.provider ?? "local") === "local";
     if (isLocal && isLocalLikePath(path)) acceptedPaths.push(path);
     else rejectedPaths.push(path);
   }

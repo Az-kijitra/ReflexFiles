@@ -6,11 +6,6 @@ export function handleListKey(event, ctx) {
   const active = ctx.activeElement;
   const reportCapabilityUnavailable = () => ctx.setStatusMessage(ctx.t("capability.not_available"));
   const reportPasteUnavailable = () => {
-    const currentPath = String(ctx.currentPath || "").trim().toLowerCase();
-    if (currentPath.startsWith("gdrive://")) {
-      ctx.setStatusMessage(ctx.t("paste.destination_not_writable"));
-      return;
-    }
     reportCapabilityUnavailable();
   };
   const isPlainDeleteKey =
@@ -265,6 +260,8 @@ export function handleListKey(event, ctx) {
     return true;
   }
   if (ctx.matchesAction(event, "select_toggle")) {
+    const activeTag = (active as any)?.tagName;
+    if (activeTag === "INPUT" || activeTag === "TEXTAREA") return false;
     event.preventDefault();
     ctx.toggleSelection(ctx.focusedIndex, true);
     return true;

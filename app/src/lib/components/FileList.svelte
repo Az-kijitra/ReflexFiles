@@ -36,7 +36,7 @@
   export let listRows = 1;
   export let t;
   export let selectedPaths = [];
-  export let resolveGdriveWorkcopyBadge;
+  export let resolveGitBadge = null;
   export let openContextMenu;
   export let selectRange;
   export let toggleSelection;
@@ -63,17 +63,15 @@
   }
 
   /** @param {import("$lib/types").Entry} entry */
-  function getGdriveWorkcopyBadge(entry) {
-    if (typeof resolveGdriveWorkcopyBadge !== "function") return "";
+  function getGitBadge(entry) {
+    if (typeof resolveGitBadge !== "function") return "";
     try {
-      const value = String(resolveGdriveWorkcopyBadge(entry) || "");
-      return value === "dirty" || value === "local" ? value : "";
+      return String(resolveGitBadge(entry) || "");
     } catch {
       return "";
     }
   }
 
-  $: isGdrivePath = String(currentPath || "").trim().toLowerCase().startsWith("gdrive://");
   $: dndExperimentPolicy =
     typeof window !== "undefined" && typeof window.localStorage !== "undefined"
       ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
@@ -217,7 +215,7 @@
 </script>
 
 <div
-  class="list {showSize ? 'show-size' : ''} {showTime ? 'show-time' : ''} {isGdrivePath ? 'gdrive-surface' : ''} {pathCompletionPreviewActive ? 'path-completion-surface' : ''}"
+  class="list {showSize ? 'show-size' : ''} {showTime ? 'show-time' : ''} {pathCompletionPreviewActive ? 'path-completion-surface' : ''}"
   tabindex="0"
   role="listbox"
   aria-label={t("label.list")}
@@ -245,9 +243,7 @@
           {formatName}
           {formatSize}
           {formatModified}
-          gdriveWorkcopyBadge={getGdriveWorkcopyBadge(entry)}
-          gdriveWorkcopyLocalTitle={t("list.gdrive_workcopy_local")}
-          gdriveWorkcopyDirtyTitle={t("list.gdrive_workcopy_dirty")}
+          gitBadge={getGitBadge(entry)}
           {overflowLeft}
           {overflowRight}
           {visibleColStart}
@@ -299,10 +295,6 @@
     flex: 1;
     min-height: 0;
     color: var(--ui-fg);
-  }
-
-  .list.gdrive-surface {
-    background: var(--ui-gdrive-surface);
   }
 
   .list.path-completion-surface {

@@ -24,19 +24,15 @@ PR 作成時は以下の構成を使ってください。
 - [x] npm run test:keys（キー操作/フォーカス/ショートカット変更時）
 - [x] npm run check
 - [x] cargo test --manifest-path app/src-tauri/Cargo.toml --locked
-- [x] npm run e2e:full（または対象の E2E コマンド）
 
 ## Risks and Rollback
 - 既知のリスク
 - ロールバック手順
 ```
 
-### 記載例（E2E 安定化 + Rust テスト修正）
-- スイート実行時にケース間で発生していた Vite `1422` ポート競合による不安定性を解消。
-- `app/scripts/e2e/run-tauri-selenium.mjs` のプロセス終了処理と起動待機を強化。
+### 記載例（Rust テスト修正）
 - `StorageProvider` への `Debug` derive 追加と、`app/src-tauri/src/storage_provider.rs` のアサーション調整で Rust テストのコンパイルエラーを修正。
 - 検証:
-  - `npm run e2e:full`
   - `cargo test --manifest-path app/src-tauri/Cargo.toml --locked`
 
 ## 開発手順（Windows）
@@ -52,14 +48,12 @@ cd app
 npm run test:keys   # キー操作/フォーカス/ショートカット変更時に先に実行
 npm run docs:keymap-main   # メイン画面キー操作一覧の生成ドキュメントを更新
 npm run check
-npm run e2e:tauri
 ```
 
 キー関連の変更時の推奨順序:
 1. `npm run test:keys`（軽量・高速）
 2. `npm run docs:keymap-main`（内部文書 `development_documents/ja/KEYBOARD_BEHAVIOR_MAIN.ja.md` を再生成）
 3. `npm run build`
-4. 影響範囲に応じた対象 E2E（`e2e:tauri` / `e2e:viewer` / `e2e:settings`）
 
 ## コード品質
 - 変更は目的を明確にし、影響範囲を最小化してください。

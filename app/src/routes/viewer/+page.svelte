@@ -2,8 +2,6 @@
   import { onMount, tick } from "svelte";
   import MarkdownIt from "markdown-it";
   import { invoke, listen, convertFileSrc } from "$lib/tauri_client";
-  import { toGdriveResourceRef } from "$lib/utils/resource_ref";
-
   const markdown = new MarkdownIt({ html: false, linkify: true, breaks: true });
   const MAX_TEXT_BYTES = 2 * 1024 * 1024;
   const SYNTAX_HIGHLIGHT_MAX_CHARS = 1_000_000;
@@ -476,18 +474,11 @@
     }
 
     const token = ++virtualTextRequestToken;
-    const currentRef = toGdriveResourceRef(currentPath);
-    const chunk = currentRef
-      ? await invoke("fs_read_text_viewport_lines_by_ref", {
-          resourceRef: currentRef,
-          startLine: requestStart,
-          lineCount: requestCount,
-        })
-      : await invoke("fs_read_text_viewport_lines", {
-          path: currentPath,
-          startLine: requestStart,
-          lineCount: requestCount,
-        });
+    const chunk = await invoke("fs_read_text_viewport_lines", {
+      path: currentPath,
+      startLine: requestStart,
+      lineCount: requestCount,
+    });
     if (token !== virtualTextRequestToken) {
       return;
     }
@@ -686,20 +677,12 @@
     }
 
     try {
-      const gdriveRef = toGdriveResourceRef(dirPath);
-      const entries = gdriveRef
-        ? await invoke("fs_list_dir_by_ref", {
-            resourceRef: gdriveRef,
-            showHidden: true,
-            sortKey: "name",
-            sortOrder: "asc",
-          })
-        : await invoke("fs_list_dir", {
-            path: dirPath,
-            showHidden: true,
-            sortKey: "name",
-            sortOrder: "asc",
-          });
+      const entries = await invoke("fs_list_dir", {
+        path: dirPath,
+        showHidden: true,
+        sortKey: "name",
+        sortOrder: "asc",
+      });
       if (token !== siblingRefreshToken) {
         return;
       }
@@ -798,26 +781,9 @@
 
   /**
    * @param {string} path
-   * @param {{ provider: "local" | "gdrive", resource_id: string } | null} resourceRef
    */
-  async function resolveViewerKind(path, resourceRef = null) {
-    const byPath = detectKind(path);
-    if (!resourceRef || resourceRef.provider !== "gdrive" || byPath !== "text") {
-      return { kind: byPath, nameHint: "" };
-    }
-    try {
-      const props = await invoke("fs_get_properties_by_ref", { resourceRef });
-      const name = String(props?.name || "").trim();
-      const ext = String(props?.ext || "").trim();
-      const lowerName = name.toLowerCase();
-      const lowerExt = ext.toLowerCase();
-      const kindProbe =
-        name && ext && lowerExt && !lowerName.endsWith(lowerExt) ? `${name}${ext}` : name;
-      const resolvedKind = detectKind(kindProbe || path);
-      return { kind: resolvedKind, nameHint: name };
-    } catch {
-      return { kind: byPath, nameHint: "" };
-    }
+  function resolveViewerKind(path) {
+    return { kind: detectKind(path), nameHint: "" };
   }
 
   function resetView() {
@@ -1199,13 +1165,6 @@
 
   async function readImageDataUrl(path, normalize) {
     const targetPath = String(path || "");
-    const gdriveRef = toGdriveResourceRef(targetPath);
-    if (gdriveRef) {
-      return await invoke("fs_read_image_data_url_by_ref", {
-        resourceRef: gdriveRef,
-        normalize,
-      });
-    }
     return await invoke("fs_read_image_data_url", {
       path: targetPath,
       normalize,
@@ -1214,12 +1173,6 @@
 
   async function readImageNormalizedTempPath(path) {
     const targetPath = String(path || "");
-    const gdriveRef = toGdriveResourceRef(targetPath);
-    if (gdriveRef) {
-      return await invoke("fs_read_image_normalized_temp_path_by_ref", {
-        resourceRef: gdriveRef,
-      });
-    }
     return await invoke("fs_read_image_normalized_temp_path", {
       path: targetPath,
     });
@@ -1810,8 +1763,7 @@
     pendingMarkdownJumpHeading = "";
 
     try {
-      const currentRef = toGdriveResourceRef(currentPath);
-      const kindResolved = await resolveViewerKind(currentPath, currentRef);
+      const kindResolved = resolveViewerKind(currentPath);
       currentKind = kindResolved.kind;
       if (kindResolved.nameHint) {
         syncTitle(currentPath, kindResolved.nameHint);
@@ -1835,13 +1787,9 @@
         void prefetchNeighborImages();
         return;
       }
-      const viewportInfoRaw = currentRef
-        ? await invoke("fs_text_viewport_info_by_ref", {
-            resourceRef: currentRef,
-          })
-        : await invoke("fs_text_viewport_info", {
-            path: currentPath,
-          });
+      const viewportInfoRaw = await invoke("fs_text_viewport_info", {
+        path: currentPath,
+      });
       const viewportFileSize = Math.max(0, Number(viewportInfoRaw?.fileSize ?? 0) || 0);
       const viewportTotalLines = Math.max(1, Number(viewportInfoRaw?.totalLines ?? 1) || 1);
       const useVirtualText =
@@ -1872,15 +1820,10 @@
         return;
       }
 
-      const rawText = currentRef
-        ? await invoke("fs_read_text_by_ref", {
-            resourceRef: currentRef,
-            maxBytes: MAX_TEXT_BYTES,
-          })
-        : await invoke("fs_read_text", {
-            path: currentPath,
-            maxBytes: MAX_TEXT_BYTES,
-          });
+      const rawText = await invoke("fs_read_text", {
+        path: currentPath,
+        maxBytes: MAX_TEXT_BYTES,
+      });
       textContent = String(rawText ?? "");
       rebuildTextLines();
       refreshSyntaxHighlight();

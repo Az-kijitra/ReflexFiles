@@ -9,9 +9,8 @@
   export let formatName;
   export let formatSize;
   export let formatModified;
-  export let gdriveWorkcopyBadge = "";
-  export let gdriveWorkcopyLocalTitle = "";
-  export let gdriveWorkcopyDirtyTitle = "";
+  /** Git status badge: "M" modified, "S" staged, "D" deleted, "?" untracked, "!" conflict, "" clean */
+  export let gitBadge = "";
   export let overflowLeft = false;
   export let overflowRight = false;
   export let visualIndex = 0;
@@ -49,19 +48,14 @@
   }}
 >
   <div class="name">
+    <span class="mark" aria-hidden="true">{selected ? '[x]' : '[ ]'}</span>
+    {#if gitBadge}
+      <span class="git-badge git-badge-{gitBadge === '!' ? 'conflict' : gitBadge === 'S' ? 'staged' : gitBadge === 'M' ? 'modified' : gitBadge === 'D' ? 'deleted' : 'untracked'}" aria-hidden="true">{gitBadge}</span>
+    {/if}
     {#if entryIcon}
       <span class="icon">{entryIcon}</span>
     {/if}
     <span class="text">{formatName(entry.name, entry.ext)}</span>
-    {#if gdriveWorkcopyBadge === "local" || gdriveWorkcopyBadge === "dirty"}
-      <span
-        class="gdrive-workcopy-badge {gdriveWorkcopyBadge === 'dirty' ? 'dirty' : 'local'}"
-        title={gdriveWorkcopyBadge === "dirty" ? gdriveWorkcopyDirtyTitle : gdriveWorkcopyLocalTitle}
-        aria-label={gdriveWorkcopyBadge === "dirty" ? gdriveWorkcopyDirtyTitle : gdriveWorkcopyLocalTitle}
-      >
-        {gdriveWorkcopyBadge === "dirty" ? "!" : "W"}
-      </span>
-    {/if}
     {#if overflowLeft && visualIndex === visibleColStart * listRows}
       <span class="edge-marker left">◀</span>
     {/if}
@@ -148,6 +142,19 @@
     overflow: hidden;
   }
 
+  .name .mark {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: center;
+    font-size: 11px;
+    color: var(--ui-muted);
+    letter-spacing: -0.5px;
+  }
+
+  .row.selected .name .mark {
+    color: var(--ui-fg);
+  }
+
   .name .icon {
     width: 1.2em;
     text-align: center;
@@ -160,27 +167,20 @@
     white-space: nowrap;
   }
 
-  .gdrive-workcopy-badge {
-    margin-left: 4px;
-    min-width: 1.2em;
-    text-align: center;
-    font-size: 10px;
-    line-height: 1.4;
-    border: 1px solid var(--ui-border-strong);
-    border-radius: 3px;
-    padding: 0 2px;
+  .git-badge {
     flex: 0 0 auto;
-    color: var(--ui-fg);
-    background: var(--ui-surface-2);
+    font-size: 10px;
+    font-weight: 700;
+    width: 1.3em;
+    text-align: center;
+    border-radius: 2px;
+    line-height: 1.5;
   }
+  .git-badge-modified  { color: #d08800; }
+  .git-badge-staged    { color: #1a8a1a; }
+  .git-badge-deleted   { color: #c0392b; }
+  .git-badge-untracked { color: var(--ui-muted); }
+  .git-badge-conflict  { color: #c0392b; background: #fde8e8; border-radius: 2px; }
 
-  .gdrive-workcopy-badge.local {
-    color: var(--ui-muted);
-  }
-
-  .gdrive-workcopy-badge.dirty {
-    color: var(--ui-error);
-    border-color: var(--ui-error);
-  }
 
 </style>

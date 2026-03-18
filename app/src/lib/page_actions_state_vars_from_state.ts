@@ -1,8 +1,13 @@
 /**
- * @param {{ state: any; statusTimer: ReturnType<typeof setTimeout> | null }} params
+ * @param {{ state: any; statusTimer: ReturnType<typeof setTimeout> | null; getActivePane?: () => any }} params
  */
 export function buildPageActionsStateVarsFromState(params) {
   const { state, statusTimer } = params;
+
+  // In dual-pane mode, callers MUST provide getActivePane (DOM-focus-based).
+  // Falling back to activePaneId is intentionally removed: it can be stale or
+  // incorrect, causing actions to silently target the wrong pane.
+  const activePane = params.getActivePane ? params.getActivePane() : state;
 
   return {
     pastePendingPaths: state.pastePendingPaths,
@@ -31,15 +36,15 @@ export function buildPageActionsStateVarsFromState(params) {
     dropdownOpen: state.dropdownOpen,
     statusMessage: state.statusMessage,
     statusTimer,
-    error: state.error,
+    error: activePane.error,
     failureModalOpen: state.failureModalOpen,
     failureModalTitle: state.failureModalTitle,
     failureItems: state.failureItems,
-    currentPath: state.currentPath,
-    currentPathCapabilities: state.currentPathCapabilities,
-    entries: state.entries,
-    focusedIndex: state.focusedIndex,
-    selectedPaths: state.selectedPaths,
+    currentPath: activePane.currentPath,
+    currentPathCapabilities: activePane.currentPathCapabilities,
+    entries: activePane.entries,
+    focusedIndex: activePane.focusedIndex,
+    selectedPaths: activePane.selectedPaths,
     undoStack: state.undoStack,
     redoStack: state.redoStack,
     zipMode: state.zipMode,

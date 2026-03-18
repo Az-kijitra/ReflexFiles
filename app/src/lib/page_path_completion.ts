@@ -62,11 +62,6 @@ export function createPathCompletionHelpers(params) {
     return String(value || "").replace(/\//g, "\\").toLowerCase();
   }
 
-  /** @param {string} value */
-  function isGdrivePath(value) {
-    return String(value || "").trim().toLowerCase().startsWith("gdrive://");
-  }
-
   function restoreDefaultListView() {
     const recompute = getRecomputeSearch?.();
     if (typeof recompute === "function") {
@@ -189,7 +184,6 @@ export function createPathCompletionHelpers(params) {
     const currentPath = getCurrentPath();
     const absolute = isAbsolutePath(trimmed) ? trimmed : currentPath ? joinPath(currentPath, trimmed) : "";
     if (!absolute) return null;
-    if (isGdrivePath(absolute)) return null;
     const endsWithSep = /[\\\/]+$/.test(absolute);
     if (endsWithSep) {
       let parent = absolute.replace(/[\\\/]+$/, "");
@@ -307,19 +301,9 @@ export function createPathCompletionHelpers(params) {
     if (advanceCompletionSession(normalizedDirection)) return;
     const rawInput = String(pathInput || "");
     const trimmed = rawInput.trim();
-    if (isGdrivePath(trimmed) || (!isAbsolutePath(trimmed) && isGdrivePath(getCurrentPath()))) {
-      clearCompletionSession();
-      getSetStatusMessage()(t("status.path_completion_local_only"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
-      return;
-    }
     const context = getPathCompletionContext(rawInput);
     if (!context || !context.parent) {
       clearCompletionSession();
-      return;
-    }
-    if (isGdrivePath(context.parent)) {
-      clearCompletionSession();
-      getSetStatusMessage()(t("status.path_completion_local_only"), PATH_COMPLETION_ONE_SHOT_STATUS_MS);
       return;
     }
     try {

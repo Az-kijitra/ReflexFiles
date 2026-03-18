@@ -55,6 +55,7 @@ import { setupMenuRuntime } from "./page_menu_runtime";
  *   setDirStatsRequestId: (value: number) => void;
  *   cacheGetDirStats: (path: string) => any;
  *   cacheSetDirStats: (path: string, stats: any) => void;
+ *   getActivePane?: () => any;
  * }} params
  */
 export function setupPageActionsRuntimeFromState(params) {
@@ -66,6 +67,7 @@ export function setupPageActionsRuntimeFromState(params) {
     state,
     statusTimer: params.statusTimer,
     setStatusTimer: params.setStatusTimer,
+    getActivePane: params.getActivePane,
     refs: () => ({
       deleteModalEl: overlayRefs.deleteModalEl,
       renameInputEl: overlayRefs.renameInputEl,
@@ -97,12 +99,15 @@ export function setupPageActionsRuntimeFromState(params) {
 
   applyPageActionGroups(params.actions, pageActionGroups);
 
+  const getActivePane = params.getActivePane ?? (() => state);
+
   Object.assign(
     params.actions,
     setupJumpHandlersBundle(
       buildJumpHandlersInputsFromState({
         state,
         refs: { dropdownEl: overlayRefs.dropdownEl },
+        getActivePane,
         actions: {
           setDropdownMode: (value) => {
             state.dropdownMode = value;
@@ -111,13 +116,13 @@ export function setupPageActionsRuntimeFromState(params) {
             state.dropdownOpen = value;
           },
           setPathInput: (value) => {
-            state.pathInput = value;
+            getActivePane().pathInput = value;
           },
           setFilteredEntries: (value) => {
-            state.filteredEntries = value;
+            getActivePane().filteredEntries = value;
           },
           setPathCompletionPreviewActive: (value) => {
-            state.pathCompletionPreviewActive = Boolean(value);
+            getActivePane().pathCompletionPreviewActive = Boolean(value);
           },
           getRecomputeSearch: () => params.actions.recomputeSearch,
           setStatusMessage: params.actions.setStatusMessage,

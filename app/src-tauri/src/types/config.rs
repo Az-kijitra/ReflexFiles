@@ -71,6 +71,8 @@ pub struct AppConfig {
     pub external_git_client_path: String,
     #[serde(rename = "external_vscode_path", alias = "vscode_path")]
     pub external_vscode_path: String,
+    #[serde(rename = "external_winmerge_path")]
+    pub external_winmerge_path: String,
     #[serde(rename = "external_terminal_profile", alias = "terminal_profile")]
     pub external_terminal_profile: String,
     #[serde(
@@ -88,12 +90,6 @@ pub struct AppConfig {
         alias = "terminal_profile_wsl"
     )]
     pub external_terminal_profile_wsl: String,
-    #[serde(rename = "gdrive_oauth_client_id")]
-    pub gdrive_oauth_client_id: String,
-    #[serde(rename = "gdrive_oauth_redirect_uri")]
-    pub gdrive_oauth_redirect_uri: String,
-    #[serde(rename = "gdrive_account_id")]
-    pub gdrive_account_id: String,
     #[serde(rename = "log_path", alias = "log_file")]
     pub log_path: String,
     #[serde(rename = "log_enabled", alias = "logging_enabled")]

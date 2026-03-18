@@ -43,8 +43,9 @@ import {
  * @param {(err: unknown) => void} actions.showError
  * @param {(app: import("$lib/types").ExternalAppConfig, entry: import("$lib/types").Entry | null) => void} actions.runExternalApp
  * @param {() => import("$lib/types").ExternalAppConfig[]} actions.getExternalApps
- * @param {(entry: import("$lib/types").Entry | null) => void} [actions.syncGdriveWorkcopyForEntry]
  * @param {() => Promise<void>} [actions.startExplorerDrag]
+ * @param {(path1: string, path2: string) => void} [actions.compareWithWinMerge]
+ * @param {(path: string) => void} [actions.compareWithWinMergeGitHead]
  * @param {() => void} closeContextMenu
  */
 export function createContextMenuItems(ctx, actions, closeContextMenu) {
@@ -67,8 +68,9 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     showError,
     runExternalApp,
     getExternalApps,
-    syncGdriveWorkcopyForEntry,
     startExplorerDrag,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   } = actions;
 
   function dndExportReasonLabel(reason) {
@@ -116,21 +118,23 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     closeContextMenu();
   }
 
+  function onContextWinMergeCompareSelected() {
+    const selected = ctx.getSelectedPaths();
+    if (selected.length !== 2) return;
+    compareWithWinMerge?.(selected[0], selected[1]);
+    closeContextMenu();
+  }
+
+  function onContextWinMergeGitHead() {
+    const selected = ctx.getSelectedPaths();
+    if (selected.length !== 1) return;
+    compareWithWinMergeGitHead?.(selected[0]);
+    closeContextMenu();
+  }
+
   async function onContextExplorerDragExperimental() {
     closeContextMenu();
     await startExplorerDrag?.();
-  }
-
-  function onContextGdriveWriteBack() {
-    const selected = ctx.getSelectedPaths();
-    if (selected.length !== 1) return;
-    const target = ctx.getEntries().find((e) => e.path === selected[0]);
-    if (!target || target.type === "dir") {
-      closeContextMenu();
-      return;
-    }
-    syncGdriveWorkcopyForEntry?.(target);
-    closeContextMenu();
   }
 
   /** @param {import("$lib/types").ExternalAppConfig} app */
@@ -264,10 +268,7 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canCreateInCurrentPath = currentPathSupports("can_create");
     const canPasteIntoCurrentPath =
       currentPathSupports("can_copy") || currentPathSupports("can_move");
-    const currentPath = String(ctx.getCurrentPath?.() || "").trim().toLowerCase();
-    const pasteCapabilityReason = currentPath.startsWith("gdrive://")
-      ? ctx.t("paste.destination_not_writable")
-      : capabilityReason;
+    const pasteCapabilityReason = capabilityReason;
     const allSelectedSupport = (capabilityKey) =>
       hasSelection &&
       hasAllSelectedEntries &&
@@ -313,12 +314,6 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         ? !!getParentPath(selected[0])
         : !!getParentPath(ctx.getCurrentPath()));
     const selectedEntry = isSingle ? entries.find((e) => e.path === selected[0]) : null;
-    const isGdriveFile =
-      isSingle &&
-      !!selectedEntry &&
-      selectedEntry.type === "file" &&
-      (selectedEntry?.ref?.provider === "gdrive" ||
-        String(selectedEntry?.path || "").startsWith("gdrive://"));
     const isZip = !!selectedEntry && selectedEntry.ext?.toLowerCase() === ".zip";
     const canCopySelection = allSelectedSupport("can_copy");
     const canMoveSelection = allSelectedSupport("can_move");
@@ -327,6 +322,12 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
     const canRenameSingle = isSingle && singleSupports(selectedEntry, "can_rename");
     const canExtractZip = isZip && singleSupports(selectedEntry, "can_archive_extract");
     const extApps = getExternalApps ? getExternalApps() : [];
+    // WinMerge conditions
+    const isTwoFiles =
+      selected.length === 2 &&
+      selectedEntries.length === 2 &&
+      selectedEntries.every((e) => e?.type === "file");
+    const isSingleFile = isSingle && !!selectedEntry && selectedEntry.type === "file";
     const dndExperimentPolicy =
       typeof window !== "undefined" && typeof window.localStorage !== "undefined"
         ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
@@ -389,19 +390,26 @@ export function createContextMenuItems(ctx, actions, closeContextMenu) {
         visible: isSingle,
         action: onContextOpenGitClient,
       },
+      {
+        id: "ctx-winmerge-compare-selected",
+        label: "Compare selected with WinMerge",
+        enabled: isTwoFiles,
+        visible: isTwoFiles,
+        action: onContextWinMergeCompareSelected,
+      },
+      {
+        id: "ctx-winmerge-git-head",
+        label: "Compare with git HEAD (WinMerge)",
+        enabled: isSingleFile,
+        visible: isSingleFile,
+        action: onContextWinMergeGitHead,
+      },
       ...extApps.map((app) => ({
         label: app.name,
         enabled: isSingle,
         visible: isSingle && !!selectedEntry && selectedEntry.type !== "dir",
         action: () => onContextOpenExternalApp(app),
       })),
-      {
-        id: "ctx-gdrive-write-back",
-        label: ctx.t("context.gdrive_write_back"),
-        enabled: isGdriveFile,
-        visible: isGdriveFile,
-        action: onContextGdriveWriteBack,
-      },
       {
         id: "ctx-open-parent",
         label: ctx.t("context.open_parent"),

@@ -61,6 +61,7 @@ export function buildPageMountRuntimeInputsFromPageState(params) {
     state,
     shellRefs,
     overlayRefs,
+    rightRefs: params.rightRefs,
     handlers: params.handlers,
     deps: {
       homeDir: params.deps.homeDir,

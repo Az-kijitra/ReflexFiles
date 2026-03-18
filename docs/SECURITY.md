@@ -75,7 +75,7 @@ Complete all items before starting Google Drive implementation work.
 4. Security gate evidence
 - `npm run audit:deps` has no unresolved High/Critical findings.
 - Threat model review has no unresolved High/Critical risks.
-- Required PR checks (`quality`, `e2e_pr_quick`) are green.
+- Required PR checks (`quality`) are green.
 
 ## Implementation Start Stop Rule (Google Drive)
 - If any High/Critical risk remains unresolved in threat model, dependency audit, or security review, implementation start is blocked.

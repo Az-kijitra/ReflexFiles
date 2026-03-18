@@ -1,5 +1,4 @@
 use crate::config::{config_path, load_config, save_config, save_history, save_jump_list};
-use crate::config_defaults::DEFAULT_GDRIVE_OAUTH_REDIRECT_URI;
 use crate::error::{format_error, AppErrorKind};
 use crate::types::{AppConfig, FileIconMode, JumpItem, Language, SortKey, SortOrder, Theme};
 use chrono::Local;
@@ -405,13 +404,11 @@ pub fn config_save_preferences(
     perf_dir_stats_timeout_ms: Option<u64>,
     external_vscode_path: Option<String>,
     external_git_client_path: Option<String>,
+    external_winmerge_path: Option<String>,
     external_terminal_profile: Option<String>,
     external_terminal_profile_cmd: Option<String>,
     external_terminal_profile_powershell: Option<String>,
     external_terminal_profile_wsl: Option<String>,
-    gdrive_oauth_client_id: Option<String>,
-    gdrive_oauth_redirect_uri: Option<String>,
-    gdrive_account_id: Option<String>,
 ) -> Result<AppConfig, String> {
     let (mut config, _) = ensure_config()?;
 
@@ -433,6 +430,9 @@ pub fn config_save_preferences(
     if let Some(value) = external_git_client_path {
         config.external_git_client_path = normalize_executable_path(&value);
     }
+    if let Some(value) = external_winmerge_path {
+        config.external_winmerge_path = normalize_executable_path(&value);
+    }
     if let Some(value) = external_terminal_profile {
         config.external_terminal_profile = normalize_single_line(&value, 256);
     }
@@ -444,20 +444,6 @@ pub fn config_save_preferences(
     }
     if let Some(value) = external_terminal_profile_wsl {
         config.external_terminal_profile_wsl = normalize_single_line(&value, 256);
-    }
-    if let Some(value) = gdrive_oauth_client_id {
-        config.gdrive_oauth_client_id = normalize_single_line(&value, 1024);
-    }
-    if let Some(value) = gdrive_oauth_redirect_uri {
-        let normalized = normalize_single_line(&value, 1024);
-        config.gdrive_oauth_redirect_uri = if normalized.is_empty() {
-            DEFAULT_GDRIVE_OAUTH_REDIRECT_URI.to_string()
-        } else {
-            normalized
-        };
-    }
-    if let Some(value) = gdrive_account_id {
-        config.gdrive_account_id = normalize_single_line(&value, 320);
     }
 
     persist_config(&config)?;

@@ -1,7 +1,7 @@
 import { getParentPath } from "$lib/utils/path";
-import { toGdriveResourceRef } from "$lib/utils/resource_ref";
 import { STATUS_LONG_MS, STATUS_SHORT_MS } from "$lib/ui_durations";
 import { formatError } from "$lib/utils/error_format";
+import { winmergeCompareFiles, winmergeCompareGitHead } from "$lib/utils/tauri_winmerge";
 const VIEWER_SUPPORTED_EXTS = new Set([
   "md", "markdown",
   "png", "jpg", "jpeg", "bmp",
@@ -16,118 +16,9 @@ const VIEWER_SUPPORTED_EXTS = new Set([
  */
 export function createExternalActions(ctx, helpers) {
   const { setStatusMessage, showError } = helpers;
-  const gdriveWorkcopyMap = new Map();
-  const openSettingsForGdriveConflict = () => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(
-      new CustomEvent("rf:open-settings", {
-        detail: { section: "advanced", reason: "gdrive_write_conflict" },
-      })
-    );
-  };
-
-  function gdriveWorkcopyKey(resourceRef) {
-    const provider = String(resourceRef?.provider || "").trim().toLowerCase();
-    const resourceId = String(resourceRef?.resource_id || "").trim();
-    if (provider !== "gdrive" || !resourceId) {
-      return "";
-    }
-    return `gdrive:${resourceId}`;
-  }
 
   function getExternalApps() {
     return ctx.normalizeExternalApps(ctx.getExternalAppsRaw());
-  }
-
-  function normalizeCachedResourceRef(resourceRef) {
-    return {
-      provider: "gdrive",
-      resource_id: String(resourceRef?.resource_id || "").trim(),
-    };
-  }
-
-  function updateCachedWorkcopyFromState(resourceRef, state) {
-    const key = gdriveWorkcopyKey(resourceRef);
-    if (!key) return null;
-    const exists = Boolean(state?.exists);
-    const localPath = String(state?.localPath || "").trim();
-    const revision = state?.revision || null;
-    if (!exists || !localPath || !revision) {
-      gdriveWorkcopyMap.delete(key);
-      return null;
-    }
-    const cached = gdriveWorkcopyMap.get(key) || {};
-    const next = {
-      resourceRef: normalizeCachedResourceRef(resourceRef),
-      localPath,
-      fileName: String(state?.fileName || cached.fileName || "").trim() || "file",
-      revision,
-      dirty: Boolean(state?.dirty),
-    };
-    gdriveWorkcopyMap.set(key, next);
-    return next;
-  }
-
-  async function loadCachedWorkcopyFromBackend(resourceRef) {
-    const state = await ctx.invoke("gdrive_get_edit_workcopy_state", { resourceRef });
-    return updateCachedWorkcopyFromState(resourceRef, state);
-  }
-
-  /**
-   * @param {import("$lib/types").Entry[] | null | undefined} entries
-   */
-  async function refreshGdriveWorkcopyBadges(entries = undefined) {
-    const source = Array.isArray(entries) ? entries : ctx.getEntries();
-    if (!Array.isArray(source) || source.length === 0) return;
-    const refs = [];
-    const seenResourceIds = new Set();
-    for (const entry of source) {
-      if (!entry || entry.type !== "file") continue;
-      const resourceRef = resolveResourceRef(entry.path, entry);
-      if (!resourceRef || resourceRef.provider !== "gdrive") continue;
-      const resourceId = String(resourceRef.resource_id || "").trim();
-      if (!resourceId || seenResourceIds.has(resourceId)) continue;
-      seenResourceIds.add(resourceId);
-      refs.push({
-        provider: "gdrive",
-        resource_id: resourceId,
-      });
-    }
-    if (refs.length === 0) return;
-    try {
-      const states = await ctx.invoke("gdrive_get_edit_workcopy_states", { resourceRefs: refs });
-      const handled = new Set();
-      for (const state of Array.isArray(states) ? states : []) {
-        const resourceId = String(state?.resourceId || "").trim();
-        if (!resourceId) continue;
-        const resourceRef = { provider: "gdrive", resource_id: resourceId };
-        const key = gdriveWorkcopyKey(resourceRef);
-        if (!key) continue;
-        handled.add(key);
-        updateCachedWorkcopyFromState(resourceRef, state);
-      }
-      for (const ref of refs) {
-        const key = gdriveWorkcopyKey(ref);
-        if (!key || handled.has(key)) continue;
-        gdriveWorkcopyMap.delete(key);
-      }
-    } catch {
-      // Ignore refresh failures and keep best-effort cache state.
-    }
-  }
-
-  /**
-   * @param {import("$lib/types").Entry | null | undefined} entry
-   * @returns {"" | "local" | "dirty"}
-   */
-  function resolveGdriveWorkcopyBadge(entry) {
-    if (!entry || entry.type !== "file") return "";
-    const resourceRef = resolveResourceRef(entry.path, entry);
-    const key = gdriveWorkcopyKey(resourceRef);
-    if (!key) return "";
-    const cached = gdriveWorkcopyMap.get(key);
-    if (!cached) return "";
-    return cached.dirty ? "dirty" : "local";
   }
 
   function getTargetEntry() {
@@ -161,17 +52,12 @@ export function createExternalActions(ctx, helpers) {
       return;
     }
     const currentPath = ctx.getCurrentPath();
-    const resourceRef = resolveResourceRef(entry.path, entry);
     const targetPath =
       entry.type === "dir"
         ? entry.path
         : currentPath || entry.path;
     try {
-      let effectivePath = targetPath;
-      if (entry.type === "file") {
-        effectivePath = await resolveAssociatedOpenPath(targetPath, resourceRef, entry.name || "");
-      }
-      const args = buildExternalArgs(app.args || [], effectivePath, currentPath || "");
+      const args = buildExternalArgs(app.args || [], targetPath, currentPath || "");
       await ctx.invoke("external_open_custom", { command: app.command, args });
     } catch (err) {
       showError(err);
@@ -202,28 +88,9 @@ export function createExternalActions(ctx, helpers) {
     return VIEWER_SUPPORTED_EXTS.has(ext);
   }
 
-  function resolveResourceRef(path, entry = null) {
-    const fromEntry = entry?.ref;
-    if (
-      fromEntry &&
-      (fromEntry.provider === "local" || fromEntry.provider === "gdrive") &&
-      String(fromEntry.resource_id || "").trim().length > 0
-    ) {
-      return fromEntry;
-    }
-    return toGdriveResourceRef(path);
-  }
-
   /** @param {string} path */
-  async function isProbablyTextByContent(path, resourceRef = null) {
+  async function isProbablyTextByContent(path) {
     try {
-      if (resourceRef) {
-        const result = await ctx.invoke("fs_is_probably_text_by_ref", {
-          resourceRef,
-          sampleBytes: 65536,
-        });
-        return !!result;
-      }
       const result = await ctx.invoke("fs_is_probably_text", { path, sampleBytes: 65536 });
       return !!result;
     } catch {
@@ -235,134 +102,12 @@ export function createExternalActions(ctx, helpers) {
    * @param {string} path
    * @param {string | undefined} jumpHint
    */
-  async function openViewerWindow(path, jumpHint = undefined, resourceRef = null) {
+  async function openViewerWindow(path, jumpHint = undefined) {
     await ctx.invoke("open_viewer", {
       path,
-      resourceRef,
       jumpHint,
       jump_hint: jumpHint,
     });
-  }
-
-  /**
-   * @param {string} path
-   * @param {import("$lib/types").ResourceRef | null} resourceRef
-   * @param {string} displayName
-   */
-  async function resolveAssociatedOpenPath(path, resourceRef = null, displayName = "") {
-    if (!resourceRef || resourceRef.provider !== "gdrive") {
-      return path;
-    }
-    const workcopy = await ctx.invoke("gdrive_prepare_edit_workcopy", { resourceRef });
-    const localPath = String(workcopy?.localPath || "").trim();
-    if (!localPath) {
-      throw new Error("gdrive edit workcopy path is empty");
-    }
-    const name = String(workcopy?.fileName || displayName || "").trim() || "file";
-    const key = gdriveWorkcopyKey(resourceRef);
-    if (key) {
-      gdriveWorkcopyMap.set(key, {
-        resourceRef: normalizeCachedResourceRef(resourceRef),
-        localPath,
-        fileName: name,
-        revision: workcopy?.revision || null,
-        dirty: false,
-      });
-    }
-    setStatusMessage(
-      ctx.t("status.gdrive_workcopy_opened", { name }),
-      STATUS_LONG_MS
-    );
-    return localPath;
-  }
-
-  /**
-   * @param {import("$lib/types").Entry | null} entry
-   */
-  async function syncGdriveWorkcopyForEntry(entry) {
-    if (!entry || entry.type !== "file") {
-      setStatusMessage(ctx.t("status.no_selection"), STATUS_SHORT_MS);
-      return;
-    }
-    const resourceRef = resolveResourceRef(entry.path, entry);
-    if (!resourceRef || resourceRef.provider !== "gdrive") {
-      setStatusMessage(ctx.t("status.gdrive_writeback_only"), STATUS_LONG_MS);
-      return;
-    }
-    const key = gdriveWorkcopyKey(resourceRef);
-    let cached = key ? gdriveWorkcopyMap.get(key) : null;
-    if (!cached || !cached.localPath || !cached.revision) {
-      try {
-        cached = await loadCachedWorkcopyFromBackend(resourceRef);
-      } catch {
-        cached = null;
-      }
-    }
-    if (!cached || !cached.localPath || !cached.revision) {
-      if (key) {
-        gdriveWorkcopyMap.delete(key);
-      }
-      setStatusMessage(
-        ctx.t("status.gdrive_workcopy_missing", { name: entry.name || "file" }),
-        STATUS_LONG_MS
-      );
-      return;
-    }
-    try {
-      const result = await ctx.invoke("gdrive_apply_edit_workcopy", {
-        resourceRef,
-        localPath: cached.localPath,
-        baseRevision: cached.revision,
-      });
-      if (result?.conflict) {
-        // Keep the previous base revision on conflict to prevent accidental overwrite
-        // by repeated write-back without explicitly refreshing/merging.
-        cached.dirty = true;
-        setStatusMessage(
-          ctx.t("status.gdrive_writeback_conflict", { name: cached.fileName || entry.name || "file" }),
-          STATUS_LONG_MS
-        );
-        openSettingsForGdriveConflict();
-        return;
-      }
-      const nextRevision = result?.revision || null;
-      if (nextRevision) {
-        cached.revision = nextRevision;
-      }
-      if (result?.unchanged) {
-        cached.dirty = false;
-        setStatusMessage(
-          ctx.t("status.gdrive_writeback_no_change", { name: cached.fileName || entry.name || "file" }),
-          STATUS_SHORT_MS
-        );
-        return;
-      }
-      if (result?.uploaded) {
-        cached.dirty = false;
-        setStatusMessage(
-          ctx.t("status.gdrive_writeback_done", { name: cached.fileName || entry.name || "file" }),
-          STATUS_LONG_MS
-        );
-        return;
-      }
-      setStatusMessage(
-        ctx.t("status.gdrive_writeback_unknown", { name: cached.fileName || entry.name || "file" }),
-        STATUS_LONG_MS
-      );
-      await refreshGdriveWorkcopyBadges([entry]);
-    } catch (err) {
-      showError(err);
-    }
-  }
-
-  /**
-   * @param {string} path
-   * @param {import("$lib/types").ResourceRef | null} resourceRef
-   * @param {string} displayName
-   */
-  async function openAssociatedApp(path, resourceRef = null, displayName = "") {
-    const openPath = await resolveAssociatedOpenPath(path, resourceRef, displayName);
-    await ctx.openPath(openPath);
   }
 
   /**
@@ -376,10 +121,9 @@ export function createExternalActions(ctx, helpers) {
       return;
     }
     const forceAssociatedApp = !!options?.forceAssociatedApp;
-    const resourceRef = resolveResourceRef(entry.path, entry);
     if (!forceAssociatedApp && isViewerTarget(entry)) {
       try {
-        await openViewerWindow(entry.path, undefined, resourceRef);
+        await openViewerWindow(entry.path);
         return;
       } catch (err) {
         showError(err);
@@ -387,10 +131,10 @@ export function createExternalActions(ctx, helpers) {
       }
     }
     if (!forceAssociatedApp) {
-      const contentLooksText = await isProbablyTextByContent(entry.path, resourceRef);
+      const contentLooksText = await isProbablyTextByContent(entry.path);
       if (contentLooksText) {
         try {
-          await openViewerWindow(entry.path, undefined, resourceRef);
+          await openViewerWindow(entry.path);
           return;
         } catch (err) {
           showError(err);
@@ -399,7 +143,7 @@ export function createExternalActions(ctx, helpers) {
       }
     }
     try {
-      await openAssociatedApp(entry.path, resourceRef, entry.name || "");
+      await ctx.openPath(entry.path);
     } catch (err) {
       showError(err);
     }
@@ -570,13 +314,26 @@ export function createExternalActions(ctx, helpers) {
     }
   }
 
+  async function compareWithWinMerge(path1, path2) {
+    try {
+      await winmergeCompareFiles(path1, path2);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  async function compareWithWinMergeGitHead(path) {
+    try {
+      await winmergeCompareGitHead(path);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
   return {
     getExternalApps,
     getTargetEntry,
-    resolveGdriveWorkcopyBadge,
-    refreshGdriveWorkcopyBadges,
     runExternalApp,
-    syncGdriveWorkcopyForEntry,
     openEntry,
     openFocusedOrSelected,
     openParentForSelection,
@@ -593,6 +350,7 @@ export function createExternalActions(ctx, helpers) {
     openAbout,
     closeAbout,
     closeViewer,
+    compareWithWinMerge,
+    compareWithWinMergeGitHead,
   };
 }
-

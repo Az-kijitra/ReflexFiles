@@ -74,7 +74,7 @@ Google Drive 実装に着手する前に、以下をすべて満たすこと。
 4. セキュリティゲート証跡
 - `npm run audit:deps` で High/Critical 未解決 0 件。
 - 脅威モデルレビューで High/Critical 未解決 0 件。
-- PR 必須チェック（`quality`, `e2e_pr_quick`）が成功している。
+- PR 必須チェック（`quality`）が成功している。
 
 ## 実装着手の停止ルール（Google Drive）
 - 脅威モデル・依存監査・セキュリティレビューのいずれかで High/Critical が未解決なら、実装着手を停止する。

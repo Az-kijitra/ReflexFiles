@@ -12,18 +12,7 @@
 
   import { EVENT_FS_CHANGED, EVENT_OP_PROGRESS } from "$lib/events";
   import { KEYMAP_ACTIONS, MENU_GROUPS } from "$lib/ui_constants";
-  import { toGdriveResourceRef } from "$lib/utils/resource_ref";
-  import { fsGetCapabilities, fsGetCapabilitiesByRef } from "$lib/utils/tauri_fs";
-  import {
-    gdriveAuthCompleteExchange,
-    gdriveAuthGetStatus,
-    gdriveAuthLoadClientSecret,
-    gdriveAuthStoreClientSecret,
-    gdriveAuthSignOut,
-    gdriveAuthStartSession,
-    gdriveAuthValidateCallback,
-    gdriveAuthWaitForCallback,
-  } from "$lib/utils/tauri_gdrive_auth";
+  import { fsGetCapabilities } from "$lib/utils/tauri_fs";
 
   import { formatModified, formatName, formatSize } from "$lib/utils/format";
   import { formatError } from "$lib/utils/error_format";
@@ -51,12 +40,16 @@
   import { applyDropdownEffects, applyListLayoutEffects } from "$lib/page_effects_apply";
   import { createPageErrorHandler } from "$lib/page_error_handler";
   import { autofocus, createListNameFormatter, createTranslator } from "$lib/page_helpers";
+  import { createDirHelpers } from "$lib/page_dir";
   import { setupPageInitFromState } from "$lib/page_init_runtime";
   import { buildInitPageRuntimeInputsFromPageState } from "$lib/page_init_runtime_inputs_from_page_state";
   import { setupPageActionsRuntimeFromState } from "$lib/page_actions_runtime_from_state";
   import { buildPageViewRuntimeBundleInputsFromState } from "$lib/page_view_runtime_bundle_inputs_from_state";
   import { createPageStateDefaults } from "$lib/page_state_defaults";
   import { createPageViewRuntimeBundle } from "$lib/page_view_runtime_bundle";
+  import { createListLayoutHelpers } from "$lib/page_list_layout";
+  import { createViewRuntime } from "$lib/page_view_runtime";
+  import { buildViewRuntimeInputsFromState } from "$lib/page_view_runtime_inputs_from_state";
   import { createPageMountRuntime } from "$lib/page_mount_runtime";
   import { buildPageMountRuntimeInputsFromPageState } from "$lib/page_mount_runtime_inputs_from_page_state";
   import {
@@ -72,9 +65,16 @@
   import { trapModalTab } from "$lib/page_trap";
   import { createPageActionPlaceholders } from "$lib/page_action_placeholders";
   import { createKeymapBindingsState } from "$lib/page_keymap_bindings_state";
+  import { createListFocusMovers } from "$lib/page_list_focus";
+  import { selectRangeByIndex } from "$lib/utils/selection";
+  import { isRightPaneFocused } from "$lib/pane_focus_utils";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
+  import ClipboardPreview from "$lib/components/ClipboardPreview.svelte";
+  import GitPanel from "$lib/components/GitPanel.svelte";
+  import { gitGetStatus, getEntryGitBadge } from "$lib/utils/tauri_git";
+  import { winmergeCompareFiles } from "$lib/utils/tauri_winmerge";
 
   const defaults = createPageStateDefaults();
 
@@ -191,6 +191,14 @@
     /** @type {HTMLInputElement | null} */
     pathInputEl: null,
   });
+  let rightShellRefs = $state({
+    /** @type {HTMLElement | null} */
+    listEl: null,
+    /** @type {HTMLElement | null} */
+    listBodyEl: null,
+    /** @type {HTMLInputElement | null} */
+    pathInputEl: null,
+  });
   const overlayRefs = $state({
     /** @type {HTMLElement | null} */
     dropdownEl: null,
@@ -257,41 +265,7 @@
     external_terminal_profile_cmd: "",
     external_terminal_profile_powershell: "",
     external_terminal_profile_wsl: "",
-    gdrive_oauth_client_id: "",
-    gdrive_oauth_redirect_uri: "http://127.0.0.1:45123/oauth2/callback",
-    gdrive_account_id: "",
   });
-  const GDRIVE_DEFAULT_REDIRECT_URI = "http://127.0.0.1:45123/oauth2/callback";
-  const GDRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
-  const GDRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
-  const GDRIVE_ALLOWED_SCOPES = new Set([GDRIVE_SCOPE, GDRIVE_READONLY_SCOPE]);
-  const DEFAULT_GDRIVE_AUTH_STATUS = {
-    phase: "signed_out",
-    backendMode: "stub",
-    accountId: null,
-    grantedScopes: [],
-    hasWriteScope: false,
-    refreshTokenPersisted: false,
-    pendingStartedAtMs: null,
-    accessTokenExpiresAtMs: null,
-    lastError: "",
-    lastScopeInsufficientAtMs: null,
-    lastWriteConflictAtMs: null,
-    lastTokenRefreshError: "",
-    lastTokenRefreshErrorAtMs: null,
-    tokenStoreBackend: "",
-    tokenStoreAvailable: false,
-  };
-  let settingsGdriveAuthStatus = $state({ ...DEFAULT_GDRIVE_AUTH_STATUS });
-  let settingsGdriveAuthLoading = $state(false);
-  let settingsGdriveAuthBusy = $state(false);
-  let settingsGdriveAuthError = $state("");
-  let settingsGdriveAuthMessage = $state("");
-  let settingsGdriveWorkcopyItems = $state([]);
-  let settingsGdriveWorkcopyLoading = $state(false);
-  let settingsGdriveWorkcopyBusy = $state(false);
-  let settingsGdriveWorkcopyError = $state("");
-  let settingsGdriveWorkcopyMessage = $state("");
   // Watch timers
   /** @type {ReturnType<typeof setTimeout> | null} */
   let watchTimer = null;
@@ -378,12 +352,113 @@
       })
     );
 
+  // Register Tab handler BEFORE lifecycle keydown handler so stopImmediatePropagation works
+  onMount(() => {
+    function handleDualModeTab(event) {
+      if (state.layoutMode !== "dual") return;
+
+      // Sync activePaneId with actual DOM focus for ALL key events
+      // This ensures Enter, Backspace, etc. all operate on the correct pane
+      const activeEl = document.activeElement;
+      if (activeEl) {
+        const inRight =
+          (rightShellRefs.listEl && (activeEl === rightShellRefs.listEl || rightShellRefs.listEl.contains(activeEl))) ||
+          (rightShellRefs.pathInputEl && activeEl === rightShellRefs.pathInputEl);
+        const inLeft =
+          (shellRefs.listEl && (activeEl === shellRefs.listEl || shellRefs.listEl.contains(activeEl))) ||
+          (shellRefs.pathInputEl && activeEl === shellRefs.pathInputEl);
+        if (inRight) state.activePaneId = "right";
+        else if (inLeft) state.activePaneId = "left";
+      }
+
+      if (event.key !== "Tab" || event.altKey || event.metaKey) return;
+      const isInModal = typeof activeEl?.closest === "function" && activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu");
+      if (isInModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      if (event.ctrlKey) {
+        const newPaneId = state.activePaneId === "left" ? "right" : "left";
+        state.activePaneId = newPaneId;
+        if (newPaneId === "right") {
+          rightShellRefs.listEl?.focus({ preventScroll: true });
+        } else {
+          shellRefs.listEl?.focus({ preventScroll: true });
+        }
+        return;
+      }
+
+      const leftListEl = shellRefs.listEl;
+      const leftPathEl = shellRefs.pathInputEl;
+      const rightListEl = rightShellRefs.listEl;
+      const rightPathEl = rightShellRefs.pathInputEl;
+
+      const inLeft =
+        (leftListEl && (activeEl === leftListEl || leftListEl.contains?.(activeEl))) ||
+        (leftPathEl && (activeEl === leftPathEl || leftPathEl.contains?.(activeEl)));
+      const inRight =
+        (rightListEl && (activeEl === rightListEl || rightListEl.contains?.(activeEl))) ||
+        (rightPathEl && (activeEl === rightPathEl || rightPathEl.contains?.(activeEl)));
+
+      if (inLeft) state.activePaneId = "left";
+      else if (inRight) state.activePaneId = "right";
+
+      const paneId = inRight ? "right" : "left";
+      const listEl = paneId === "right" ? rightListEl : leftListEl;
+      const pathEl = paneId === "right" ? rightPathEl : leftPathEl;
+
+      const isListFocused = listEl && (activeEl === listEl || listEl.contains?.(activeEl));
+      const isPathFocused = pathEl && (activeEl === pathEl || pathEl.contains?.(activeEl));
+
+      if (!event.shiftKey) {
+        if (isListFocused) {
+          pathEl?.focus({ preventScroll: true });
+          /** @type {any} */ (pathEl)?.select?.();
+        } else {
+          listEl?.focus({ preventScroll: true });
+        }
+      } else {
+        if (isPathFocused) {
+          listEl?.focus({ preventScroll: true });
+        } else {
+          pathEl?.focus({ preventScroll: true });
+          /** @type {any} */ (pathEl)?.select?.();
+        }
+      }
+    }
+    // Sync activePaneId on pointer events so mouse-based selection uses the correct pane.
+    // pointerdown fires before click/focus, ensuring activePaneId is set before selection actions run.
+    function handleDualModePointerDown(event) {
+      if (state.layoutMode !== "dual") return;
+      const target = /** @type {Node | null} */ (event.target);
+      if (!target) return;
+      if (
+        (rightShellRefs.listEl && rightShellRefs.listEl.contains(target)) ||
+        (rightShellRefs.pathInputEl && rightShellRefs.pathInputEl.contains(target))
+      ) {
+        state.activePaneId = "right";
+      } else if (
+        (shellRefs.listEl && shellRefs.listEl.contains(target)) ||
+        (shellRefs.pathInputEl && shellRefs.pathInputEl.contains(target))
+      ) {
+        state.activePaneId = "left";
+      }
+    }
+    window.addEventListener("keydown", handleDualModeTab, { capture: true });
+    window.addEventListener("pointerdown", handleDualModePointerDown, { capture: true });
+    return () => {
+      window.removeEventListener("keydown", handleDualModeTab, { capture: true });
+      window.removeEventListener("pointerdown", handleDualModePointerDown, { capture: true });
+    };
+  });
+
   const pageMountInputs = createPageMountRuntime({
     onMount,
     inputs: buildPageMountRuntimeInputsFromPageState({
       state: () => state,
       shellRefs: () => shellRefs,
       overlayRefs: () => overlayRefs,
+      rightRefs: () => rightShellRefs,
       handlers: pageMountHandlers,
       actions: {
         setStatusMessage: actions.setStatusMessage,
@@ -450,8 +525,154 @@
     },
     cacheGetDirStats,
     cacheSetDirStats,
+    getActivePane: () => isDualRightFocused() ? state.rightPane : state,
   });
   showErrorImpl = showErrorAction;
+
+  // Right pane directory loading (uses its own loadSeq via createDirHelpers)
+  const rightDirHelpers = createDirHelpers({
+    invoke,
+    getShowHidden: () => state.showHidden,
+    getSortKey: () => state.sortKey,
+    getSortOrder: () => state.sortOrder,
+    setEntries: (v) => { state.rightPane.entries = v; },
+    setCurrentPath: (v) => { state.rightPane.currentPath = v; },
+    setPathInput: (v) => { state.rightPane.pathInput = v; },
+    scheduleWatch: () => {},
+    setSelectedPaths: (v) => { state.rightPane.selectedPaths = v; },
+    setFocusedIndex: (v) => { state.rightPane.focusedIndex = v; },
+    setAnchorIndex: (v) => { state.rightPane.anchorIndex = v; },
+    getPathHistory: () => state.pathHistory,
+    setPathHistory: (v) => { state.pathHistory = v; },
+    scheduleUiSave: () => actions.scheduleUiSave(),
+    getShowTree: () => false,
+    buildTreeRoot: async () => {},
+    clearTree: () => {},
+    setLoading: (v) => { state.rightPane.loading = v; },
+    setError: (v) => { state.rightPane.error = v; },
+    showError,
+  });
+
+  // Right pane list layout helpers (fixes "only 1 item shown" issue)
+  const rightListLayoutHelpers = createListLayoutHelpers({
+    getListEl: () => rightShellRefs.listEl,
+    getListBodyEl: () => rightShellRefs.listBodyEl,
+    getListCols: () => state.rightPane.listCols,
+    getListRows: () => state.rightPane.listRows,
+    getVisibleColStart: () => state.rightPane.visibleColStart,
+    getVisibleColEnd: () => state.rightPane.visibleColEnd,
+    getFilteredCount: () => (state.rightPane.filteredEntries.length || state.rightPane.entries.length),
+    getShowSize: () => state.showSize,
+    getShowTime: () => state.showTime,
+    setListRows: (v) => { state.rightPane.listRows = v; },
+    setListCols: (v) => { state.rightPane.listCols = v; },
+    setNameMaxChars: (v) => { state.rightPane.nameMaxChars = v; },
+    setVisibleColStart: (v) => { state.rightPane.visibleColStart = v; },
+    setVisibleColEnd: (v) => { state.rightPane.visibleColEnd = v; },
+    setOverflowLeft: (v) => { state.rightPane.overflowLeft = v; },
+    setOverflowRight: (v) => { state.rightPane.overflowRight = v; },
+  });
+
+  // Helper: check if the right pane has DOM focus
+  function isDualRightFocused() {
+    if (state.layoutMode !== "dual") return false;
+    return isRightPaneFocused(rightShellRefs);
+  }
+
+  // Helper: check if the left pane has DOM focus
+  function isDualLeftFocused() {
+    if (state.layoutMode !== "dual") return false;
+    return isRightPaneFocused(shellRefs);
+  }
+
+  // Tracks which pane owns the currently-open dropdown.
+  // Set at the moment the dropdown opens, while DOM focus is still on the pane element.
+  let dropdownOwnerPaneId = $state("left");
+
+  // Routing decision: should this action go to the right pane?
+  // - DOM focus in right pane → right
+  // - DOM focus in left pane → left
+  // - Dropdown open → use dropdownOwnerPaneId (recorded at open time, before focus moves to overlay)
+  // - DOM focus outside both panes (other overlay) → use activePaneId fallback
+  function shouldRouteToRightPane() {
+    if (state.layoutMode !== "dual") return false;
+    if (isDualRightFocused()) return true;
+    if (isDualLeftFocused()) return false;
+    if (state.dropdownOpen) return dropdownOwnerPaneId === "right";
+    return state.activePaneId === "right";
+  }
+
+  // ── Git status refresh helpers ────────────────────────────────────────────
+  async function refreshLeftGitStatus(path) {
+    try {
+      state.gitStatus = await gitGetStatus(path || state.currentPath);
+    } catch {
+      state.gitStatus = null;
+    }
+  }
+  async function refreshRightGitStatus(path) {
+    try {
+      state.rightPane.gitStatus = await gitGetStatus(path || state.rightPane.currentPath);
+    } catch {
+      state.rightPane.gitStatus = null;
+    }
+  }
+
+  // Wrap actions.loadDir with dual-pane routing + git refresh
+  const _leftLoadDir = actions.loadDir;
+  actions.loadDir = async (path) => {
+    if (shouldRouteToRightPane()) {
+      await rightDirHelpers.loadDir(path);
+      void refreshRightGitStatus(path);
+      return;
+    }
+    await _leftLoadDir(path);
+    void refreshLeftGitStatus(path);
+  };
+
+  // Wrap actions.focusList with dual-pane routing
+  const _baseFocusList = actions.focusList;
+  actions.focusList = () => {
+    if (shouldRouteToRightPane()) {
+      rightShellRefs.listEl?.focus({ preventScroll: true });
+    } else {
+      _baseFocusList();
+    }
+  };
+
+  // Right-pane focus movers (cursor key navigation)
+  const rightFocusMovers = createListFocusMovers({
+    getEntries: () => state.rightPane.entries,
+    getFilteredEntries: () => state.rightPane.filteredEntries.length ? state.rightPane.filteredEntries : state.rightPane.entries,
+    getFocusedIndex: () => state.rightPane.focusedIndex,
+    getAnchorIndex: () => state.rightPane.anchorIndex ?? null,
+    getListRows: () => state.rightPane.listRows,
+    setFocusedIndex: (v) => { state.rightPane.focusedIndex = v; },
+    selectRange: (from, to) => {
+      const result = selectRangeByIndex(state.rightPane.entries, from, to);
+      state.rightPane.selectedPaths = result.selectedPaths;
+      state.rightPane.focusedIndex = result.focusedIndex;
+      state.rightPane.anchorIndex = result.anchorIndex;
+    },
+    ensureColumnVisible: rightListLayoutHelpers.ensureColumnVisible,
+  });
+
+  const _baseMoveByRow = actions.moveFocusByRow;
+  actions.moveFocusByRow = (delta, useRange) => {
+    if (isDualRightFocused()) {
+      return rightFocusMovers.moveFocusByRow(delta, useRange);
+    }
+    return _baseMoveByRow(delta, useRange);
+  };
+
+  const _baseMoveByCol = actions.moveFocusByColumn;
+  actions.moveFocusByColumn = (delta, useRange) => {
+    if (isDualRightFocused()) {
+      return rightFocusMovers.moveFocusByColumn(delta, useRange);
+    }
+    return _baseMoveByCol(delta, useRange);
+  };
+
   $effect(() => actions.recomputeSearch());
   $effect(() => actions.recomputeDropdownItems());
   $effect(() => actions.recomputeStatusItems());
@@ -472,10 +693,7 @@
 
     (async () => {
       try {
-        const gdriveRef = toGdriveResourceRef(path);
-        const capabilities = gdriveRef
-          ? await fsGetCapabilitiesByRef(gdriveRef)
-          : await fsGetCapabilities(path);
+        const capabilities = await fsGetCapabilities(path);
         if (cancelled) return;
         if (state.currentPath === path) {
           state.currentPathCapabilities = normalizeProviderCapabilities(capabilities);
@@ -490,27 +708,6 @@
 
     return () => {
       cancelled = true;
-    };
-  });
-
-  $effect(() => {
-    const path = String(state.currentPath || "").trim();
-    const entries = state.entries;
-    if (!path.startsWith("gdrive://")) return;
-    if (!Array.isArray(entries) || entries.length === 0) return;
-    void actions.refreshGdriveWorkcopyBadges(entries);
-  });
-
-  $effect(() => {
-    if (typeof window === "undefined") return;
-    const onFocus = () => {
-      const path = String(state.currentPath || "").trim();
-      if (!path.startsWith("gdrive://")) return;
-      void actions.refreshGdriveWorkcopyBadges(state.entries);
-    };
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.removeEventListener("focus", onFocus);
     };
   });
 
@@ -539,6 +736,13 @@
 
   $effect(() => applyListLayoutEffects(listEffectConfig));
   $effect(() => applyDropdownEffects(dropdownEffectConfig));
+  // Record which pane owns the dropdown at the moment it opens.
+  // applyDropdownEffects calls focusDropdownOnOpen which does `await tick()` before
+  // moving DOM focus to the overlay — so at this point the pane element still has focus.
+  $effect(() => {
+    if (!state.dropdownOpen) return;
+    dropdownOwnerPaneId = isDualRightFocused() ? "right" : "left";
+  });
   $effect(() =>
     applyThemeEffect(
       themeEffectConfig.uiConfigLoaded,
@@ -563,12 +767,90 @@
 
   $effect(() => setupContextMenuKeydown(state.contextMenuOpen, actions.handleContextMenuKey));
 
+  // ── Clipboard preview ────────────────────────────────────────────────────
+  // Captures per-item metadata (name, modified, isDir) at copy/cut time so the
+  // preview can show timestamps even after the user navigates away.
+  function captureClipboardMeta() {
+    const paths = state.lastClipboard.paths;
+    const srcEntries =
+      state.layoutMode === "dual" && state.activePaneId === "right"
+        ? state.rightPane.entries
+        : state.entries;
+    state.clipboardItemsMeta = paths.map((p) => {
+      const name = p.split(/[\\\/]/).pop() || p;
+      const entry = srcEntries.find((e) => e.path === p);
+      return { path: p, name, modified: entry?.modified ?? null, isDir: entry?.is_dir ?? false };
+    });
+    state.clipboardPreviewVisible = true;
+  }
+
+  // Detect copy/cut: watch lastClipboard for changes.
+  // Uses $effect instead of wrapping pageActions because the keyboard dispatch
+  // chain reads from pageActionGroups.selection (a snapshot), not pageActions.
+  let _clipboardEffectInitialized = false;
+  $effect(() => {
+    const clip = state.lastClipboard; // establish reactive dependency
+    if (!_clipboardEffectInitialized) {
+      _clipboardEffectInitialized = true;
+      return; // skip initial stored value
+    }
+    if (clip.paths.length > 0) {
+      captureClipboardMeta();
+    }
+  });
+
+  // Dismiss preview when paste is initiated.
+  // pageActionGroups.selection is a plain object — patching it is read each call
+  // because pageMountHandlers() rebuilds handlers lazily on every dispatch.
+  const _origPasteInGroup = pageActionGroups.selection.pasteItems;
+  pageActionGroups.selection.pasteItems = async (...args) => {
+    state.clipboardPreviewVisible = false;
+    return _origPasteInGroup(...args);
+  };
+
+  // ESC dismisses the clipboard preview (if no other modal is open)
+  $effect(() => {
+    function handleEscPreview(e) {
+      if (
+        e.key === "Escape" &&
+        state.clipboardPreviewVisible &&
+        !state.deleteConfirmOpen &&
+        !state.pasteConfirmOpen &&
+        !state.createOpen &&
+        !state.renameOpen &&
+        !state.propertiesOpen &&
+        !state.zipModalOpen &&
+        !state.aboutOpen &&
+        !state.jumpUrlOpen &&
+        !settingsOpen
+      ) {
+        state.clipboardPreviewVisible = false;
+        e.stopPropagation();
+      }
+    }
+    window.addEventListener("keydown", handleEscPreview);
+    return () => window.removeEventListener("keydown", handleEscPreview);
+  });
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Left pane: wrap only the selection-writing actions to ensure activePaneId="left".
+  // Using a spread object (not Proxy) to avoid interfering with Svelte 5 internals.
+  const leftPageActions = {
+    ...pageActions,
+    toggleSelection: (...args) => { state.activePaneId = "left"; return pageActions.toggleSelection(...args); },
+    selectRange: (...args) => { state.activePaneId = "left"; return pageActions.selectRange(...args); },
+    setSelected: (...args) => { state.activePaneId = "left"; return pageActions.setSelected(...args); },
+    clearSelection: (...args) => { state.activePaneId = "left"; return pageActions.clearSelection(...args); },
+    invertSelection: (...args) => { state.activePaneId = "left"; return pageActions.invertSelection(...args); },
+    openContextMenu: (...args) => { state.activePaneId = "left"; return pageActions.openContextMenu(...args); },
+  };
+
   const viewRuntime = createPageViewRuntimeBundle(
     buildPageViewRuntimeBundleInputsFromState({
       state: () => state,
       shellRefs: () => shellRefs,
       overlayRefs: () => overlayRefs,
-      pageActions,
+      pageActions: leftPageActions,
       pageActionGroups,
       actions,
       deps: { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
@@ -586,17 +868,353 @@
     })
   );
   const overlayBindings = viewRuntime.overlayBindings;
-  const viewProps = $derived(viewRuntime.getViewProps());
+
+  // Inject resolveGitBadge into left-pane fileListProps
+  const viewProps = $derived.by(() => {
+    const base = viewRuntime.getViewProps();
+    const gs = state.gitStatus;
+    return {
+      ...base,
+      fileListProps: {
+        ...base.fileListProps,
+        resolveGitBadge: gs?.is_repo
+          ? (entry) => getEntryGitBadge(entry.path, gs.repo_root, gs.statuses, entry.entry_type === "dir")
+          : null,
+      },
+    };
+  });
+
+  // Right pane list layout effect
+  $effect(() => applyListLayoutEffects({
+    listBodyEl: rightShellRefs.listBodyEl,
+    listEl: rightShellRefs.listEl,
+    updateListRows: rightListLayoutHelpers.updateListRows,
+    updateOverflowMarkers: rightListLayoutHelpers.updateOverflowMarkers,
+    updateVisibleColumns: rightListLayoutHelpers.updateVisibleColumns,
+    getActualColumnSpan: rightListLayoutHelpers.getActualColumnSpan,
+  }));
+
+  // Right pane: proxy wraps pageActions to ensure activePaneId="right" before each call
+  const rightPageActions = new Proxy(pageActions, {
+    get(target, prop) {
+      const value = target[prop];
+      if (typeof value === "function") {
+        return (...args) => {
+          state.activePaneId = "right";
+          return value(...args);
+        };
+      }
+      return value;
+    },
+  });
+
+  function activateRight(fn) {
+    return (...args) => {
+      state.activePaneId = "right";
+      return fn(...args);
+    };
+  }
+
+  // Right pane full view runtime (same functionality as left pane)
+  const rightPaneViewProps = $derived.by(() => {
+    const base = createViewRuntime(
+      buildViewRuntimeInputsFromState({
+        state: {
+          // Pane-specific fields from rightPane
+          currentPath: state.rightPane.currentPath,
+          loading: state.rightPane.loading,
+          filteredEntries: state.rightPane.filteredEntries,
+          entries: state.rightPane.entries,
+          pathCompletionPreviewActive: state.rightPane.pathCompletionPreviewActive,
+          overflowLeft: state.rightPane.overflowLeft,
+          overflowRight: state.rightPane.overflowRight,
+          visibleColStart: state.rightPane.visibleColStart,
+          visibleColEnd: state.rightPane.visibleColEnd,
+          listRows: state.rightPane.listRows,
+          selectedPaths: state.rightPane.selectedPaths,
+          dropdownItems: state.dropdownItems,
+          searchActive: state.rightPane.searchActive,
+          searchError: state.rightPane.searchError,
+          error: state.rightPane.error,
+          // Global fields (shared UI state)
+          menuOpen: state.menuOpen,
+          pathHistory: state.pathHistory,
+          showTree: false,
+          treeLoading: state.treeLoading,
+          treeRoot: state.treeRoot,
+          treeSelectedPath: state.treeSelectedPath,
+          treeFocusedIndex: state.treeFocusedIndex,
+          showSize: state.showSize,
+          showTime: state.showTime,
+          ui_file_icon_mode: state.ui_file_icon_mode,
+          sortMenuOpen: state.sortMenuOpen,
+          aboutOpen: state.aboutOpen,
+          deleteConfirmOpen: state.deleteConfirmOpen,
+          deleteTargets: state.deleteTargets,
+          deleteError: state.deleteError,
+          pasteConfirmOpen: state.pasteConfirmOpen,
+          pasteConflicts: state.pasteConflicts,
+          createOpen: state.createOpen,
+          createError: state.createError,
+          jumpUrlOpen: state.jumpUrlOpen,
+          renameOpen: state.renameOpen,
+          renameError: state.renameError,
+          propertiesOpen: state.propertiesOpen,
+          propertiesData: state.propertiesData,
+          dirStatsInFlight: state.dirStatsInFlight,
+          zipModalOpen: state.zipModalOpen,
+          zipMode: state.zipMode,
+          zipTargets: state.zipTargets,
+          zipPasswordAttempts: state.zipPasswordAttempts,
+          zipOverwriteConfirmed: state.zipOverwriteConfirmed,
+          zipError: state.zipError,
+          contextMenuOpen: state.contextMenuOpen,
+          contextMenuPos: state.contextMenuPos,
+          contextMenuIndex: state.contextMenuIndex,
+          failureModalOpen: state.failureModalOpen,
+          failureModalTitle: state.failureModalTitle,
+          failureItems: state.failureItems,
+          jumpList: state.jumpList,
+        },
+        treeEl: null,
+        pageActions: rightPageActions,
+        pageActionGroups,
+        menu: {
+          toggleMenu: actions.toggleMenu,
+          getMenuItems: actions.getMenuItems,
+          closeMenu: actions.closeMenu,
+        },
+        list: {
+          loadDir: activateRight(actions.loadDir),
+          focusList: () => rightShellRefs.listEl?.focus({ preventScroll: true }),
+          handlePathTabCompletion: activateRight(actions.handlePathTabCompletion),
+          handlePathCompletionSeparator: activateRight(actions.handlePathCompletionSeparator),
+          handlePathCompletionInputChange: activateRight(actions.handlePathCompletionInputChange),
+          clearPathCompletionPreview: activateRight(actions.clearPathCompletionPreview),
+        },
+        tree: {
+          focusTree: () => {},
+          focusTreeTop: () => {},
+          selectTreeNode: () => {},
+          toggleTreeNode: () => {},
+        },
+        keymap: { matchesAction: actions.matchesAction },
+        sort: {
+          setSort: activateRight(actions.setSort),
+          handleSortMenuKey: activateRight(actions.handleSortMenuKey),
+        },
+        deps: { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
+        dirStats: { clearDirStatsCache },
+        meta: {
+          formatName: formatNameForList,
+          formatSize,
+          formatModified,
+          MENU_GROUPS,
+          ABOUT_URL,
+          ABOUT_LICENSE,
+          ZIP_PASSWORD_MAX_ATTEMPTS,
+          t,
+        },
+        overlay: viewRuntime.getOverlayState(),
+      })
+    ).viewProps;
+    // Inject resolveGitBadge for right pane
+    const gs = state.rightPane.gitStatus;
+    return {
+      ...base,
+      fileListProps: {
+        ...base.fileListProps,
+        resolveGitBadge: gs?.is_repo
+          ? (entry) => getEntryGitBadge(entry.path, gs.repo_root, gs.statuses, entry.entry_type === "dir")
+          : null,
+      },
+    };
+  });
+
+  // Keep right pane filteredEntries in sync with entries (no search for right pane yet)
+  $effect(() => {
+    state.rightPane.filteredEntries = state.rightPane.entries;
+  });
+
+  // Auto-refresh git status when the left pane's current path changes
+  $effect(() => {
+    const path = state.currentPath;
+    if (!path) { state.gitStatus = null; return; }
+    void refreshLeftGitStatus(path);
+  });
+
+  // Auto-refresh git status when the right pane's current path changes
+  $effect(() => {
+    const path = state.rightPane.currentPath;
+    if (!path) { state.rightPane.gitStatus = null; return; }
+    void refreshRightGitStatus(path);
+  });
+
+  // Update right pane path capabilities when currentPath changes
+  $effect(() => {
+    const path = String(state.rightPane.currentPath || "").trim();
+    if (!path) {
+      state.rightPane.currentPathCapabilities = {
+        can_read: true, can_create: true, can_rename: true, can_copy: true,
+        can_move: true, can_delete: true, can_archive_create: true, can_archive_extract: true,
+      };
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fsGetCapabilities } = await import("$lib/utils/tauri_fs");
+        const capabilities = await fsGetCapabilities(path);
+        if (cancelled) return;
+        if (state.rightPane.currentPath === path) {
+          state.rightPane.currentPathCapabilities = {
+            can_read: Boolean(capabilities?.can_read ?? true),
+            can_create: Boolean(capabilities?.can_create ?? true),
+            can_rename: Boolean(capabilities?.can_rename ?? true),
+            can_copy: Boolean(capabilities?.can_copy ?? true),
+            can_move: Boolean(capabilities?.can_move ?? true),
+            can_delete: Boolean(capabilities?.can_delete ?? true),
+            can_archive_create: Boolean(capabilities?.can_archive_create ?? true),
+            can_archive_extract: Boolean(capabilities?.can_archive_extract ?? true),
+          };
+        }
+      } catch {
+        // ignore capability errors for right pane
+      }
+    })();
+    return () => { cancelled = true; };
+  });
+
+  // Force single-column layout in dual mode for left pane
+  $effect(() => {
+    if (state.layoutMode === "dual") {
+      state.listCols = 1;
+      state.rightPane.listCols = 1;
+    }
+  });
+
+  // Ctrl+G to toggle git panel
+  $effect(() => {
+    function handleGitPanelToggle(event) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+      if (event.key !== "g" && event.key !== "G") return;
+      const activeEl = document.activeElement;
+      if (activeEl?.tagName === "INPUT" || activeEl?.tagName === "TEXTAREA") return;
+      const isInModal =
+        typeof activeEl?.closest === "function" &&
+        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
+      if (isInModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (state.gitPanelOpen) { void closeGitPanel(); } else { void openGitPanel(); }
+    }
+    window.addEventListener("keydown", handleGitPanelToggle, { capture: true });
+    return () => window.removeEventListener("keydown", handleGitPanelToggle, { capture: true });
+  });
+
+  // ── Git panel CSS offset ──────────────────────────────────────────────────
+  // When the panel is open, push the main content left by the panel width via a
+  // CSS custom property so the panel never overlaps either pane.
+  $effect(() => {
+    document.documentElement.style.setProperty(
+      "--git-panel-offset",
+      state.gitPanelOpen ? "300px" : "0px"
+    );
+  });
+
+  function openGitPanel()  { state.gitPanelOpen = true; }
+  function closeGitPanel() { state.gitPanelOpen = false; }
+
+  // F3 key to toggle dual/single pane mode
+  $effect(() => {
+    function handleDualPaneToggle(event) {
+      const isF3 =
+        !event.ctrlKey && !event.altKey && !event.metaKey &&
+        (event.key === "F3" || event.code === "F3" || event.keyCode === 114);
+      if (!isF3) return;
+      const activeEl = document.activeElement;
+      if (!activeEl) return;
+      const isInInput = activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA";
+      const isInModal =
+        typeof activeEl.closest === "function" &&
+        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
+      if (isInInput || isInModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const next = state.layoutMode === "dual" ? "single" : "dual";
+      state.layoutMode = next;
+      if (next === "dual") {
+        state.activePaneId = "left";
+        if (!state.rightPane.currentPath && state.currentPath) {
+          rightDirHelpers.loadDir(state.currentPath);
+        }
+      }
+    }
+    window.addEventListener("keydown", handleDualPaneToggle, { capture: true });
+    return () => window.removeEventListener("keydown", handleDualPaneToggle, { capture: true });
+  });
+
+  // Ctrl+W: cross-pane WinMerge comparison (dual mode only)
+  $effect(() => {
+    function handleWinMergeCrossPane(event) {
+      const isCtrlW =
+        event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey &&
+        (event.key === "w" || event.key === "W");
+      if (!isCtrlW) return;
+      if (state.layoutMode !== "dual") return;
+      const activeEl = document.activeElement;
+      if (!activeEl) return;
+      const isInInput = activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA";
+      const isInModal =
+        typeof activeEl.closest === "function" &&
+        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
+      if (isInInput || isInModal) return;
+      const leftSelected = state.selectedPaths;
+      const rightSelected = state.rightPane.selectedPaths;
+      if (leftSelected.length === 1 && rightSelected.length === 1) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void winmergeCompareFiles(leftSelected[0], rightSelected[0]).catch((err) => {
+          actions.showError(err);
+        });
+      }
+    }
+    window.addEventListener("keydown", handleWinMergeCrossPane, { capture: true });
+    return () => window.removeEventListener("keydown", handleWinMergeCrossPane, { capture: true });
+  });
+
+  // Active pane's entries — used by ClipboardPreview to detect paste conflicts
+  const clipboardPreviewEntries = $derived(
+    state.layoutMode === "dual" && state.activePaneId === "right"
+      ? state.rightPane.filteredEntries
+      : state.filteredEntries
+  );
 
   const pageShellProps = $derived({
     showTree: state.showTree,
     statusItems: state.statusItems,
     viewProps,
     overlayBindings,
+    layoutMode: state.layoutMode,
+    activePaneId: state.activePaneId,
+    rightPaneViewProps: state.layoutMode === "dual" ? rightPaneViewProps : null,
+    onActivateLeft: () => {
+      state.activePaneId = "left";
+      const activeEl = document.activeElement;
+      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
+        shellRefs.listEl?.focus({ preventScroll: true });
+      }
+    },
+    onActivateRight: () => {
+      state.activePaneId = "right";
+      const activeEl = document.activeElement;
+      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
+        rightShellRefs.listEl?.focus({ preventScroll: true });
+      }
+    },
   });
 
   function normalizeSettingsConfig(config) {
-    const redirectUriRaw = String(config?.gdrive_oauth_redirect_uri || "").trim();
     return {
       ui_theme: config?.ui_theme === "dark" ? "dark" : "light",
       ui_language: config?.ui_language === "ja" ? "ja" : "en",
@@ -607,22 +1225,18 @@
       perf_dir_stats_timeout_ms: Math.max(500, Number(config?.perf_dir_stats_timeout_ms || 3000)),
       external_vscode_path: String(config?.external_vscode_path || ""),
       external_git_client_path: String(config?.external_git_client_path || ""),
+      external_winmerge_path: String(config?.external_winmerge_path || ""),
       external_terminal_profile: String(config?.external_terminal_profile || ""),
       external_terminal_profile_cmd: String(config?.external_terminal_profile_cmd || ""),
       external_terminal_profile_powershell: String(
         config?.external_terminal_profile_powershell || ""
       ),
       external_terminal_profile_wsl: String(config?.external_terminal_profile_wsl || ""),
-      gdrive_oauth_client_id: String(config?.gdrive_oauth_client_id || ""),
-      gdrive_oauth_redirect_uri: redirectUriRaw || GDRIVE_DEFAULT_REDIRECT_URI,
-      gdrive_account_id: String(config?.gdrive_account_id || ""),
     };
   }
 
   const SETTINGS_PATH_MAX_LEN = 1024;
   const SETTINGS_PROFILE_MAX_LEN = 256;
-  const SETTINGS_ACCOUNT_ID_MAX_LEN = 320;
-  const SETTINGS_REDIRECT_URI_MAX_LEN = 1024;
 
   function buildSettingsSavePatch(baseValues, nextValues) {
     const base = normalizeSettingsConfig(baseValues || {});
@@ -641,6 +1255,10 @@
         base.external_git_client_path !== next.external_git_client_path
           ? next.external_git_client_path
           : null,
+      externalWinmergePath:
+        base.external_winmerge_path !== next.external_winmerge_path
+          ? next.external_winmerge_path
+          : null,
       externalTerminalProfile:
         base.external_terminal_profile !== next.external_terminal_profile
           ? next.external_terminal_profile
@@ -657,16 +1275,6 @@
         base.external_terminal_profile_wsl !== next.external_terminal_profile_wsl
           ? next.external_terminal_profile_wsl
           : null,
-      gdriveOauthClientId:
-        base.gdrive_oauth_client_id !== next.gdrive_oauth_client_id
-          ? next.gdrive_oauth_client_id
-          : null,
-      gdriveOauthRedirectUri:
-        base.gdrive_oauth_redirect_uri !== next.gdrive_oauth_redirect_uri
-          ? next.gdrive_oauth_redirect_uri
-          : null,
-      gdriveAccountId:
-        base.gdrive_account_id !== next.gdrive_account_id ? next.gdrive_account_id : null,
     };
   }
 
@@ -695,7 +1303,7 @@
       return t("settings.validation_timeout_range");
     }
 
-    const pathValues = [values?.external_vscode_path, values?.external_git_client_path];
+    const pathValues = [values?.external_vscode_path, values?.external_git_client_path, values?.external_winmerge_path];
     for (const raw of pathValues) {
       const value = String(raw || "");
       if (value.length > SETTINGS_PATH_MAX_LEN) {
@@ -722,34 +1330,9 @@
       }
     }
 
-    const gdriveClientId = String(values?.gdrive_oauth_client_id || "");
-    if (gdriveClientId.length > SETTINGS_PATH_MAX_LEN) {
-      return t("settings.validation_path_too_long");
-    }
-    if (/\r|\n/.test(gdriveClientId)) {
-      return t("settings.validation_single_line");
-    }
-
-    const gdriveRedirectUri = String(values?.gdrive_oauth_redirect_uri || "");
-    if (gdriveRedirectUri.length > SETTINGS_REDIRECT_URI_MAX_LEN) {
-      return t("settings.validation_path_too_long");
-    }
-    if (/\r|\n/.test(gdriveRedirectUri)) {
-      return t("settings.validation_single_line");
-    }
-
-    const gdriveAccountId = String(values?.gdrive_account_id || "");
-    if (gdriveAccountId.length > SETTINGS_ACCOUNT_ID_MAX_LEN) {
-      return t("settings.validation_profile_too_long");
-    }
-    if (/\r|\n/.test(gdriveAccountId)) {
-      return t("settings.validation_single_line");
-    }
-
     return "";
   }
   const KNOWN_SHORTCUT_CONFLICTS = {
-    [normalizeKeyString("Ctrl+Alt+G")]: "settings.shortcut_conflict_google_drive",
     [normalizeKeyString("Ctrl+Shift+Esc")]: "settings.shortcut_conflict_task_manager",
     [normalizeKeyString("Alt+Shift")]: "settings.shortcut_conflict_input_switch",
     [normalizeKeyString("Ctrl+Alt+ArrowUp")]: "settings.shortcut_conflict_display_driver",
@@ -844,9 +1427,6 @@
         ui_language: state.ui_language,
         ui_file_icon_mode: state.ui_file_icon_mode,
         perf_dir_stats_timeout_ms: state.dirStatsTimeoutMs,
-        gdrive_oauth_client_id: "",
-        gdrive_oauth_redirect_uri: GDRIVE_DEFAULT_REDIRECT_URI,
-        gdrive_account_id: "",
       });
     }
 
@@ -859,8 +1439,6 @@
 
     collectSettingsShortcutConflicts();
     settingsOpen = true;
-    void refreshGdriveAuthStatus();
-    void refreshGdriveWorkcopies();
   }
 
   function closeSettingsModal() {
@@ -870,361 +1448,6 @@
     queueMicrotask(() => {
       shellRefs.listEl?.focus?.();
     });
-  }
-
-  function normalizeGdriveAuthStatus(status) {
-    const phaseRaw = String(status?.phase || "signed_out").trim();
-    const phase = phaseRaw === "pending" || phaseRaw === "authorized" ? phaseRaw : "signed_out";
-    const backendRaw = String(status?.backendMode || "stub").trim();
-    const backendMode = backendRaw === "real" ? "real" : "stub";
-    const accountIdRaw = status?.accountId;
-    const accountId =
-      typeof accountIdRaw === "string" && accountIdRaw.trim() ? accountIdRaw.trim() : null;
-    const grantedScopes = Array.isArray(status?.grantedScopes)
-      ? status.grantedScopes
-          .map((scope) => String(scope || "").trim())
-          .filter((scope) => Boolean(scope))
-      : [];
-    const pendingMsRaw = Number(status?.pendingStartedAtMs ?? Number.NaN);
-    const pendingStartedAtMs = Number.isFinite(pendingMsRaw) ? Math.trunc(pendingMsRaw) : null;
-    const expiresMsRaw = Number(status?.accessTokenExpiresAtMs ?? Number.NaN);
-    const accessTokenExpiresAtMs = Number.isFinite(expiresMsRaw) ? Math.trunc(expiresMsRaw) : null;
-    const scopeInsufficientMsRaw = Number(status?.lastScopeInsufficientAtMs ?? Number.NaN);
-    const lastScopeInsufficientAtMs = Number.isFinite(scopeInsufficientMsRaw)
-      ? Math.trunc(scopeInsufficientMsRaw)
-      : null;
-    const writeConflictMsRaw = Number(status?.lastWriteConflictAtMs ?? Number.NaN);
-    const lastWriteConflictAtMs = Number.isFinite(writeConflictMsRaw)
-      ? Math.trunc(writeConflictMsRaw)
-      : null;
-    const tokenRefreshErrorMsRaw = Number(status?.lastTokenRefreshErrorAtMs ?? Number.NaN);
-    const lastTokenRefreshErrorAtMs = Number.isFinite(tokenRefreshErrorMsRaw)
-      ? Math.trunc(tokenRefreshErrorMsRaw)
-      : null;
-    return {
-      phase,
-      backendMode,
-      accountId,
-      grantedScopes,
-      hasWriteScope: Boolean(status?.hasWriteScope),
-      refreshTokenPersisted: Boolean(status?.refreshTokenPersisted),
-      pendingStartedAtMs,
-      accessTokenExpiresAtMs,
-      lastError: String(status?.lastError || ""),
-      lastScopeInsufficientAtMs,
-      lastWriteConflictAtMs,
-      lastTokenRefreshError: String(status?.lastTokenRefreshError || ""),
-      lastTokenRefreshErrorAtMs,
-      tokenStoreBackend: String(status?.tokenStoreBackend || ""),
-      tokenStoreAvailable: Boolean(status?.tokenStoreAvailable),
-    };
-  }
-
-  async function refreshGdriveAuthStatus() {
-    settingsGdriveAuthLoading = true;
-    settingsGdriveAuthError = "";
-    try {
-      const status = await gdriveAuthGetStatus();
-      settingsGdriveAuthStatus = normalizeGdriveAuthStatus(status);
-    } catch (err) {
-      settingsGdriveAuthError = formatError(err, "failed to read gdrive auth status", t);
-      settingsGdriveAuthStatus = { ...DEFAULT_GDRIVE_AUTH_STATUS };
-    } finally {
-      settingsGdriveAuthLoading = false;
-    }
-  }
-
-  function parseGdriveCallbackParams(callbackUrl) {
-    const input = String(callbackUrl || "").trim();
-    if (!input) {
-      throw new Error(t("settings.gdrive.callback_missing"));
-    }
-    let parsed;
-    try {
-      parsed = new URL(input);
-    } catch {
-      parsed = new URL(input, "http://localhost");
-    }
-    const stateParam = String(parsed.searchParams.get("state") || "").trim();
-    const codeParam = String(parsed.searchParams.get("code") || "").trim();
-    if (!stateParam || !codeParam) {
-      throw new Error(t("settings.gdrive.callback_parse_error"));
-    }
-    return { state: stateParam, code: codeParam };
-  }
-
-  function normalizeTokenScopeList(scopeText, fallbackScopes) {
-    const parsedScopes = String(scopeText || "")
-      .trim()
-      .split(/\s+/)
-      .map((scope) => scope.trim())
-      .filter((scope) => GDRIVE_ALLOWED_SCOPES.has(scope));
-    if (parsedScopes.length > 0) {
-      return [...new Set(parsedScopes)];
-    }
-    const normalizedFallback = Array.isArray(fallbackScopes)
-      ? fallbackScopes
-          .map((scope) => String(scope || "").trim())
-          .filter((scope) => GDRIVE_ALLOWED_SCOPES.has(scope))
-      : [];
-    return normalizedFallback.length > 0 ? [...new Set(normalizedFallback)] : [GDRIVE_SCOPE];
-  }
-
-  async function exchangeGoogleAuthCode(validated, clientSecretRaw = "") {
-    const form = new URLSearchParams();
-    form.set("client_id", String(validated?.clientId || ""));
-    form.set("code", String(validated?.code || ""));
-    form.set("code_verifier", String(validated?.codeVerifier || ""));
-    form.set("redirect_uri", String(validated?.redirectUri || ""));
-    form.set("grant_type", "authorization_code");
-    const clientSecret = String(clientSecretRaw || "").trim();
-    if (clientSecret) {
-      form.set("client_secret", clientSecret);
-    }
-
-    let response;
-    try {
-      response = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: form.toString(),
-      });
-    } catch {
-      throw new Error(t("settings.gdrive.token_exchange_network_error"));
-    }
-
-    let payload = null;
-    try {
-      payload = await response.json();
-    } catch {
-      payload = null;
-    }
-
-    if (!response.ok) {
-      const detail = String(payload?.error_description || payload?.error || "").trim();
-      if (!clientSecret && detail.toLowerCase().includes("client_secret is missing")) {
-        throw new Error(t("settings.gdrive.token_exchange_requires_client_secret"));
-      }
-      if (detail) {
-        throw new Error(
-          t("settings.gdrive.token_exchange_failed_with_detail", {
-            detail,
-          })
-        );
-      }
-      throw new Error(t("settings.gdrive.token_exchange_failed"));
-    }
-
-    const accessToken = String(payload?.access_token || "").trim();
-    if (!accessToken) {
-      throw new Error(t("settings.gdrive.token_exchange_no_access_token"));
-    }
-
-    const refreshToken = String(payload?.refresh_token || "").trim();
-    const expiresInRaw = Number(payload?.expires_in ?? Number.NaN);
-    const expiresInSec = Number.isFinite(expiresInRaw) ? Math.max(60, Math.trunc(expiresInRaw)) : 3600;
-    return {
-      accessToken,
-      expiresInSec,
-      refreshToken: refreshToken || null,
-      scopes: normalizeTokenScopeList(payload?.scope, validated?.scopes),
-    };
-  }
-
-  async function startGdriveAuth(values) {
-    const clientId = String(values?.client_id || "").trim();
-    const redirectUri = String(values?.redirect_uri || "").trim();
-    if (!clientId || !redirectUri) {
-      settingsGdriveAuthError = t("settings.gdrive.client_or_redirect_required");
-      return;
-    }
-
-    settingsGdriveAuthBusy = true;
-    settingsGdriveAuthError = "";
-    settingsGdriveAuthMessage = "";
-    try {
-      const started = await gdriveAuthStartSession(clientId, redirectUri, [GDRIVE_SCOPE]);
-      await openUrl(started.authorizationUrl);
-      settingsGdriveAuthMessage = t("settings.gdrive.started_opened");
-      const captured = await gdriveAuthWaitForCallback(180000);
-      if (values && typeof values === "object") {
-        values.callback_url = String(captured?.callbackUrl || "");
-      }
-      settingsGdriveAuthMessage = t("settings.gdrive.callback_auto_captured");
-      await refreshGdriveAuthStatus();
-    } catch (err) {
-      settingsGdriveAuthError = formatError(err, "failed to start gdrive auth", t);
-    } finally {
-      settingsGdriveAuthBusy = false;
-    }
-  }
-
-  async function completeGdriveAuth(values) {
-    const accountId = String(values?.account_id || "").trim();
-    const clientIdToPersist = String(values?.client_id || "").trim();
-    const redirectUriToPersist = String(values?.redirect_uri || "").trim();
-    if (!accountId) {
-      settingsGdriveAuthError = t("settings.gdrive.account_required");
-      return;
-    }
-
-    settingsGdriveAuthBusy = true;
-    settingsGdriveAuthError = "";
-    settingsGdriveAuthMessage = "";
-    try {
-      const callback = parseGdriveCallbackParams(values?.callback_url);
-      const validated = await gdriveAuthValidateCallback(callback.state, callback.code);
-      const refreshTokenRaw = String(values?.refresh_token || "").trim();
-      const enteredClientSecret = String(values?.client_secret || "").trim();
-      let resolvedClientSecret = enteredClientSecret;
-      const validatedClientId = String(validated?.clientId || "").trim();
-      if (refreshTokenRaw.length === 0 && !resolvedClientSecret && validatedClientId) {
-        try {
-          const loaded = await gdriveAuthLoadClientSecret(validatedClientId);
-          resolvedClientSecret = String(loaded || "").trim();
-        } catch {
-          resolvedClientSecret = "";
-        }
-      }
-      const exchanged =
-        refreshTokenRaw.length > 0
-          ? {
-              accessToken: null,
-              expiresInSec: null,
-              refreshToken: refreshTokenRaw,
-              scopes: normalizeTokenScopeList("", validated?.scopes),
-            }
-          : await exchangeGoogleAuthCode(validated, resolvedClientSecret);
-
-      if (refreshTokenRaw.length === 0 && enteredClientSecret && validatedClientId) {
-        try {
-          await gdriveAuthStoreClientSecret(validatedClientId, enteredClientSecret);
-        } catch {
-          // continue sign-in flow even if secure storage is unavailable
-        }
-      }
-      const status = await gdriveAuthCompleteExchange(
-        accountId,
-        exchanged.scopes,
-        exchanged.refreshToken,
-        exchanged.accessToken,
-        exchanged.expiresInSec
-      );
-      settingsGdriveAuthStatus = normalizeGdriveAuthStatus(status);
-      try {
-        const savedConfig = await invoke("config_save_preferences", {
-          gdriveOauthClientId: clientIdToPersist || null,
-          gdriveOauthRedirectUri: redirectUriToPersist || null,
-          gdriveAccountId: accountId,
-        });
-        settingsInitial = normalizeSettingsConfig(savedConfig || settingsInitial);
-      } catch {
-        // keep auth success even if config persistence fails
-      }
-      settingsGdriveAuthMessage = refreshTokenRaw.length > 0
-        ? t("settings.gdrive.complete_done_manual")
-        : t("settings.gdrive.complete_done");
-    } catch (err) {
-      settingsGdriveAuthError = formatError(err, "failed to complete gdrive auth", t);
-    } finally {
-      settingsGdriveAuthBusy = false;
-    }
-  }
-
-  async function signOutGdrive(values) {
-    settingsGdriveAuthBusy = true;
-    settingsGdriveAuthError = "";
-    settingsGdriveAuthMessage = "";
-    try {
-      const accountId = String(values?.account_id || "").trim();
-      const status = await gdriveAuthSignOut(accountId || null);
-      settingsGdriveAuthStatus = normalizeGdriveAuthStatus(status);
-      settingsGdriveAuthMessage = t("settings.gdrive.sign_out_done");
-    } catch (err) {
-      settingsGdriveAuthError = formatError(err, "failed to sign out gdrive", t);
-    } finally {
-      settingsGdriveAuthBusy = false;
-    }
-  }
-
-  function normalizeGdriveWorkcopyItems(items) {
-    if (!Array.isArray(items)) return [];
-    return items
-      .map((item) => ({
-        resourceId: String(item?.resourceId || "").trim(),
-        exists: Boolean(item?.exists),
-        dirty: Boolean(item?.dirty),
-        fileName: String(item?.fileName || "").trim(),
-        localPath: String(item?.localPath || "").trim(),
-        updatedAtMs: Number.isFinite(Number(item?.updatedAtMs))
-          ? Math.trunc(Number(item.updatedAtMs))
-          : null,
-        sizeBytes: Math.max(0, Number(item?.sizeBytes || 0) || 0),
-      }))
-      .filter((item) => Boolean(item.resourceId));
-  }
-
-  async function refreshGdriveWorkcopies() {
-    settingsGdriveWorkcopyLoading = true;
-    settingsGdriveWorkcopyError = "";
-    try {
-      const items = await invoke("gdrive_list_edit_workcopies");
-      settingsGdriveWorkcopyItems = normalizeGdriveWorkcopyItems(items);
-    } catch (err) {
-      settingsGdriveWorkcopyError = formatError(err, "failed to list gdrive workcopies", t);
-      settingsGdriveWorkcopyItems = [];
-    } finally {
-      settingsGdriveWorkcopyLoading = false;
-    }
-  }
-
-  async function deleteGdriveWorkcopy(item) {
-    const resourceId = String(item?.resourceId || "").trim();
-    if (!resourceId) return;
-    settingsGdriveWorkcopyBusy = true;
-    settingsGdriveWorkcopyError = "";
-    settingsGdriveWorkcopyMessage = "";
-    try {
-      await invoke("gdrive_delete_edit_workcopy", {
-        resourceRef: {
-          provider: "gdrive",
-          resource_id: resourceId,
-        },
-      });
-      settingsGdriveWorkcopyMessage = t("settings.gdrive.workcopy.delete_done", {
-        name: String(item?.fileName || resourceId),
-      });
-      await refreshGdriveWorkcopies();
-      await actions.refreshGdriveWorkcopyBadges(state.entries);
-    } catch (err) {
-      settingsGdriveWorkcopyError = formatError(err, "failed to delete gdrive workcopy", t);
-    } finally {
-      settingsGdriveWorkcopyBusy = false;
-    }
-  }
-
-  async function cleanupGdriveWorkcopies(maxAgeDays) {
-    const daysRaw = Number(maxAgeDays);
-    const days = Number.isFinite(daysRaw) ? Math.min(365, Math.max(1, Math.trunc(daysRaw))) : 3;
-    settingsGdriveWorkcopyBusy = true;
-    settingsGdriveWorkcopyError = "";
-    settingsGdriveWorkcopyMessage = "";
-    try {
-      const result = await invoke("gdrive_cleanup_edit_workcopies", { maxAgeDays: days });
-      settingsGdriveWorkcopyMessage = t("settings.gdrive.workcopy.cleanup_done", {
-        files: Math.trunc(Number(result?.removedFiles || 0)),
-        bytes: Math.trunc(Number(result?.removedBytes || 0)),
-      });
-      await refreshGdriveWorkcopies();
-      await actions.refreshGdriveWorkcopyBadges(state.entries);
-    } catch (err) {
-      settingsGdriveWorkcopyError = formatError(err, "failed to cleanup gdrive workcopies", t);
-    } finally {
-      settingsGdriveWorkcopyBusy = false;
-    }
   }
 
   async function saveSettings(values) {
@@ -1645,8 +1868,42 @@
 <PageShellBindings
   bind:state={state}
   bind:refs={shellRefs}
+  bind:rightRefs={rightShellRefs}
   {...pageShellProps}
 />
+
+{#if state.clipboardPreviewVisible && state.clipboardItemsMeta.length > 0}
+  <ClipboardPreview
+    lastClipboard={state.lastClipboard}
+    clipboardItemsMeta={state.clipboardItemsMeta}
+    currentEntries={clipboardPreviewEntries}
+    onClose={() => { state.clipboardPreviewVisible = false; }}
+  />
+{/if}
+
+{#if state.gitPanelOpen}
+  <GitPanel
+    gitStatus={state.activePaneId === "right" ? state.rightPane.gitStatus : state.gitStatus}
+    currentPath={state.activePaneId === "right" ? state.rightPane.currentPath : state.currentPath}
+    onClose={closeGitPanel}
+    onRefresh={() => {
+      if (state.activePaneId === "right") {
+        void refreshRightGitStatus();
+        void rightDirHelpers.loadDir(state.rightPane.currentPath);
+      } else {
+        void refreshLeftGitStatus();
+        void _leftLoadDir(state.currentPath);
+      }
+    }}
+    onOpenPath={(path, side) => {
+      if (side === "right") {
+        void rightDirHelpers.loadDir(path);
+      } else {
+        void _leftLoadDir(path);
+      }
+    }}
+  />
+{/if}
 
 {#if settingsOpen}
   <SettingsModal
@@ -1662,16 +1919,6 @@
     reportMessage={settingsReportMessage}
     reportIsError={settingsReportIsError}
     shortcutConflicts={settingsShortcutConflicts}
-    gdriveAuthStatus={settingsGdriveAuthStatus}
-    gdriveAuthLoading={settingsGdriveAuthLoading}
-    gdriveAuthBusy={settingsGdriveAuthBusy}
-    gdriveAuthError={settingsGdriveAuthError}
-    gdriveAuthMessage={settingsGdriveAuthMessage}
-    gdriveWorkcopyItems={settingsGdriveWorkcopyItems}
-    gdriveWorkcopyLoading={settingsGdriveWorkcopyLoading}
-    gdriveWorkcopyBusy={settingsGdriveWorkcopyBusy}
-    gdriveWorkcopyError={settingsGdriveWorkcopyError}
-    gdriveWorkcopyMessage={settingsGdriveWorkcopyMessage}
     error={settingsError}
     initialSection={settingsInitialSection}
     onCancel={closeSettingsModal}
@@ -1681,13 +1928,6 @@
     onRestoreConfig={restoreSettingsBackup}
     onExportReport={exportDiagnosticReport}
     onRunDiagnostic={runSettingsDiagnostic}
-    onGdriveAuthRefresh={refreshGdriveAuthStatus}
-    onGdriveAuthStart={startGdriveAuth}
-    onGdriveAuthComplete={completeGdriveAuth}
-    onGdriveAuthSignOut={signOutGdrive}
-    onGdriveWorkcopyRefresh={refreshGdriveWorkcopies}
-    onGdriveWorkcopyDelete={deleteGdriveWorkcopy}
-    onGdriveWorkcopyCleanup={cleanupGdriveWorkcopies}
     {trapModalTab}
     {autofocus}
   />

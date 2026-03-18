@@ -53,11 +53,11 @@ export function buildPastePairs(paths, destination) {
  */
 export function getPasteConflicts(paths, entries) {
   if (!paths || !paths.length) return [];
-  const existing = new Set(entries.map((e) => e.name));
+  const existing = new Set(entries.map((e) => e.name.toLowerCase()));
   const conflicts = [];
   for (const p of paths) {
     const name = basename(p);
-    if (name && existing.has(name)) {
+    if (name && existing.has(name.toLowerCase())) {
       conflicts.push(name);
     }
   }

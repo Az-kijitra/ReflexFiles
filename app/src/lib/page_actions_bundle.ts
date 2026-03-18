@@ -29,6 +29,7 @@ import { buildPageActionGroups } from "./page_action_groups";
  *   showError: (err: unknown) => void;
  *   cacheGetDirStats: (path: string) => any;
  *   cacheSetDirStats: (path: string, value: any) => void;
+ *   getActivePane?: () => any;
  * }} params
  */
 export function setupPageActionsBundle(params) {
@@ -36,6 +37,7 @@ export function setupPageActionsBundle(params) {
     buildPageSettersInputsFromState({
       state: params.state,
       setStatusTimer: params.setStatusTimer,
+      getActivePane: params.getActivePane,
     })
   );
 
@@ -43,6 +45,7 @@ export function setupPageActionsBundle(params) {
     buildPageActionsStateVarsFromState({
       state: params.state,
       statusTimer: params.statusTimer,
+      getActivePane: params.getActivePane,
     })
   );
 

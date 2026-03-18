@@ -62,15 +62,7 @@ export function buildEditMenuItems(params) {
   const prefixDateEnabled = hasTargets && (canPrefixDateTargets ? canPrefixDateTargets() : true);
   const cutEnabled = hasTargets && (canCutTargets ? canCutTargets() : true);
   const pasteEnabled = canPasteCurrentPath ? canPasteCurrentPath() : true;
-  const pasteReason =
-    pasteEnabled
-      ? ""
-      : String(getCurrentPath ? getCurrentPath() : "")
-          .trim()
-          .toLowerCase()
-          .startsWith("gdrive://")
-        ? t("paste.destination_not_writable")
-        : t("capability.not_available");
+  const pasteReason = pasteEnabled ? "" : t("capability.not_available");
   const deleteEnabled = hasSelectedItems && (canDeleteSelection ? canDeleteSelection() : true);
   const propertiesEnabled =
     hasSelectedItems && (canOpenPropertiesSelection ? canOpenPropertiesSelection() : true);

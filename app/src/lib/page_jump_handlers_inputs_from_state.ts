@@ -22,20 +22,25 @@ import { buildJumpHandlersSetupInputsFromVars } from "./page_jump_inputs_from_va
  *     invoke: typeof import("@tauri-apps/api/core").invoke;
  *     treeNodeName: (node: unknown) => string;
  *   };
+ *   getActivePane?: () => any;
  * }} params
  */
 export function buildJumpHandlersInputsFromState(params) {
+  const getActivePane = params.getActivePane ?? (() => params.state);
   return buildJumpHandlersSetupInputsFromVars({
-    state: () => ({
-      dropdownEl: params.refs.dropdownEl,
-      jumpList: params.state.jumpList,
-      pathHistory: params.state.pathHistory,
-      currentPath: params.state.currentPath,
-      showHidden: params.state.showHidden,
-      entries: params.state.entries,
-      statusMessage: params.state.statusMessage,
-      showError: params.showError,
-    }),
+    state: () => {
+      const ap = getActivePane();
+      return {
+        dropdownEl: params.refs.dropdownEl,
+        jumpList: params.state.jumpList,
+        pathHistory: params.state.pathHistory,
+        currentPath: ap.currentPath,
+        showHidden: params.state.showHidden,
+        entries: ap.entries,
+        statusMessage: params.state.statusMessage,
+        showError: params.showError,
+      };
+    },
     actions: () => ({
       setDropdownMode: params.actions.setDropdownMode,
       setDropdownOpen: params.actions.setDropdownOpen,

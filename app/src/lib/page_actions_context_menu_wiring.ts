@@ -34,6 +34,8 @@ export function setupPageContextMenuWiring(ctx, deps) {
     getExternalApps: deps.getExternalApps,
     syncGdriveWorkcopyForEntry: deps.syncGdriveWorkcopyForEntry,
     startExplorerDrag: deps.startExplorerDrag,
+    compareWithWinMerge: deps.compareWithWinMerge,
+    compareWithWinMergeGitHead: deps.compareWithWinMergeGitHead,
   });
 
   closeContextMenu = contextMenuActions.closeContextMenu;

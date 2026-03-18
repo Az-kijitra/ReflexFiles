@@ -11,11 +11,6 @@ import { basename, makeDuplicateName } from "$lib/utils/file_ops";
  */
 export function createClipboardActions(ctx, helpers) {
   const { setStatusMessage, showError, showFailures, pushUndoEntry } = helpers;
-  const isCurrentPathGdrive = () =>
-    String(ctx.getCurrentPath?.() || "")
-      .trim()
-      .toLowerCase()
-      .startsWith("gdrive://");
   const currentPathCanPaste = () => {
     const caps = ctx.getCurrentPathCapabilities?.();
     const canCopy = Boolean(caps?.can_copy ?? true);
@@ -23,9 +18,7 @@ export function createClipboardActions(ctx, helpers) {
     return canCopy || canMove;
   };
   const notifyPasteUnavailable = () => {
-    setStatusMessage(
-      isCurrentPathGdrive() ? ctx.t("paste.destination_not_writable") : ctx.t("capability.not_available")
-    );
+    setStatusMessage(ctx.t("capability.not_available"));
   };
 
   async function confirmPasteOverwrite() {
@@ -169,9 +162,6 @@ export function createClipboardActions(ctx, helpers) {
     try {
       const base = cut ? ctx.t("status.moving") : ctx.t("status.copying");
       const pairs = ctx.buildPastePairs(filtered, currentPath);
-      const involvesGdrive =
-        String(currentPath || "").trim().toLowerCase().startsWith("gdrive://") ||
-        filtered.some((path) => String(path || "").trim().toLowerCase().startsWith("gdrive://"));
       if (cut) {
         const summary = await ctx.fsMove(filtered, currentPath);
         const okCount = typeof summary?.ok === "number" ? summary.ok : filtered.length;
@@ -201,16 +191,14 @@ export function createClipboardActions(ctx, helpers) {
         if (failCount > 0) {
           showFailures(`${base} failed`, summary?.failures || []);
         }
-        if (!involvesGdrive) {
-          if (pairs.length && summary?.failures) {
-            const failed = new Set(summary.failures.map((item) => item.path));
-            const okPairs = pairs.filter((pair) => !failed.has(pair.from));
-            if (okPairs.length) {
-              pushUndoEntry({ kind: "copy", pairs: okPairs });
-            }
-          } else if (pairs.length) {
-            pushUndoEntry({ kind: "copy", pairs });
+        if (pairs.length && summary?.failures) {
+          const failed = new Set(summary.failures.map((item) => item.path));
+          const okPairs = pairs.filter((pair) => !failed.has(pair.from));
+          if (okPairs.length) {
+            pushUndoEntry({ kind: "copy", pairs: okPairs });
           }
+        } else if (pairs.length) {
+          pushUndoEntry({ kind: "copy", pairs });
         }
         const suffix = failCount ? ` (failed ${failCount})` : "";
         setStatusMessage(`${base} ${okCount}/${totalCount} item(s)${suffix}`);
