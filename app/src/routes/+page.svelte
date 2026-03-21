@@ -68,6 +68,8 @@
   import { createListFocusMovers } from "$lib/page_list_focus";
   import { selectRangeByIndex } from "$lib/utils/selection";
   import { isRightPaneFocused } from "$lib/pane_focus_utils";
+  import { createSettingsActions } from "$lib/page_settings_actions";
+  import { normalizeSettingsSection } from "$lib/page_settings_logic";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
@@ -328,6 +330,43 @@
   });
 
   initPage();
+
+  const settingsActions = createSettingsActions({
+    getSettingsState: () => ({ settingsSaving, settingsInitial }),
+    setters: {
+      setSettingsOpen:               (v) => { settingsOpen = v; },
+      setSettingsInitialSection:     (v) => { settingsInitialSection = v; },
+      setSettingsSaving:             (v) => { settingsSaving = v; },
+      setSettingsError:              (v) => { settingsError = v; },
+      setSettingsTesting:            (v) => { settingsTesting = v; },
+      setSettingsTestMessage:        (v) => { settingsTestMessage = v; },
+      setSettingsTestIsError:        (v) => { settingsTestIsError = v; },
+      setSettingsReporting:          (v) => { settingsReporting = v; },
+      setSettingsReportMessage:      (v) => { settingsReportMessage = v; },
+      setSettingsReportIsError:      (v) => { settingsReportIsError = v; },
+      setSettingsShortcutConflicts:  (v) => { settingsShortcutConflicts = v; },
+      setSettingsProfiles:           (v) => { settingsProfiles = v; },
+      setSettingsInitial:            (v) => { settingsInitial = v; },
+    },
+    getAppStateForSettingsFallback: () => ({
+      ui_theme:         state.ui_theme,
+      ui_language:      state.ui_language,
+      ui_file_icon_mode: state.ui_file_icon_mode,
+      dirStatsTimeoutMs: state.dirStatsTimeoutMs,
+    }),
+    applyStateChanges: (patch) => {
+      state.ui_theme            = patch.ui_theme;
+      state.ui_language         = patch.ui_language;
+      state.ui_file_icon_mode   = patch.ui_file_icon_mode;
+      state.dirStatsTimeoutMs   = patch.dirStatsTimeoutMs;
+    },
+    getCurrentPath:     () => state.currentPath,
+    focusList:          () => shellRefs.listEl?.focus?.(),
+    invoke,
+    actions,
+    t,
+    getActionBindings:  (actionId) => keymapBindings.getActionBindings(actionId),
+  });
 
   const formatNameForList = createListNameFormatter(formatName, () => state.nameMaxChars);
   const invokeExit = () => invoke("app_exit").catch(() => getCurrentWindow().close());
@@ -1214,448 +1253,32 @@
     },
   });
 
-  function normalizeSettingsConfig(config) {
-    return {
-      ui_theme: config?.ui_theme === "dark" ? "dark" : "light",
-      ui_language: config?.ui_language === "ja" ? "ja" : "en",
-      ui_file_icon_mode:
-        config?.ui_file_icon_mode === "simple" || config?.ui_file_icon_mode === "none"
-          ? config.ui_file_icon_mode
-          : "by_type",
-      perf_dir_stats_timeout_ms: Math.max(500, Number(config?.perf_dir_stats_timeout_ms || 3000)),
-      external_vscode_path: String(config?.external_vscode_path || ""),
-      external_git_client_path: String(config?.external_git_client_path || ""),
-      external_winmerge_path: String(config?.external_winmerge_path || ""),
-      external_terminal_profile: String(config?.external_terminal_profile || ""),
-      external_terminal_profile_cmd: String(config?.external_terminal_profile_cmd || ""),
-      external_terminal_profile_powershell: String(
-        config?.external_terminal_profile_powershell || ""
-      ),
-      external_terminal_profile_wsl: String(config?.external_terminal_profile_wsl || ""),
-    };
-  }
-
-  const SETTINGS_PATH_MAX_LEN = 1024;
-  const SETTINGS_PROFILE_MAX_LEN = 256;
-
-  function buildSettingsSavePatch(baseValues, nextValues) {
-    const base = normalizeSettingsConfig(baseValues || {});
-    const next = normalizeSettingsConfig(nextValues || {});
-    return {
-      uiTheme: base.ui_theme !== next.ui_theme ? next.ui_theme : null,
-      uiLanguage: base.ui_language !== next.ui_language ? next.ui_language : null,
-      uiFileIconMode: base.ui_file_icon_mode !== next.ui_file_icon_mode ? next.ui_file_icon_mode : null,
-      perfDirStatsTimeoutMs:
-        Number(base.perf_dir_stats_timeout_ms) !== Number(next.perf_dir_stats_timeout_ms)
-          ? Number(next.perf_dir_stats_timeout_ms)
-          : null,
-      externalVscodePath:
-        base.external_vscode_path !== next.external_vscode_path ? next.external_vscode_path : null,
-      externalGitClientPath:
-        base.external_git_client_path !== next.external_git_client_path
-          ? next.external_git_client_path
-          : null,
-      externalWinmergePath:
-        base.external_winmerge_path !== next.external_winmerge_path
-          ? next.external_winmerge_path
-          : null,
-      externalTerminalProfile:
-        base.external_terminal_profile !== next.external_terminal_profile
-          ? next.external_terminal_profile
-          : null,
-      externalTerminalProfileCmd:
-        base.external_terminal_profile_cmd !== next.external_terminal_profile_cmd
-          ? next.external_terminal_profile_cmd
-          : null,
-      externalTerminalProfilePowershell:
-        base.external_terminal_profile_powershell !== next.external_terminal_profile_powershell
-          ? next.external_terminal_profile_powershell
-          : null,
-      externalTerminalProfileWsl:
-        base.external_terminal_profile_wsl !== next.external_terminal_profile_wsl
-          ? next.external_terminal_profile_wsl
-          : null,
-    };
-  }
-
-  function hasSettingsPatchChanges(patch) {
-    return Object.values(patch || {}).some((value) => value !== null && value !== undefined);
-  }
-
-  function validateSettingsDraft(values) {
-    const theme = String(values?.ui_theme || "");
-    if (theme !== "light" && theme !== "dark") {
-      return t("settings.validation_invalid_theme");
-    }
-
-    const language = String(values?.ui_language || "");
-    if (language !== "en" && language !== "ja") {
-      return t("settings.validation_invalid_language");
-    }
-
-    const iconMode = String(values?.ui_file_icon_mode || "");
-    if (iconMode !== "by_type" && iconMode !== "simple" && iconMode !== "none") {
-      return t("settings.validation_invalid_icon_mode");
-    }
-
-    const timeoutMs = Number(values?.perf_dir_stats_timeout_ms ?? 0);
-    if (!Number.isFinite(timeoutMs) || timeoutMs < 500 || timeoutMs > 3_600_000) {
-      return t("settings.validation_timeout_range");
-    }
-
-    const pathValues = [values?.external_vscode_path, values?.external_git_client_path, values?.external_winmerge_path];
-    for (const raw of pathValues) {
-      const value = String(raw || "");
-      if (value.length > SETTINGS_PATH_MAX_LEN) {
-        return t("settings.validation_path_too_long");
-      }
-      if (/\r|\n/.test(value)) {
-        return t("settings.validation_single_line");
-      }
-    }
-
-    const profileValues = [
-      values?.external_terminal_profile,
-      values?.external_terminal_profile_cmd,
-      values?.external_terminal_profile_powershell,
-      values?.external_terminal_profile_wsl,
-    ];
-    for (const raw of profileValues) {
-      const value = String(raw || "");
-      if (value.length > SETTINGS_PROFILE_MAX_LEN) {
-        return t("settings.validation_profile_too_long");
-      }
-      if (/\r|\n/.test(value)) {
-        return t("settings.validation_single_line");
-      }
-    }
-
-    return "";
-  }
-  const KNOWN_SHORTCUT_CONFLICTS = {
-    [normalizeKeyString("Ctrl+Shift+Esc")]: "settings.shortcut_conflict_task_manager",
-    [normalizeKeyString("Alt+Shift")]: "settings.shortcut_conflict_input_switch",
-    [normalizeKeyString("Ctrl+Alt+ArrowUp")]: "settings.shortcut_conflict_display_driver",
-    [normalizeKeyString("Ctrl+Alt+ArrowDown")]: "settings.shortcut_conflict_display_driver",
-    [normalizeKeyString("Ctrl+Alt+ArrowLeft")]: "settings.shortcut_conflict_display_driver",
-    [normalizeKeyString("Ctrl+Alt+ArrowRight")]: "settings.shortcut_conflict_display_driver",
-  };
-
-  function collectSettingsShortcutConflicts() {
-    const knownItems = [];
-    const knownSeen = new Set();
-    const bindingActions = new Map();
-
-    for (const action of KEYMAP_ACTIONS) {
-      const bindings = keymapBindings.getActionBindings(action.id);
-      for (const binding of bindings) {
-        const normalized = normalizeKeyString(binding);
-        if (!normalized) continue;
-
-        const reasonKey = KNOWN_SHORTCUT_CONFLICTS[normalized];
-        if (reasonKey) {
-          const dedupeKey = `${action.id}:${normalized}:${reasonKey}`;
-          if (!knownSeen.has(dedupeKey)) {
-            knownSeen.add(dedupeKey);
-            knownItems.push(
-              t("settings.shortcut_conflict_item", {
-                binding: normalized,
-                action: t(action.labelKey),
-                reason: t(reasonKey),
-              })
-            );
-          }
-        }
-
-        const current = bindingActions.get(normalized) || [];
-        if (!current.includes(action.id)) {
-          current.push(action.id);
-        }
-        bindingActions.set(normalized, current);
-      }
-    }
-
-    const internalItems = [];
-    for (const [binding, actionIds] of bindingActions.entries()) {
-      if (!Array.isArray(actionIds) || actionIds.length <= 1) continue;
-      const actionLabels = actionIds
-        .map((id) => {
-          const meta = KEYMAP_ACTIONS.find((entry) => entry.id === id);
-          return meta ? t(meta.labelKey) : id;
-        })
-        .join(", ");
-      internalItems.push(
-        t("settings.shortcut_conflict_internal_item", {
-          binding,
-          actions: actionLabels,
-        })
-      );
-    }
-
-    settingsShortcutConflicts = [...knownItems, ...internalItems];
-  }
-
-  function normalizeSettingsSection(value) {
-    const section = String(value || "").trim().toLowerCase();
-    if (section === "external" || section === "advanced") {
-      return section;
-    }
-    return "general";
-  }
+  // ── Settings modal actions ────────────────────────────────────────────────
+  // Logic lives in page_settings_logic.ts (pure) and page_settings_actions.ts (side effects).
 
   async function openSettingsModal(options = undefined) {
-    settingsInitialSection = normalizeSettingsSection(options?.initialSection);
-    settingsSaving = false;
-    settingsError = "";
-    settingsTesting = false;
-    settingsTestMessage = "";
-    settingsTestIsError = false;
-    settingsReporting = false;
-    settingsReportMessage = "";
-    settingsReportIsError = false;
-    try {
-      const config = await invoke("config_get");
-      settingsInitial = normalizeSettingsConfig(config || {});
-    } catch (err) {
-      settingsError = formatError(err, "failed to load config", t);
-      settingsInitial = normalizeSettingsConfig({
-        ui_theme: state.ui_theme,
-        ui_language: state.ui_language,
-        ui_file_icon_mode: state.ui_file_icon_mode,
-        perf_dir_stats_timeout_ms: state.dirStatsTimeoutMs,
-      });
-    }
-
-    try {
-      const profiles = await invoke("external_list_terminal_profiles");
-      settingsProfiles = Array.isArray(profiles) ? profiles : [];
-    } catch {
-      settingsProfiles = [];
-    }
-
-    collectSettingsShortcutConflicts();
-    settingsOpen = true;
+    return settingsActions.openSettingsModal(options);
   }
-
   function closeSettingsModal() {
-    if (settingsSaving) return;
-    settingsOpen = false;
-    settingsError = "";
-    queueMicrotask(() => {
-      shellRefs.listEl?.focus?.();
-    });
+    return settingsActions.closeSettingsModal();
   }
-
   async function saveSettings(values) {
-    settingsSaving = true;
-    settingsError = "";
-
-    const normalizedValues = normalizeSettingsConfig(values || {});
-    const validationError = validateSettingsDraft(normalizedValues);
-    if (validationError) {
-      settingsSaving = false;
-      settingsError = validationError;
-      return;
-    }
-
-    const patch = buildSettingsSavePatch(settingsInitial, normalizedValues);
-    if (!hasSettingsPatchChanges(patch)) {
-      settingsSaving = false;
-      actions.setStatusMessage(t("settings.no_changes"), 1200);
-      settingsOpen = false;
-      queueMicrotask(() => {
-        shellRefs.listEl?.focus?.();
-      });
-      return;
-    }
-
-    try {
-      const saved = await invoke("config_save_preferences", patch);
-
-      settingsInitial = normalizeSettingsConfig(saved || normalizedValues);
-      state.ui_theme = settingsInitial.ui_theme;
-      state.ui_language = settingsInitial.ui_language;
-      state.ui_file_icon_mode = settingsInitial.ui_file_icon_mode;
-      state.dirStatsTimeoutMs = settingsInitial.perf_dir_stats_timeout_ms;
-      actions.setStatusMessage(t("settings.saved"), 1500);
-      settingsOpen = false;
-      settingsError = "";
-      queueMicrotask(() => {
-        shellRefs.listEl?.focus?.();
-      });
-    } catch (err) {
-      settingsError = formatError(err, "save failed", t);
-    } finally {
-      settingsSaving = false;
-    }
+    return settingsActions.saveSettings(values);
   }
   async function openConfigFromSettings() {
-    try {
-      await invoke("config_open_in_editor");
-      actions.setStatusMessage(t("status.opened_config"), 1500);
-    } catch (err) {
-      settingsError = `${t("status.open_failed")}: ${formatError(err, "unknown error", t)}`;
-    }
+    return settingsActions.openConfigFromSettings();
   }
-
   async function createSettingsBackup() {
-    settingsReporting = true;
-    settingsReportMessage = "";
-    settingsReportIsError = false;
-    try {
-      const backupPath = await invoke("config_create_backup");
-      settingsReportMessage = t("settings.backup_ok", { path: String(backupPath || "") });
-      actions.setStatusMessage(t("settings.backup_ready"), 1800);
-    } catch (err) {
-      settingsReportIsError = true;
-      settingsReportMessage = t("settings.backup_failed", {
-        error: formatError(err, "unknown error", t),
-      });
-    } finally {
-      settingsReporting = false;
-    }
+    return settingsActions.createSettingsBackup();
   }
-
   async function restoreSettingsBackup() {
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(t("settings.restore_confirm"));
-      if (!ok) return;
-    }
-
-    settingsReporting = true;
-    settingsReportMessage = "";
-    settingsReportIsError = false;
-    try {
-      const restored = await invoke("config_restore_latest_backup");
-      settingsInitial = normalizeSettingsConfig(restored || {});
-      state.ui_theme = settingsInitial.ui_theme;
-      state.ui_language = settingsInitial.ui_language;
-      state.ui_file_icon_mode = settingsInitial.ui_file_icon_mode;
-      state.dirStatsTimeoutMs = settingsInitial.perf_dir_stats_timeout_ms;
-      settingsReportMessage = t("settings.restore_ok");
-      actions.setStatusMessage(t("settings.restore_ready"), 1800);
-    } catch (err) {
-      settingsReportIsError = true;
-      settingsReportMessage = t("settings.restore_failed", {
-        error: formatError(err, "unknown error", t),
-      });
-    } finally {
-      settingsReporting = false;
-    }
+    return settingsActions.restoreSettingsBackup();
   }
-
   async function exportDiagnosticReport(options) {
-    settingsReporting = true;
-    settingsReportMessage = "";
-    settingsReportIsError = false;
-    try {
-      const result = await invoke("config_generate_diagnostic_report", {
-        openAfterWrite: Boolean(options?.open_after_write ?? true),
-        maskSensitivePaths: Boolean(options?.mask_sensitive_paths ?? true),
-        asZip: Boolean(options?.as_zip ?? false),
-        copyPathToClipboard: Boolean(options?.copy_path_to_clipboard ?? false),
-      });
-      const reportPath = String(result?.report_path || result?.reportPath || "");
-      const copied = Boolean(result?.copied_to_clipboard ?? result?.copiedToClipboard ?? false);
-      settingsReportMessage = copied
-        ? t("settings.report_ok_copied", { path: reportPath })
-        : t("settings.report_ok", { path: reportPath });
-      actions.setStatusMessage(t("settings.report_ready"), 1800);
-    } catch (err) {
-      settingsReportIsError = true;
-      settingsReportMessage = t("settings.report_failed", {
-        error: formatError(err, "unknown error", t),
-      });
-    } finally {
-      settingsReporting = false;
-    }
+    return settingsActions.exportDiagnosticReport(options);
   }
-
-  function normalizeExecutablePath(value) {
-    const raw = String(value || "").trim();
-    if (!raw) return "";
-    if (
-      (raw.startsWith('"') && raw.endsWith('"')) ||
-      (raw.startsWith("'") && raw.endsWith("'"))
-    ) {
-      return raw.slice(1, -1).trim();
-    }
-    return raw;
-  }
-
   async function runSettingsDiagnostic(kind, values) {
-    settingsTesting = true;
-    settingsTestMessage = "";
-    settingsTestIsError = false;
-    settingsReporting = false;
-    settingsReportMessage = "";
-    settingsReportIsError = false;
-
-    const targetPath = String(state.currentPath || "").trim();
-    if (!targetPath) {
-      settingsTestIsError = true;
-      settingsTestMessage = t("settings.test_path_missing");
-      settingsTesting = false;
-      return;
-    }
-
-    try {
-      if (kind === "terminal") {
-        const profile = String(values?.external_terminal_profile || "").trim();
-        if (profile) {
-          await invoke("external_open_terminal_profile", {
-            path: targetPath,
-            profile,
-          });
-        } else {
-          await invoke("external_open_terminal_kind", {
-            path: targetPath,
-            kind: "cmd",
-          });
-        }
-        settingsTestMessage = t("settings.test_ok", { target: t("settings.test_terminal") });
-      } else if (kind === "vscode") {
-        const command = normalizeExecutablePath(values?.external_vscode_path);
-        if (command) {
-          try {
-            await invoke("external_open_custom", { command, args: [targetPath] });
-          } catch {
-            await invoke("external_open_vscode", { path: targetPath });
-          }
-        } else {
-          await invoke("external_open_vscode", { path: targetPath });
-        }
-        settingsTestMessage = t("settings.test_ok", { target: t("settings.test_vscode") });
-      } else if (kind === "git") {
-        const command = normalizeExecutablePath(values?.external_git_client_path);
-        if (command) {
-          try {
-            await invoke("external_open_custom", { command, args: [targetPath] });
-          } catch {
-            await invoke("external_open_git_client", { path: targetPath });
-          }
-        } else {
-          await invoke("external_open_git_client", { path: targetPath });
-        }
-        settingsTestMessage = t("settings.test_ok", { target: t("settings.test_git_client") });
-      } else {
-        throw new Error("unknown diagnostics target");
-      }
-      actions.setStatusMessage(settingsTestMessage, 1800);
-    } catch (err) {
-      settingsTestIsError = true;
-      settingsTestMessage = t("settings.test_failed", {
-        target:
-          kind === "terminal"
-            ? t("settings.test_terminal")
-            : kind === "vscode"
-              ? t("settings.test_vscode")
-              : t("settings.test_git_client"),
-        error: formatError(err, "unknown error", t),
-      });
-    } finally {
-      settingsTesting = false;
-    }
+    return settingsActions.runSettingsDiagnostic(kind, values);
   }
 
   onMount(() => {
