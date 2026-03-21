@@ -14,199 +14,96 @@ export function buildPageSettersInputsFromState(params) {
   // incorrect, causing setters to silently write to the wrong pane.
   const getActivePane = params.getActivePane ?? (() => state);
 
+  // Shorthand: setter writing to global state
+  const s = (field) => (value) => { state[field] = value; };
+  // Shorthand: setter writing to whichever pane is currently active
+  const ap = (field) => (value) => { getActivePane()[field] = value; };
+
   return buildPageSettersInputsFromGroups({
     paste: {
-      setPasteConfirmOpen: (value) => {
-        state.pasteConfirmOpen = value;
-      },
-      setPastePendingPaths: (value) => {
-        state.pastePendingPaths = value;
-      },
-      setPasteConflicts: (value) => {
-        state.pasteConflicts = value;
-      },
-      setPasteConfirmIndex: (value) => {
-        state.pasteConfirmIndex = value;
-      },
-      setPasteMode: (value) => {
-        state.pasteMode = value;
-      },
-      setPasteApplyAll: (value) => {
-        state.pasteApplyAll = value;
-      },
+      setPasteConfirmOpen:  s("pasteConfirmOpen"),
+      setPastePendingPaths: s("pastePendingPaths"),
+      setPasteConflicts:    s("pasteConflicts"),
+      setPasteConfirmIndex: s("pasteConfirmIndex"),
+      setPasteMode:         s("pasteMode"),
+      setPasteApplyAll:     s("pasteApplyAll"),
     },
     delete: {
-      setDeleteConfirmOpen: (value) => {
-        state.deleteConfirmOpen = value;
-      },
-      setDeleteTargets: (value) => {
-        state.deleteTargets = value;
-      },
-      setDeleteError: (value) => {
-        state.deleteError = value;
-      },
-      setDeleteConfirmIndex: (value) => {
-        state.deleteConfirmIndex = value;
-      },
+      setDeleteConfirmOpen:  s("deleteConfirmOpen"),
+      setDeleteTargets:      s("deleteTargets"),
+      setDeleteError:        s("deleteError"),
+      setDeleteConfirmIndex: s("deleteConfirmIndex"),
     },
     rename: {
-      setRenameTarget: (value) => {
-        state.renameTarget = value;
-      },
-      setRenameValue: (value) => {
-        state.renameValue = value;
-      },
-      setRenameError: (value) => {
-        state.renameError = value;
-      },
-      setRenameOpen: (value) => {
-        state.renameOpen = value;
-      },
+      setRenameTarget: s("renameTarget"),
+      setRenameValue:  s("renameValue"),
+      setRenameError:  s("renameError"),
+      setRenameOpen:   s("renameOpen"),
     },
     create: {
-      setCreateType: (value) => {
-        state.createType = value;
-      },
-      setCreateName: (value) => {
-        state.createName = value;
-      },
-      setCreateError: (value) => {
-        state.createError = value;
-      },
-      setCreateOpen: (value) => {
-        state.createOpen = value;
-      },
+      setCreateType:  s("createType"),
+      setCreateName:  s("createName"),
+      setCreateError: s("createError"),
+      setCreateOpen:  s("createOpen"),
     },
     jump: {
-      setJumpUrlOpen: (value) => {
-        state.jumpUrlOpen = value;
-      },
-      setJumpUrlError: (value) => {
-        state.jumpUrlError = value;
-      },
-      setJumpUrlValue: (value) => {
-        state.jumpUrlValue = value;
-      },
-      setJumpList: (value) => {
-        state.jumpList = value;
-      },
-      setPathHistory: (value) => {
-        state.pathHistory = value;
-      },
+      setJumpUrlOpen:  s("jumpUrlOpen"),
+      setJumpUrlError: s("jumpUrlError"),
+      setJumpUrlValue: s("jumpUrlValue"),
+      setJumpList:     s("jumpList"),
+      setPathHistory:  s("pathHistory"),
     },
     search: {
-      setSearchQuery: (value) => {
-        state.searchQuery = value;
-      },
-      setSearchActive: (value) => {
-        state.searchActive = value;
-      },
-      setSearchError: (value) => {
-        state.searchError = value;
-      },
-      setSearchHistory: (value) => {
-        state.searchHistory = value;
-      },
+      setSearchQuery:   s("searchQuery"),
+      setSearchActive:  s("searchActive"),
+      setSearchError:   s("searchError"),
+      setSearchHistory: s("searchHistory"),
     },
     about: {
-      setAboutOpen: (value) => {
-        state.aboutOpen = value;
-      },
+      setAboutOpen: s("aboutOpen"),
     },
     selection: {
-      setFocusedIndex: (value) => {
-        getActivePane().focusedIndex = value;
-      },
-      setSelected: (paths) => {
-        getActivePane().selectedPaths = paths;
-      },
-      setAnchorIndex: (value) => {
-        getActivePane().anchorIndex = value;
-      },
+      setFocusedIndex: ap("focusedIndex"),
+      setSelected:     (paths) => { getActivePane().selectedPaths = paths; },
+      setAnchorIndex:  ap("anchorIndex"),
     },
     contextMenu: {
-      setContextMenuOpen: (value) => {
-        state.contextMenuOpen = value;
-      },
-      setContextMenuPos: (value) => {
-        state.contextMenuPos = value;
-      },
-      setContextMenuMode: (value) => {
-        state.contextMenuMode = value;
-      },
-      setContextMenuCanPaste: (value) => {
-        state.contextMenuCanPaste = value;
-      },
-      setContextMenuIndex: (value) => {
-        state.contextMenuIndex = value;
-      },
+      setContextMenuOpen:     s("contextMenuOpen"),
+      setContextMenuPos:      s("contextMenuPos"),
+      setContextMenuMode:     s("contextMenuMode"),
+      setContextMenuCanPaste: s("contextMenuCanPaste"),
+      setContextMenuIndex:    s("contextMenuIndex"),
     },
     dropdown: {
-      setDropdownOpen: (value) => {
-        state.dropdownOpen = value;
-      },
+      setDropdownOpen: s("dropdownOpen"),
     },
     status: {
-      setStatusMessageState: (value) => {
-        state.statusMessage = value;
-      },
+      setStatusMessageState: s("statusMessage"),
       setStatusTimer,
     },
     failure: {
-      setError: (value) => {
-        getActivePane().error = value;
-      },
-      setFailureModalOpen: (value) => {
-        state.failureModalOpen = value;
-      },
-      setFailureModalTitle: (value) => {
-        state.failureModalTitle = value;
-      },
-      setFailureItems: (value) => {
-        state.failureItems = value;
-      },
+      setError:             ap("error"),
+      setFailureModalOpen:  s("failureModalOpen"),
+      setFailureModalTitle: s("failureModalTitle"),
+      setFailureItems:      s("failureItems"),
     },
     clipboard: {
-      setLastClipboard: (value) => {
-        state.lastClipboard = value;
-      },
+      setLastClipboard: s("lastClipboard"),
     },
     undo: {
-      setUndoStack: (value) => {
-        state.undoStack = value;
-      },
-      setRedoStack: (value) => {
-        state.redoStack = value;
-      },
+      setUndoStack: s("undoStack"),
+      setRedoStack: s("redoStack"),
     },
     zip: {
-      setZipMode: (value) => {
-        state.zipMode = value;
-      },
-      setZipTargets: (value) => {
-        state.zipTargets = value;
-      },
-      setZipDestination: (value) => {
-        state.zipDestination = value;
-      },
-      setZipPassword: (value) => {
-        state.zipPassword = value;
-      },
-      setZipError: (value) => {
-        state.zipError = value;
-      },
-      setZipPasswordAttempts: (value) => {
-        state.zipPasswordAttempts = value;
-      },
-      setZipConfirmIndex: (value) => {
-        state.zipConfirmIndex = value;
-      },
-      setZipOverwriteConfirmed: (value) => {
-        state.zipOverwriteConfirmed = value;
-      },
-      setZipModalOpen: (value) => {
-        state.zipModalOpen = value;
-      },
+      setZipMode:              s("zipMode"),
+      setZipTargets:           s("zipTargets"),
+      setZipDestination:       s("zipDestination"),
+      setZipPassword:          s("zipPassword"),
+      setZipError:             s("zipError"),
+      setZipPasswordAttempts:  s("zipPasswordAttempts"),
+      setZipConfirmIndex:      s("zipConfirmIndex"),
+      setZipOverwriteConfirmed:s("zipOverwriteConfirmed"),
+      setZipModalOpen:         s("zipModalOpen"),
     },
   });
 }

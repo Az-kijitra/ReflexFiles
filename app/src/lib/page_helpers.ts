@@ -29,6 +29,24 @@ export function createListNameFormatter(formatName, getNameMaxChars) {
   };
 }
 
+/**
+ * Normalize a raw capabilities object from the backend, defaulting all
+ * boolean fields to `true` when missing or null.
+ */
+export function normalizeProviderCapabilities(value: unknown) {
+  const v = value as Record<string, unknown> | null | undefined;
+  return {
+    can_read:            Boolean(v?.can_read            ?? true),
+    can_create:          Boolean(v?.can_create          ?? true),
+    can_rename:          Boolean(v?.can_rename          ?? true),
+    can_copy:            Boolean(v?.can_copy            ?? true),
+    can_move:            Boolean(v?.can_move            ?? true),
+    can_delete:          Boolean(v?.can_delete          ?? true),
+    can_archive_create:  Boolean(v?.can_archive_create  ?? true),
+    can_archive_extract: Boolean(v?.can_archive_extract ?? true),
+  };
+}
+
 /** @param {HTMLElement | null} node */
 export function autofocus(node) {
   const focus = () => {

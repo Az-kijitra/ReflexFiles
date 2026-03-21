@@ -13,7 +13,7 @@
  * Intended to be called at action dispatch time (not at setup time),
  * so refs can be bound after component mount.
  */
-export function isRightPaneFocused(rightRefs: {
+export function isPaneFocused(rightRefs: {
   listEl: HTMLElement | null;
   pathInputEl: HTMLInputElement | null;
 }): boolean {

@@ -6,6 +6,7 @@ import {
   readDragDropExperimentPolicyFromStorage,
 } from "$lib/utils/drag_drop_experiment";
 import { getPasteConflicts } from "$lib/utils/file_ops";
+import { MODAL_OVERLAY_SELECTOR } from "$lib/page_constants";
 
 /**
  * @param {object} ctx
@@ -243,7 +244,7 @@ export async function setupPageLifecycle(ctx) {
         if (
           typeof document !== "undefined" &&
           document.querySelector(
-            ".modal, .modal-backdrop, .context-menu, .dropdown, .menu-dropdown, .sort-menu"
+            MODAL_OVERLAY_SELECTOR
           )
         ) {
           ctx.setStatusMessage(ctx.t("status.dnd_import_blocked_overlay"), 2000);

@@ -1,125 +1,163 @@
-/**
- * @param {object} params
- * @param {(event: KeyboardEvent, ctx: any) => boolean} params.handleGlobalKey
- * @param {() => HTMLElement | null} params.getListEl
- * @param {() => HTMLInputElement | null} params.getPathInputEl
- * @param {() => HTMLElement | null} params.getTreeEl
- * @param {() => HTMLElement | null} params.getDropdownEl
- * @param {() => HTMLElement | null} params.getContextMenuEl
- * @param {() => boolean} params.getPasteConfirmOpen
- * @param {() => boolean} params.getDeleteConfirmOpen
- * @param {() => boolean} params.getJumpUrlOpen
- * @param {() => boolean} params.getSortMenuOpen
- * @param {() => boolean} params.getZipModalOpen
- * @param {() => boolean} params.getFailureModalOpen
- * @param {() => boolean} params.getDropdownOpen
- * @param {() => boolean} params.getRenameOpen
- * @param {() => boolean} params.getCreateOpen
- * @param {() => boolean} params.getPropertiesOpen
- * @param {() => boolean} params.getContextMenuOpen
- * @param {() => boolean} params.getShowTree
- * @param {() => boolean} params.getShowHidden
- * @param {() => boolean} params.getShowSize
- * @param {() => boolean} params.getShowTime
- * @param {() => boolean} params.getSearchActive
- * @param {() => string} params.getCurrentPath
- * @param {() => string} params.getDropdownMode
- * @param {() => unknown[]} params.getEntries
- * @param {() => number} params.getFocusedIndex
- * @param {() => number} params.getListRows
- * @param {() => string[]} params.getSelectedPaths
- * @param {() => unknown[]} params.getJumpList
- * @param {() => string[]} params.getPathHistory
- * @param {() => string} params.getMenuOpen
- * @param {(event: KeyboardEvent, actionId: import("$lib/ui_types").ActionId) => boolean} params.matchesAction
- * @param {(event: KeyboardEvent) => void} params.handleSortMenuKey
- * @param {() => void} params.focusTreeTop
- * @param {() => void} params.focusList
- * @param {() => void} params.cancelRename
- * @param {() => void} params.confirmRename
- * @param {() => void} params.cancelCreate
- * @param {() => void} params.confirmCreate
- * @param {() => void} params.cancelJumpUrl
- * @param {() => void} params.confirmJumpUrl
- * @param {() => void} params.closeProperties
- * @param {(event: KeyboardEvent) => void} params.handleContextMenuKey
- * @param {() => void} params.openConfigFile
- * @param {() => void} params.openKeymapHelp
- * @param {(event: KeyboardEvent) => void} params.handleTreeKey
- * @param {() => void} params.performUndo
- * @param {() => void} params.performRedo
- * @param {() => void} params.clearDirStatsCache
- * @param {(message: string, durationMs?: number) => void} params.setStatusMessage
- * @param {() => void} params.selectAll
- * @param {(paths: string[]) => void} params.setSelected
- * @param {(value: number | null) => void} params.setAnchorIndex
- * @param {() => void} params.updateListRows
- * @param {(delay?: number) => void} params.scheduleUiSave
- * @param {(path: string) => Promise<void>} params.buildTreeRoot
- * @param {(err: unknown) => void} params.showError
- * @param {() => void} params.openInExplorer
- * @param {() => void} params.openInCmd
- * @param {() => void} params.openInTerminalCmd
- * @param {() => void} params.openInTerminalPowerShell
- * @param {() => void} params.openInTerminalWsl
- * @param {() => void} params.openInVSCode
- * @param {() => void} params.openInGitClient
- * @param {() => void} params.openZipCreate
- * @param {() => void} params.openZipExtract
- * @param {(path: string) => Promise<void>} params.openProperties
- * @param {(path: string) => Promise<void>} params.loadDir
- * @param {(delta: number, useRange: boolean) => void} params.moveFocusByRow
- * @param {(delta: number, useRange: boolean) => void} params.moveFocusByColumn
- * @param {(index: number) => void} params.toggleSelection
- * @param {(start: number, end: number) => void} params.selectRange
- * @param {(entry: unknown) => void} params.openEntry
- * @param {() => void} params.openRename
- * @param {() => void} params.openCreate
- * @param {() => void} params.copySelected
- * @param {() => void} params.duplicateSelected
- * @param {() => void} params.prefixDateSelected
- * @param {() => void} params.cutSelected
- * @param {() => void} params.pasteItems
- * @param {() => boolean} params.hasOperationTargets
- * @param {() => boolean} params.hasSelection
- * @param {() => boolean} params.canCopyTargets
- * @param {() => boolean} params.canDuplicateTargets
- * @param {() => boolean} params.canPrefixDateTargets
- * @param {() => boolean} params.canCutTargets
- * @param {() => boolean} params.canRenameFocused
- * @param {() => boolean} params.canDeleteSelection
- * @param {() => boolean} params.canDeleteTargets
- * @param {() => boolean} params.canOpenPropertiesSelection
- * @param {() => boolean} params.canZipCreateSelection
- * @param {() => boolean} params.canZipExtractSelection
- * @param {() => boolean} params.canZipExtractFocused
- * @param {() => void} params.addJumpCurrent
- * @param {() => void} params.openJumpUrlModal
- * @param {() => void} params.openSortMenu
- * @param {() => void} params.closeSortMenu
- * @param {() => unknown[]} params.getExternalApps
- * @param {(app: unknown) => void} params.runExternalApp
- * @param {(value: string) => void} params.setDropdownMode
- * @param {(value: boolean) => void} params.setDropdownOpen
- * @param {(value: boolean) => void} params.setSearchActive
- * @param {(value: string) => void} params.setPathInput
- * @param {(value: boolean) => void} params.setShowHidden
- * @param {(value: boolean) => void} params.setShowSize
- * @param {(value: boolean) => void} params.setShowTime
- * @param {(value: boolean) => void} params.setShowTree
- * @param {(value: string[]) => void} params.setDeleteTargets
- * @param {(value: boolean) => void} params.setDeleteConfirmOpen
- * @param {(value: number) => void} params.setDeleteConfirmIndex
- * @param {(value: string) => void} params.setDeleteError
- * @param {(value: string[]) => void} params.setPathHistory
- * @param {() => void} params.closeMenu
- * @param {(key: string, vars?: Record<string, string | number>) => string} params.t
- * @param {(question: string) => Promise<boolean>} params.confirm
- * @param {() => void} params.exitApp
- * @param {() => void} params.focusPathInput
- * @param {(event: KeyboardEvent) => string} params.eventToKeyString
- * @param {(value: string) => string} params.normalizeKeyString
- * @param {() => unknown} params.getTargetEntry
- */
+import type { ActionId } from "$lib/ui_types";
 
-export type PageKeydownParams = Record<string, any>;
+/** All dependencies injected into the global keydown handler. */
+export interface PageKeydownParams {
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  handleGlobalKey: (event: KeyboardEvent, ctx: unknown) => boolean;
+  getListEl:        () => HTMLElement | null;
+  getPathInputEl:   () => HTMLInputElement | null;
+  getTreeEl:        () => HTMLElement | null;
+  getDropdownEl:    () => HTMLElement | null;
+  getContextMenuEl: () => HTMLElement | null;
+
+  // ── Modal open-state getters ──────────────────────────────────────────────
+  getPasteConfirmOpen:  () => boolean;
+  getDeleteConfirmOpen: () => boolean;
+  getJumpUrlOpen:       () => boolean;
+  getSortMenuOpen:      () => boolean;
+  getZipModalOpen:      () => boolean;
+  getFailureModalOpen:  () => boolean;
+  getDropdownOpen:      () => boolean;
+  getRenameOpen:        () => boolean;
+  getCreateOpen:        () => boolean;
+  getPropertiesOpen:    () => boolean;
+  getContextMenuOpen:   () => boolean;
+
+  // ── UI-state getters ──────────────────────────────────────────────────────
+  getShowTree:     () => boolean;
+  getShowHidden:   () => boolean;
+  getShowSize:     () => boolean;
+  getShowTime:     () => boolean;
+  getSearchActive: () => boolean;
+
+  // ── Data getters ──────────────────────────────────────────────────────────
+  getCurrentPath:  () => string;
+  getDropdownMode: () => string;
+  getEntries:      () => unknown[];
+  getFocusedIndex: () => number;
+  getListRows:     () => number;
+  getSelectedPaths: () => string[];
+  getJumpList:     () => unknown[];
+  getPathHistory:  () => string[];
+  getMenuOpen:     () => string;
+  getExternalApps: () => unknown[];
+  getTargetEntry:  () => unknown;
+
+  // ── Keymap helpers ────────────────────────────────────────────────────────
+  matchesAction:       (event: KeyboardEvent, actionId: ActionId) => boolean;
+  eventToKeyString:    (event: KeyboardEvent) => string;
+  normalizeKeyString:  (value: string) => string;
+
+  // ── Focus / navigation ────────────────────────────────────────────────────
+  focusTreeTop:      () => void;
+  focusList:         () => void;
+  focusPathInput:    () => void;
+  updateListRows:    () => void;
+  moveFocusByRow:    (delta: number, useRange: boolean) => void;
+  moveFocusByColumn: (delta: number, useRange: boolean) => void;
+
+  // ── Rename ────────────────────────────────────────────────────────────────
+  cancelRename:  () => void;
+  confirmRename: () => void;
+  openRename:    () => void;
+
+  // ── Create ────────────────────────────────────────────────────────────────
+  cancelCreate:  () => void;
+  confirmCreate: () => void;
+  openCreate:    () => void;
+
+  // ── Jump URL ──────────────────────────────────────────────────────────────
+  cancelJumpUrl:  () => void;
+  confirmJumpUrl: () => void;
+
+  // ── Properties / menus ───────────────────────────────────────────────────
+  closeProperties:      () => void;
+  openProperties:       (path: string) => Promise<void>;
+  closeMenu:            () => void;
+  openSortMenu:         () => void;
+  closeSortMenu:        () => void;
+  openJumpUrlModal:     () => void;
+  addJumpCurrent:       () => void;
+
+  // ── Key handlers (sub-handlers) ───────────────────────────────────────────
+  handleSortMenuKey:   (event: KeyboardEvent) => void;
+  handleContextMenuKey:(event: KeyboardEvent) => void;
+  handleTreeKey:       (event: KeyboardEvent) => void;
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+  toggleSelection: (index: number) => void;
+  selectRange:     (start: number, end: number) => void;
+  selectAll:       () => void;
+  setSelected:     (paths: string[]) => void;
+  setAnchorIndex:  (value: number | null) => void;
+
+  // ── Clipboard ─────────────────────────────────────────────────────────────
+  copySelected:       () => void;
+  duplicateSelected:  () => void;
+  prefixDateSelected: () => void;
+  cutSelected:        () => void;
+  pasteItems:         () => void;
+
+  // ── Capability checks ─────────────────────────────────────────────────────
+  hasOperationTargets:       () => boolean;
+  hasSelection:              () => boolean;
+  canCopyTargets:            () => boolean;
+  canDuplicateTargets:       () => boolean;
+  canPrefixDateTargets:      () => boolean;
+  canCutTargets:             () => boolean;
+  canRenameFocused:          () => boolean;
+  canDeleteSelection:        () => boolean;
+  canDeleteTargets:          () => boolean;
+  canOpenPropertiesSelection:() => boolean;
+  canZipCreateSelection:     () => boolean;
+  canZipExtractSelection:    () => boolean;
+  canZipExtractFocused:      () => boolean;
+
+  // ── Entry operations ──────────────────────────────────────────────────────
+  openEntry:   (entry: unknown) => void;
+  openContextMenu: (...args: unknown[]) => void;
+  loadDir:     (path: string) => Promise<void>;
+  buildTreeRoot:(path: string) => Promise<void>;
+
+  // ── External apps ─────────────────────────────────────────────────────────
+  openInExplorer:           () => void;
+  openInCmd:                () => void;
+  openInTerminalCmd:        () => void;
+  openInTerminalPowerShell: () => void;
+  openInTerminalWsl:        () => void;
+  openInVSCode:             () => void;
+  openInGitClient:          () => void;
+  runExternalApp:           (app: unknown) => void;
+
+  // ── Zip ───────────────────────────────────────────────────────────────────
+  openZipCreate:   () => void;
+  openZipExtract:  () => void;
+
+  // ── Undo / redo ───────────────────────────────────────────────────────────
+  performUndo: () => void;
+  performRedo: () => void;
+
+  // ── Misc ──────────────────────────────────────────────────────────────────
+  clearDirStatsCache:  () => void;
+  openConfigFile:      () => void;
+  openKeymapHelp:      () => void;
+  setStatusMessage:    (message: string, durationMs?: number) => void;
+  setDropdownMode:     (value: string) => void;
+  setDropdownOpen:     (value: boolean) => void;
+  setSearchActive:     (value: boolean) => void;
+  setPathInput:        (value: string) => void;
+  setShowHidden:       (value: boolean) => void;
+  setShowSize:         (value: boolean) => void;
+  setShowTime:         (value: boolean) => void;
+  setShowTree:         (value: boolean) => void;
+  setDeleteTargets:    (value: string[]) => void;
+  setDeleteConfirmOpen:(value: boolean) => void;
+  setDeleteConfirmIndex:(value: number) => void;
+  setDeleteError:      (value: string) => void;
+  setPathHistory:      (value: string[]) => void;
+  scheduleUiSave:      (delay?: number) => void;
+  showError:           (err: unknown) => void;
+  exitApp:             () => void;
+  t:                   (key: string, vars?: Record<string, string | number>) => string;
+  confirm:             (question: string) => Promise<boolean>;
+}

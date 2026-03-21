@@ -1,5 +1,5 @@
 import { buildPageMountDomHandlersFromVars } from "./page_mount_dom_handlers_from_vars";
-import { isRightPaneFocused } from "./pane_focus_utils";
+import { isPaneFocused } from "./pane_focus_utils";
 
 /**
  * @param {{
@@ -47,7 +47,7 @@ export function buildPageMountDomHandlersInputsFromState(params) {
     if (params.state.layoutMode !== "dual") return false;
     const rightRefs = getRightRefs?.();
     if (!rightRefs) return false;
-    return isRightPaneFocused(rightRefs);
+    return isPaneFocused(rightRefs);
   }
 
   return buildPageMountDomHandlersFromVars({

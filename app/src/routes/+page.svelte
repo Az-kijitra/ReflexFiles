@@ -24,7 +24,9 @@
     ABOUT_LICENSE,
     ABOUT_URL,
     DIR_STATS_CACHE_LIMIT,
+    GIT_PANEL_WIDTH,
     UNDO_LIMIT,
+    UNDO_SAVE_DEBOUNCE_MS,
     ZIP_PASSWORD_MAX_ATTEMPTS,
   } from "$lib/page_constants";
   import { createDirStatsCache } from "$lib/page_dir_stats_cache";
@@ -39,7 +41,7 @@
   } from "$lib/page_effects";
   import { applyDropdownEffects, applyListLayoutEffects } from "$lib/page_effects_apply";
   import { createPageErrorHandler } from "$lib/page_error_handler";
-  import { autofocus, createListNameFormatter, createTranslator } from "$lib/page_helpers";
+  import { autofocus, createListNameFormatter, createTranslator, normalizeProviderCapabilities } from "$lib/page_helpers";
   import { createDirHelpers } from "$lib/page_dir";
   import { setupPageInitFromState } from "$lib/page_init_runtime";
   import { buildInitPageRuntimeInputsFromPageState } from "$lib/page_init_runtime_inputs_from_page_state";
@@ -67,9 +69,20 @@
   import { createKeymapBindingsState } from "$lib/page_keymap_bindings_state";
   import { createListFocusMovers } from "$lib/page_list_focus";
   import { selectRangeByIndex } from "$lib/utils/selection";
-  import { isRightPaneFocused } from "$lib/pane_focus_utils";
+  import { isPaneFocused } from "$lib/pane_focus_utils";
   import { createSettingsActions } from "$lib/page_settings_actions";
   import { normalizeSettingsSection } from "$lib/page_settings_logic";
+  import { createGitPanelHandlers } from "$lib/page_git_panel_logic";
+  import {
+    createDualPaneFocusHandlers,
+    createDualPaneToggleHandler,
+    createWinMergeCrossPaneHandler,
+  } from "$lib/page_dual_pane_handlers";
+  import {
+    captureClipboardMeta,
+    patchPasteItemsForPreview,
+    makeClipboardEscHandler,
+  } from "$lib/page_clipboard_preview_runtime";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
@@ -165,19 +178,6 @@
 
   const t = createTranslator(() => state.ui_language);
   let testCapabilityOverride = null;
-
-  function normalizeProviderCapabilities(value) {
-    return {
-      can_read: Boolean(value?.can_read ?? true),
-      can_create: Boolean(value?.can_create ?? true),
-      can_rename: Boolean(value?.can_rename ?? true),
-      can_copy: Boolean(value?.can_copy ?? true),
-      can_move: Boolean(value?.can_move ?? true),
-      can_delete: Boolean(value?.can_delete ?? true),
-      can_archive_create: Boolean(value?.can_archive_create ?? true),
-      can_archive_extract: Boolean(value?.can_archive_extract ?? true),
-    };
-  }
 
   let shellRefs = $state({
     /** @type {HTMLElement | null} */
@@ -368,6 +368,16 @@
     getActionBindings:  (actionId) => keymapBindings.getActionBindings(actionId),
   });
 
+  const gitPanelHandlers = createGitPanelHandlers({
+    getLeftCurrentPath:  () => state.currentPath,
+    getRightCurrentPath: () => state.rightPane.currentPath,
+    setLeftGitStatus:    (v) => { state.gitStatus = v; },
+    setRightGitStatus:   (v) => { state.rightPane.gitStatus = v; },
+    getGitPanelOpen:     () => state.gitPanelOpen,
+    setGitPanelOpen:     (v) => { state.gitPanelOpen = v; },
+  });
+  const { refreshLeftGitStatus, refreshRightGitStatus, openGitPanel, closeGitPanel } = gitPanelHandlers;
+
   const formatNameForList = createListNameFormatter(formatName, () => state.nameMaxChars);
   const invokeExit = () => invoke("app_exit").catch(() => getCurrentWindow().close());
 
@@ -391,102 +401,21 @@
       })
     );
 
-  // Register Tab handler BEFORE lifecycle keydown handler so stopImmediatePropagation works
+  // Register Tab/pointer handlers BEFORE lifecycle keydown handler so stopImmediatePropagation works.
+  // Logic lives in page_dual_pane_handlers.ts.
+  const dualPaneFocusHandlers = createDualPaneFocusHandlers({
+    getLayoutMode:   () => state.layoutMode,
+    getActivePaneId: () => state.activePaneId,
+    setActivePaneId: (v) => { state.activePaneId = v; },
+    getLeftRefs:     () => shellRefs,
+    getRightRefs:    () => rightShellRefs,
+  });
   onMount(() => {
-    function handleDualModeTab(event) {
-      if (state.layoutMode !== "dual") return;
-
-      // Sync activePaneId with actual DOM focus for ALL key events
-      // This ensures Enter, Backspace, etc. all operate on the correct pane
-      const activeEl = document.activeElement;
-      if (activeEl) {
-        const inRight =
-          (rightShellRefs.listEl && (activeEl === rightShellRefs.listEl || rightShellRefs.listEl.contains(activeEl))) ||
-          (rightShellRefs.pathInputEl && activeEl === rightShellRefs.pathInputEl);
-        const inLeft =
-          (shellRefs.listEl && (activeEl === shellRefs.listEl || shellRefs.listEl.contains(activeEl))) ||
-          (shellRefs.pathInputEl && activeEl === shellRefs.pathInputEl);
-        if (inRight) state.activePaneId = "right";
-        else if (inLeft) state.activePaneId = "left";
-      }
-
-      if (event.key !== "Tab" || event.altKey || event.metaKey) return;
-      const isInModal = typeof activeEl?.closest === "function" && activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu");
-      if (isInModal) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      if (event.ctrlKey) {
-        const newPaneId = state.activePaneId === "left" ? "right" : "left";
-        state.activePaneId = newPaneId;
-        if (newPaneId === "right") {
-          rightShellRefs.listEl?.focus({ preventScroll: true });
-        } else {
-          shellRefs.listEl?.focus({ preventScroll: true });
-        }
-        return;
-      }
-
-      const leftListEl = shellRefs.listEl;
-      const leftPathEl = shellRefs.pathInputEl;
-      const rightListEl = rightShellRefs.listEl;
-      const rightPathEl = rightShellRefs.pathInputEl;
-
-      const inLeft =
-        (leftListEl && (activeEl === leftListEl || leftListEl.contains?.(activeEl))) ||
-        (leftPathEl && (activeEl === leftPathEl || leftPathEl.contains?.(activeEl)));
-      const inRight =
-        (rightListEl && (activeEl === rightListEl || rightListEl.contains?.(activeEl))) ||
-        (rightPathEl && (activeEl === rightPathEl || rightPathEl.contains?.(activeEl)));
-
-      if (inLeft) state.activePaneId = "left";
-      else if (inRight) state.activePaneId = "right";
-
-      const paneId = inRight ? "right" : "left";
-      const listEl = paneId === "right" ? rightListEl : leftListEl;
-      const pathEl = paneId === "right" ? rightPathEl : leftPathEl;
-
-      const isListFocused = listEl && (activeEl === listEl || listEl.contains?.(activeEl));
-      const isPathFocused = pathEl && (activeEl === pathEl || pathEl.contains?.(activeEl));
-
-      if (!event.shiftKey) {
-        if (isListFocused) {
-          pathEl?.focus({ preventScroll: true });
-          /** @type {any} */ (pathEl)?.select?.();
-        } else {
-          listEl?.focus({ preventScroll: true });
-        }
-      } else {
-        if (isPathFocused) {
-          listEl?.focus({ preventScroll: true });
-        } else {
-          pathEl?.focus({ preventScroll: true });
-          /** @type {any} */ (pathEl)?.select?.();
-        }
-      }
-    }
-    // Sync activePaneId on pointer events so mouse-based selection uses the correct pane.
-    // pointerdown fires before click/focus, ensuring activePaneId is set before selection actions run.
-    function handleDualModePointerDown(event) {
-      if (state.layoutMode !== "dual") return;
-      const target = /** @type {Node | null} */ (event.target);
-      if (!target) return;
-      if (
-        (rightShellRefs.listEl && rightShellRefs.listEl.contains(target)) ||
-        (rightShellRefs.pathInputEl && rightShellRefs.pathInputEl.contains(target))
-      ) {
-        state.activePaneId = "right";
-      } else if (
-        (shellRefs.listEl && shellRefs.listEl.contains(target)) ||
-        (shellRefs.pathInputEl && shellRefs.pathInputEl.contains(target))
-      ) {
-        state.activePaneId = "left";
-      }
-    }
-    window.addEventListener("keydown", handleDualModeTab, { capture: true });
+    const { handleDualModeTab, handleDualModePointerDown } = dualPaneFocusHandlers;
+    window.addEventListener("keydown",    handleDualModeTab,         { capture: true });
     window.addEventListener("pointerdown", handleDualModePointerDown, { capture: true });
     return () => {
-      window.removeEventListener("keydown", handleDualModeTab, { capture: true });
+      window.removeEventListener("keydown",    handleDualModeTab,         { capture: true });
       window.removeEventListener("pointerdown", handleDualModePointerDown, { capture: true });
     };
   });
@@ -615,13 +544,13 @@
   // Helper: check if the right pane has DOM focus
   function isDualRightFocused() {
     if (state.layoutMode !== "dual") return false;
-    return isRightPaneFocused(rightShellRefs);
+    return isPaneFocused(rightShellRefs);
   }
 
   // Helper: check if the left pane has DOM focus
   function isDualLeftFocused() {
     if (state.layoutMode !== "dual") return false;
-    return isRightPaneFocused(shellRefs);
+    return isPaneFocused(shellRefs);
   }
 
   // Tracks which pane owns the currently-open dropdown.
@@ -642,20 +571,7 @@
   }
 
   // ── Git status refresh helpers ────────────────────────────────────────────
-  async function refreshLeftGitStatus(path) {
-    try {
-      state.gitStatus = await gitGetStatus(path || state.currentPath);
-    } catch {
-      state.gitStatus = null;
-    }
-  }
-  async function refreshRightGitStatus(path) {
-    try {
-      state.rightPane.gitStatus = await gitGetStatus(path || state.rightPane.currentPath);
-    } catch {
-      state.rightPane.gitStatus = null;
-    }
-  }
+  // Logic lives in page_git_panel_logic.ts — destructured above as gitPanelHandlers.
 
   // Wrap actions.loadDir with dual-pane routing + git refresh
   const _leftLoadDir = actions.loadDir;
@@ -696,26 +612,30 @@
     ensureColumnVisible: rightListLayoutHelpers.ensureColumnVisible,
   });
 
-  const _baseMoveByRow = actions.moveFocusByRow;
+  // Wrap focus movers so the right pane's movers are used when it has DOM focus.
+  const moveByRowFallback = actions.moveFocusByRow;
   actions.moveFocusByRow = (delta, useRange) => {
     if (isDualRightFocused()) {
       return rightFocusMovers.moveFocusByRow(delta, useRange);
     }
-    return _baseMoveByRow(delta, useRange);
+    return moveByRowFallback(delta, useRange);
   };
 
-  const _baseMoveByCol = actions.moveFocusByColumn;
+  const moveByColFallback = actions.moveFocusByColumn;
   actions.moveFocusByColumn = (delta, useRange) => {
     if (isDualRightFocused()) {
       return rightFocusMovers.moveFocusByColumn(delta, useRange);
     }
-    return _baseMoveByCol(delta, useRange);
+    return moveByColFallback(delta, useRange);
   };
 
   $effect(() => actions.recomputeSearch());
   $effect(() => actions.recomputeDropdownItems());
   $effect(() => actions.recomputeStatusItems());
   $effect(() => actions.clampDropdownSelection());
+
+  // Fetch provider capabilities (copy/move/delete support) for the left pane's current
+  // directory. Runs async and cancels on path change to avoid stale writes.
   $effect(() => {
     const path = String(state.currentPath || "").trim();
     let cancelled = false;
@@ -807,82 +727,51 @@
   $effect(() => setupContextMenuKeydown(state.contextMenuOpen, actions.handleContextMenuKey));
 
   // ── Clipboard preview ────────────────────────────────────────────────────
-  // Captures per-item metadata (name, modified, isDir) at copy/cut time so the
-  // preview can show timestamps even after the user navigates away.
-  function captureClipboardMeta() {
-    const paths = state.lastClipboard.paths;
-    const srcEntries =
-      state.layoutMode === "dual" && state.activePaneId === "right"
-        ? state.rightPane.entries
-        : state.entries;
-    state.clipboardItemsMeta = paths.map((p) => {
-      const name = p.split(/[\\\/]/).pop() || p;
-      const entry = srcEntries.find((e) => e.path === p);
-      return { path: p, name, modified: entry?.modified ?? null, isDir: entry?.is_dir ?? false };
-    });
-    state.clipboardPreviewVisible = true;
-  }
-
   // Detect copy/cut: watch lastClipboard for changes.
   // Uses $effect instead of wrapping pageActions because the keyboard dispatch
   // chain reads from pageActionGroups.selection (a snapshot), not pageActions.
-  let _clipboardEffectInitialized = false;
+  let clipboardEffectSkipInitial = true;
   $effect(() => {
     const clip = state.lastClipboard; // establish reactive dependency
-    if (!_clipboardEffectInitialized) {
-      _clipboardEffectInitialized = true;
-      return; // skip initial stored value
+    if (clipboardEffectSkipInitial) {
+      clipboardEffectSkipInitial = false;
+      return; // skip the value already stored from before this effect ran
     }
     if (clip.paths.length > 0) {
-      captureClipboardMeta();
+      captureClipboardMeta(state);
     }
   });
 
   // Dismiss preview when paste is initiated.
-  // pageActionGroups.selection is a plain object — patching it is read each call
-  // because pageMountHandlers() rebuilds handlers lazily on every dispatch.
-  const _origPasteInGroup = pageActionGroups.selection.pasteItems;
-  pageActionGroups.selection.pasteItems = async (...args) => {
-    state.clipboardPreviewVisible = false;
-    return _origPasteInGroup(...args);
-  };
+  patchPasteItemsForPreview(pageActionGroups, () => { state.clipboardPreviewVisible = false; });
 
   // ESC dismisses the clipboard preview (if no other modal is open)
   $effect(() => {
-    function handleEscPreview(e) {
-      if (
-        e.key === "Escape" &&
-        state.clipboardPreviewVisible &&
-        !state.deleteConfirmOpen &&
-        !state.pasteConfirmOpen &&
-        !state.createOpen &&
-        !state.renameOpen &&
-        !state.propertiesOpen &&
-        !state.zipModalOpen &&
-        !state.aboutOpen &&
-        !state.jumpUrlOpen &&
-        !settingsOpen
-      ) {
-        state.clipboardPreviewVisible = false;
-        e.stopPropagation();
-      }
-    }
-    window.addEventListener("keydown", handleEscPreview);
-    return () => window.removeEventListener("keydown", handleEscPreview);
+    const handler = makeClipboardEscHandler(state, () => settingsOpen);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   });
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Left pane: wrap only the selection-writing actions to ensure activePaneId="left".
-  // Using a spread object (not Proxy) to avoid interfering with Svelte 5 internals.
-  const leftPageActions = {
-    ...pageActions,
-    toggleSelection: (...args) => { state.activePaneId = "left"; return pageActions.toggleSelection(...args); },
-    selectRange: (...args) => { state.activePaneId = "left"; return pageActions.selectRange(...args); },
-    setSelected: (...args) => { state.activePaneId = "left"; return pageActions.setSelected(...args); },
-    clearSelection: (...args) => { state.activePaneId = "left"; return pageActions.clearSelection(...args); },
-    invertSelection: (...args) => { state.activePaneId = "left"; return pageActions.invertSelection(...args); },
-    openContextMenu: (...args) => { state.activePaneId = "left"; return pageActions.openContextMenu(...args); },
-  };
+  // Wraps every method of `source` so that `state.activePaneId` is set to `paneId`
+  // before each call. Using a plain object (not Proxy) to avoid Svelte 5 internals.
+  function createPaneActions(source, paneId) {
+    const result = {};
+    for (const key of Object.keys(source)) {
+      const value = source[key];
+      result[key] = typeof value === "function"
+        ? (...args) => { state.activePaneId = paneId; return value(...args); }
+        : value;
+    }
+    return result;
+  }
+
+  // Wraps a single function so `state.activePaneId` is set before it runs.
+  function wrapWithPane(fn, paneId) {
+    return (...args) => { state.activePaneId = paneId; return fn(...args); };
+  }
+
+  const leftPageActions = createPaneActions(pageActions, "left");
 
   const viewRuntime = createPageViewRuntimeBundle(
     buildPageViewRuntimeBundleInputsFromState({
@@ -933,26 +822,7 @@
     getActualColumnSpan: rightListLayoutHelpers.getActualColumnSpan,
   }));
 
-  // Right pane: proxy wraps pageActions to ensure activePaneId="right" before each call
-  const rightPageActions = new Proxy(pageActions, {
-    get(target, prop) {
-      const value = target[prop];
-      if (typeof value === "function") {
-        return (...args) => {
-          state.activePaneId = "right";
-          return value(...args);
-        };
-      }
-      return value;
-    },
-  });
-
-  function activateRight(fn) {
-    return (...args) => {
-      state.activePaneId = "right";
-      return fn(...args);
-    };
-  }
+  const rightPageActions = createPaneActions(pageActions, "right");
 
   // Right pane full view runtime (same functionality as left pane)
   const rightPaneViewProps = $derived.by(() => {
@@ -1024,12 +894,12 @@
           closeMenu: actions.closeMenu,
         },
         list: {
-          loadDir: activateRight(actions.loadDir),
+          loadDir: wrapWithPane(actions.loadDir, "right"),
           focusList: () => rightShellRefs.listEl?.focus({ preventScroll: true }),
-          handlePathTabCompletion: activateRight(actions.handlePathTabCompletion),
-          handlePathCompletionSeparator: activateRight(actions.handlePathCompletionSeparator),
-          handlePathCompletionInputChange: activateRight(actions.handlePathCompletionInputChange),
-          clearPathCompletionPreview: activateRight(actions.clearPathCompletionPreview),
+          handlePathTabCompletion: wrapWithPane(actions.handlePathTabCompletion, "right"),
+          handlePathCompletionSeparator: wrapWithPane(actions.handlePathCompletionSeparator, "right"),
+          handlePathCompletionInputChange: wrapWithPane(actions.handlePathCompletionInputChange, "right"),
+          clearPathCompletionPreview: wrapWithPane(actions.clearPathCompletionPreview, "right"),
         },
         tree: {
           focusTree: () => {},
@@ -1039,8 +909,8 @@
         },
         keymap: { matchesAction: actions.matchesAction },
         sort: {
-          setSort: activateRight(actions.setSort),
-          handleSortMenuKey: activateRight(actions.handleSortMenuKey),
+          setSort: wrapWithPane(actions.setSort, "right"),
+          handleSortMenuKey: wrapWithPane(actions.handleSortMenuKey, "right"),
         },
         deps: { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
         dirStats: { clearDirStatsCache },
@@ -1089,14 +959,12 @@
     void refreshRightGitStatus(path);
   });
 
-  // Update right pane path capabilities when currentPath changes
+  // Fetch provider capabilities for the right pane's current directory.
+  // Lazy-imports tauri_fs to avoid loading it before the right pane is ever opened.
   $effect(() => {
     const path = String(state.rightPane.currentPath || "").trim();
     if (!path) {
-      state.rightPane.currentPathCapabilities = {
-        can_read: true, can_create: true, can_rename: true, can_copy: true,
-        can_move: true, can_delete: true, can_archive_create: true, can_archive_extract: true,
-      };
+      state.rightPane.currentPathCapabilities = normalizeProviderCapabilities(null);
       return;
     }
     let cancelled = false;
@@ -1106,16 +974,7 @@
         const capabilities = await fsGetCapabilities(path);
         if (cancelled) return;
         if (state.rightPane.currentPath === path) {
-          state.rightPane.currentPathCapabilities = {
-            can_read: Boolean(capabilities?.can_read ?? true),
-            can_create: Boolean(capabilities?.can_create ?? true),
-            can_rename: Boolean(capabilities?.can_rename ?? true),
-            can_copy: Boolean(capabilities?.can_copy ?? true),
-            can_move: Boolean(capabilities?.can_move ?? true),
-            can_delete: Boolean(capabilities?.can_delete ?? true),
-            can_archive_create: Boolean(capabilities?.can_archive_create ?? true),
-            can_archive_extract: Boolean(capabilities?.can_archive_extract ?? true),
-          };
+          state.rightPane.currentPathCapabilities = normalizeProviderCapabilities(capabilities);
         }
       } catch {
         // ignore capability errors for right pane
@@ -1134,21 +993,9 @@
 
   // Ctrl+G to toggle git panel
   $effect(() => {
-    function handleGitPanelToggle(event) {
-      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-      if (event.key !== "g" && event.key !== "G") return;
-      const activeEl = document.activeElement;
-      if (activeEl?.tagName === "INPUT" || activeEl?.tagName === "TEXTAREA") return;
-      const isInModal =
-        typeof activeEl?.closest === "function" &&
-        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
-      if (isInModal) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (state.gitPanelOpen) { void closeGitPanel(); } else { void openGitPanel(); }
-    }
-    window.addEventListener("keydown", handleGitPanelToggle, { capture: true });
-    return () => window.removeEventListener("keydown", handleGitPanelToggle, { capture: true });
+    const handler = gitPanelHandlers.makeGitPanelToggleHandler();
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
   });
 
   // ── Git panel CSS offset ──────────────────────────────────────────────────
@@ -1157,69 +1004,35 @@
   $effect(() => {
     document.documentElement.style.setProperty(
       "--git-panel-offset",
-      state.gitPanelOpen ? "300px" : "0px"
+      state.gitPanelOpen ? GIT_PANEL_WIDTH : "0px"
     );
   });
 
-  function openGitPanel()  { state.gitPanelOpen = true; }
-  function closeGitPanel() { state.gitPanelOpen = false; }
-
-  // F3 key to toggle dual/single pane mode
+  // F3 key to toggle dual/single pane mode — logic lives in page_dual_pane_handlers.ts
   $effect(() => {
-    function handleDualPaneToggle(event) {
-      const isF3 =
-        !event.ctrlKey && !event.altKey && !event.metaKey &&
-        (event.key === "F3" || event.code === "F3" || event.keyCode === 114);
-      if (!isF3) return;
-      const activeEl = document.activeElement;
-      if (!activeEl) return;
-      const isInInput = activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA";
-      const isInModal =
-        typeof activeEl.closest === "function" &&
-        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
-      if (isInInput || isInModal) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const next = state.layoutMode === "dual" ? "single" : "dual";
-      state.layoutMode = next;
-      if (next === "dual") {
-        state.activePaneId = "left";
-        if (!state.rightPane.currentPath && state.currentPath) {
-          rightDirHelpers.loadDir(state.currentPath);
-        }
-      }
-    }
-    window.addEventListener("keydown", handleDualPaneToggle, { capture: true });
-    return () => window.removeEventListener("keydown", handleDualPaneToggle, { capture: true });
+    const handler = createDualPaneToggleHandler({
+      getLayoutMode:       () => state.layoutMode,
+      setLayoutMode:       (v) => { state.layoutMode = v; },
+      setActivePaneId:     (v) => { state.activePaneId = v; },
+      getRightCurrentPath: () => state.rightPane.currentPath,
+      getLeftCurrentPath:  () => state.currentPath,
+      loadRightDir:        (path) => { rightDirHelpers.loadDir(path); },
+    });
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
   });
 
-  // Ctrl+W: cross-pane WinMerge comparison (dual mode only)
+  // Ctrl+W: cross-pane WinMerge comparison (dual mode only) — logic in page_dual_pane_handlers.ts
   $effect(() => {
-    function handleWinMergeCrossPane(event) {
-      const isCtrlW =
-        event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey &&
-        (event.key === "w" || event.key === "W");
-      if (!isCtrlW) return;
-      if (state.layoutMode !== "dual") return;
-      const activeEl = document.activeElement;
-      if (!activeEl) return;
-      const isInInput = activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA";
-      const isInModal =
-        typeof activeEl.closest === "function" &&
-        activeEl.closest(".modal, .modal-backdrop, .dropdown, .sort-menu, .context-menu");
-      if (isInInput || isInModal) return;
-      const leftSelected = state.selectedPaths;
-      const rightSelected = state.rightPane.selectedPaths;
-      if (leftSelected.length === 1 && rightSelected.length === 1) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        void winmergeCompareFiles(leftSelected[0], rightSelected[0]).catch((err) => {
-          actions.showError(err);
-        });
-      }
-    }
-    window.addEventListener("keydown", handleWinMergeCrossPane, { capture: true });
-    return () => window.removeEventListener("keydown", handleWinMergeCrossPane, { capture: true });
+    const handler = createWinMergeCrossPaneHandler({
+      getLayoutMode:         () => state.layoutMode,
+      getLeftSelectedPaths:  () => state.selectedPaths,
+      getRightSelectedPaths: () => state.rightPane.selectedPaths,
+      compareFiles:          (l, r) => winmergeCompareFiles(l, r),
+      showError:             (err) => actions.showError(err),
+    });
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
   });
 
   // Active pane's entries — used by ClipboardPreview to detect paste conflicts
@@ -1327,7 +1140,7 @@
         redoStack,
         limit: UNDO_LIMIT,
       }).catch(() => {});
-    }, 250);
+    }, UNDO_SAVE_DEBOUNCE_MS);
 
     return () => {
       if (undoSessionSaveTimer) {

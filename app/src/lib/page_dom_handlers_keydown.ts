@@ -1,4 +1,5 @@
 import type { PageKeydownParams } from "$lib/page_dom_handlers_keydown_types";
+import { MODAL_OVERLAY_SELECTOR } from "$lib/page_constants";
 
 export function createPageKeydownHandler(params: PageKeydownParams) {
   const devKeyDebug = Boolean((import.meta as any)?.env?.DEV);
@@ -118,7 +119,7 @@ export function createPageKeydownHandler(params: PageKeydownParams) {
     const isHiddenSearchInputActive = isSearchInputActive && !params.getSearchActive();
     const isBlockingTextInputActive = isAnyInputActive && !isHiddenSearchInputActive;
     const isOverlayDomTarget = Boolean(
-      targetClosest(".modal, .modal-backdrop, .context-menu, .dropdown, .menu-dropdown, .sort-menu")
+      targetClosest(MODAL_OVERLAY_SELECTOR)
     );
     const hasBlockingOverlay =
       params.getPasteConfirmOpen() ||
