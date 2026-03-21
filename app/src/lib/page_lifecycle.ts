@@ -8,60 +8,64 @@ import {
 import { getPasteConflicts } from "$lib/utils/file_ops";
 import { MODAL_OVERLAY_SELECTOR } from "$lib/page_constants";
 
-/**
- * @param {object} ctx
- * @param {() => Promise<string>} ctx.homeDir
- * @param {(command: string, payload?: Record<string, unknown>) => Promise<any>} ctx.invoke
- * @param {(eventName: string, handler: (event: any) => void) => Promise<() => void>} ctx.listen
- * @param {string} ctx.EVENT_FS_CHANGED
- * @param {string} ctx.EVENT_OP_PROGRESS
- * @param {(message: string, durationMs?: number) => void} ctx.setStatusMessage
- * @param {(err: unknown) => void} ctx.showError
- * @param {(path: string) => Promise<void>} ctx.loadDir
- * @param {() => string} ctx.getCurrentPath
- * @param {() => import("$lib/types").Entry[]} [ctx.getEntries]
- * @param {() => import("$lib/types").ProviderCapabilities | null} [ctx.getCurrentPathCapabilities]
- * @param {() => ReturnType<typeof setTimeout> | null} ctx.getWatchRefreshTimer
- * @param {(value: ReturnType<typeof setTimeout> | null) => void} ctx.setWatchRefreshTimer
- * @param {(value: number) => void} ctx.setDirStatsTimeoutMs
- * @param {(value: boolean) => void} ctx.setShowHidden
- * @param {(value: boolean) => void} ctx.setShowSize
- * @param {(value: boolean) => void} ctx.setShowTime
- * @param {(value: boolean) => void} ctx.setShowTree
- * @param {(value: string) => void} ctx.setSortKey
- * @param {(value: string) => void} ctx.setSortOrder
- * @param {(value: "light" | "dark") => void} ctx.setUiTheme
- * @param {(value: "en" | "ja") => void} ctx.setUiLanguage
- * @param {(value: "by_type" | "simple" | "none") => void} ctx.setUiFileIconMode
- * @param {(value: "windows" | "vim") => void} ctx.setKeymapProfile
- * @param {(value: Record<string, string>) => void} ctx.setExternalAppAssociations
- * @param {(value: import("$lib/types").ExternalAppConfig[]) => void} ctx.setExternalApps
- * @param {(value: Record<string, string>) => void} ctx.setKeymapCustom
- * @param {(value: boolean) => void} ctx.setLoggingEnabled
- * @param {(value: string) => void} ctx.setLogFile
- * @param {(value: string[]) => void} ctx.setPathHistory
- * @param {(value: import("$lib/types").JumpItem[]) => void} ctx.setJumpList
- * @param {(value: string[]) => void} ctx.setSearchHistory
- * @param {() => Promise<void>} ctx.updateWindowBounds
- * @param {(value: boolean) => void} ctx.setUiConfigLoaded
- * @param {() => import("@tauri-apps/api/window").Window} ctx.getCurrentWindow
- * @param {(value: { x: number, y: number, width: number, height: number, maximized: boolean }) => void} ctx.setWindowBounds
- * @param {(value: boolean) => void} ctx.setWindowBoundsReady
- * @param {() => void} ctx.scheduleUiSave
- * @param {() => void} ctx.onBeforeUnload
- * @param {(event: KeyboardEvent) => void} ctx.onKeyDown
- * @param {(event: MouseEvent) => void} ctx.onClick
- * @param {() => void} ctx.recomputeStatusItems
- * @param {(value: () => Promise<void>) => void} ctx.setUpdateWindowBounds
- * @param {(value: boolean) => void} [ctx.setPasteConfirmOpen]
- * @param {(value: string[]) => void} [ctx.setPastePendingPaths]
- * @param {(value: string[]) => void} [ctx.setPasteConflicts]
- * @param {(value: "copy" | "cut") => void} [ctx.setPasteMode]
- * @param {(value: boolean) => void} [ctx.setPasteApplyAll]
- * @param {(value: number) => void} [ctx.setPasteConfirmIndex]
- * @param {(key: string, vars?: Record<string, string | number>) => string} ctx.t
- */
-export async function setupPageLifecycle(ctx) {
+import type { Entry, ExternalAppConfig, JumpItem, ProviderCapabilities } from "$lib/types";
+import type { Window as TauriWindow } from "@tauri-apps/api/window";
+
+export interface PageLifecycleCtx {
+  homeDir:            () => Promise<string>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  invoke:             (command: string, payload?: Record<string, unknown>) => Promise<any>;
+  listen:             (eventName: string, handler: (event: unknown) => void) => Promise<() => void>;
+  EVENT_FS_CHANGED:   string;
+  EVENT_OP_PROGRESS:  string;
+  setStatusMessage:   (message: string, durationMs?: number) => void;
+  showError:          (err: unknown) => void;
+  loadDir:            (path: string) => Promise<void>;
+  getCurrentPath:     () => string;
+  getEntries?:        () => Entry[];
+  getCurrentPathCapabilities?: () => ProviderCapabilities | null;
+  getWatchRefreshTimer:  () => ReturnType<typeof setTimeout> | null;
+  setWatchRefreshTimer:  (value: ReturnType<typeof setTimeout> | null) => void;
+  setDirStatsTimeoutMs:  (value: number) => void;
+  setShowHidden:         (value: boolean) => void;
+  setShowSize:           (value: boolean) => void;
+  setShowTime:           (value: boolean) => void;
+  setShowTree:           (value: boolean) => void;
+  setSortKey:            (value: string) => void;
+  setSortOrder:          (value: string) => void;
+  setUiTheme:            (value: "light" | "dark") => void;
+  setUiLanguage:         (value: "en" | "ja") => void;
+  setUiFileIconMode:     (value: "by_type" | "simple" | "none") => void;
+  setKeymapProfile:      (value: "windows" | "vim") => void;
+  setExternalAppAssociations: (value: Record<string, string>) => void;
+  setExternalApps:       (value: ExternalAppConfig[]) => void;
+  setKeymapCustom:       (value: Record<string, string>) => void;
+  setLoggingEnabled:     (value: boolean) => void;
+  setLogFile:            (value: string) => void;
+  setPathHistory:        (value: string[]) => void;
+  setJumpList:           (value: JumpItem[]) => void;
+  setSearchHistory:      (value: string[]) => void;
+  updateWindowBounds:    () => Promise<void>;
+  setUiConfigLoaded:     (value: boolean) => void;
+  getCurrentWindow:      () => TauriWindow;
+  setWindowBounds:       (value: { x: number; y: number; width: number; height: number; maximized: boolean }) => void;
+  setWindowBoundsReady:  (value: boolean) => void;
+  scheduleUiSave:        () => void;
+  onBeforeUnload:        () => void;
+  onKeyDown:             (event: KeyboardEvent) => void;
+  onClick:               (event: MouseEvent) => void;
+  recomputeStatusItems:  () => void;
+  setUpdateWindowBounds: (value: () => Promise<void>) => void;
+  setPasteConfirmOpen?:  (value: boolean) => void;
+  setPastePendingPaths?: (value: string[]) => void;
+  setPasteConflicts?:    (value: string[]) => void;
+  setPasteMode?:         (value: "copy" | "cut") => void;
+  setPasteApplyAll?:     (value: boolean) => void;
+  setPasteConfirmIndex?: (value: number) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}
+
+export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
   if (typeof window !== "undefined" && import.meta.env?.DEV) {
     const debugWindow = window as Window & {
       __rf_debug?: {

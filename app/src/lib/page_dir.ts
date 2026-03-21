@@ -1,27 +1,33 @@
-/**
- * @param {object} params
- * @param {(command: string, payload?: Record<string, unknown>) => Promise<unknown>} params.invoke
- * @param {() => boolean} params.getShowHidden
- * @param {() => string} params.getSortKey
- * @param {() => string} params.getSortOrder
- * @param {(value: unknown[]) => void} params.setEntries
- * @param {(value: string) => void} params.setCurrentPath
- * @param {(value: string) => void} params.setPathInput
- * @param {() => void} params.scheduleWatch
- * @param {(value: string[]) => void} params.setSelectedPaths
- * @param {(value: number) => void} params.setFocusedIndex
- * @param {(value: number | null) => void} params.setAnchorIndex
- * @param {() => string[]} params.getPathHistory
- * @param {(value: string[]) => void} params.setPathHistory
- * @param {() => void} params.scheduleUiSave
- * @param {() => boolean} params.getShowTree
- * @param {(path: string) => Promise<void>} params.buildTreeRoot
- * @param {() => void} params.clearTree
- * @param {(value: boolean) => void} params.setLoading
- * @param {(value: string) => void} params.setError
- * @param {(err: unknown) => void} params.showError
- */
-export function createDirHelpers(params) {
+import { PATH_HISTORY_LIMIT } from "$lib/page_constants";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface DirHelpersParams {
+  invoke:          (command: string, payload?: Record<string, unknown>) => Promise<unknown>;
+  getShowHidden:   () => boolean;
+  getSortKey:      () => string;
+  getSortOrder:    () => string;
+  setEntries:      (value: unknown[]) => void;
+  setCurrentPath:  (value: string) => void;
+  setPathInput:    (value: string) => void;
+  scheduleWatch:   (path: string) => void;
+  setSelectedPaths:(value: string[]) => void;
+  setFocusedIndex: (value: number) => void;
+  setAnchorIndex:  (value: number | null) => void;
+  getPathHistory:  () => string[];
+  setPathHistory:  (value: string[]) => void;
+  scheduleUiSave:  () => void;
+  getShowTree:     () => boolean;
+  buildTreeRoot:   (path: string) => Promise<void>;
+  clearTree:       () => void;
+  setLoading:      (value: boolean) => void;
+  setError:        (value: string) => void;
+  showError:       (err: unknown) => void;
+}
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+
+export function createDirHelpers(params: DirHelpersParams) {
   const {
     invoke,
     getShowHidden,
@@ -45,10 +51,11 @@ export function createDirHelpers(params) {
     showError,
   } = params;
 
+  // loadSeq: incremented on every call; stale responses are dropped when the
+  // counter has advanced (i.e. a newer loadDir call was made before this one finished).
   let loadSeq = 0;
 
-  /** @param {string} path */
-  async function loadDir(path) {
+  async function loadDir(path: string): Promise<void> {
     const seq = ++loadSeq;
     setLoading(true);
     setError("");
@@ -60,7 +67,7 @@ export function createDirHelpers(params) {
         sortOrder: getSortOrder(),
       });
       if (seq !== loadSeq) return;
-      setEntries(items);
+      setEntries(items as unknown[]);
       setCurrentPath(path);
       setPathInput(path);
       scheduleWatch(path);
@@ -69,7 +76,7 @@ export function createDirHelpers(params) {
       setAnchorIndex(null);
       if (path) {
         const next = [path, ...getPathHistory().filter((p) => p !== path)];
-        setPathHistory(next.slice(0, 50));
+        setPathHistory(next.slice(0, PATH_HISTORY_LIMIT));
         scheduleUiSave();
       }
       if (getShowTree()) {

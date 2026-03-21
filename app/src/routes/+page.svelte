@@ -54,10 +54,7 @@
   import { buildViewRuntimeInputsFromState } from "$lib/page_view_runtime_inputs_from_state";
   import { createPageMountRuntime } from "$lib/page_mount_runtime";
   import { buildPageMountRuntimeInputsFromPageState } from "$lib/page_mount_runtime_inputs_from_page_state";
-  import {
-    buildPageMountHandlersFromState,
-    buildPageMountHandlersInputsFromState,
-  } from "$lib/page_mount_handlers_inputs_from_state";
+  import { buildPageMountHandlersFromState } from "$lib/page_mount_handlers_inputs_from_state";
   import { buildPageEffectsRuntimeInputsFromState } from "$lib/page_effects_runtime_inputs_from_state";
   import {
     applyModalFocuses,
@@ -87,6 +84,8 @@
     createCapabilityFetcher,
     createGitStatusEffect,
   } from "$lib/page_effects_helpers";
+  import { normalizeUndoEntries } from "$lib/page_undo_session";
+  import { createDevTestHooksEffect } from "$lib/page_dev_test_hooks";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
@@ -100,66 +99,6 @@
   /** @typedef {ReturnType<typeof createPageStateDefaults>} PageState */
   /** @type {PageState} */
   let state = $state(defaults);
-
-  /** @typedef {{ kind: "copy", pairs: { from: string, to: string }[] }} UndoCopy */
-  /** @typedef {{ kind: "move", pairs: { from: string, to: string }[] }} UndoMove */
-  /** @typedef {{ kind: "rename", from: string, to: string }} UndoRename */
-  /** @typedef {{ kind: "create", path: string, createKind: "file" | "folder" }} UndoCreate */
-  /** @typedef {{ kind: "delete", pairs: { from: string, to: string }[] }} UndoDelete */
-  /** @typedef {UndoCopy | UndoMove | UndoRename | UndoCreate | UndoDelete} UndoEntry */
-
-  function normalizeUndoPairs(rawPairs) {
-    if (!Array.isArray(rawPairs)) return [];
-    const pairs = [];
-    for (const pair of rawPairs) {
-      const from = typeof pair?.from === "string" ? pair.from.trim() : "";
-      const to = typeof pair?.to === "string" ? pair.to.trim() : "";
-      if (!from || !to) continue;
-      pairs.push({ from, to });
-    }
-    return pairs;
-  }
-
-  /** @returns {UndoEntry | null} */
-  function normalizeUndoEntry(entry) {
-    if (!entry || typeof entry !== "object") return null;
-    const kind = String(entry.kind || "").trim();
-
-    if (kind === "copy" || kind === "move" || kind === "delete") {
-      const pairs = normalizeUndoPairs(entry.pairs);
-      if (!pairs.length) return null;
-      return { kind, pairs };
-    }
-
-    if (kind === "rename") {
-      const from = typeof entry.from === "string" ? entry.from.trim() : "";
-      const to = typeof entry.to === "string" ? entry.to.trim() : "";
-      if (!from || !to) return null;
-      return { kind: "rename", from, to };
-    }
-
-    if (kind === "create") {
-      const path = typeof entry.path === "string" ? entry.path.trim() : "";
-      const createKind = entry.createKind === "folder" ? "folder" : "file";
-      if (!path) return null;
-      return { kind: "create", path, createKind };
-    }
-
-    return null;
-  }
-
-  function normalizeUndoEntries(entries) {
-    if (!Array.isArray(entries)) return [];
-    const next = [];
-    for (const entry of entries) {
-      const normalized = normalizeUndoEntry(entry);
-      if (normalized) {
-        next.push(normalized);
-      }
-      if (next.length >= UNDO_LIMIT) break;
-    }
-    return next;
-  }
 
   /** @type {() => Promise<void>} */
   let updateWindowBounds = async () => {};
@@ -386,24 +325,22 @@
   const invokeExit = () => invoke("app_exit").catch(() => getCurrentWindow().close());
 
   const pageMountHandlers = () =>
-    buildPageMountHandlersFromState(
-      buildPageMountHandlersInputsFromState({
-        actions,
-        pageActionGroups,
-        propertiesExtras: { clearDirStatsCache },
-        showError,
-        exitApp: invokeExit,
-        focusPathInput: () => {
-          requestAnimationFrame(() => {
-            const input = document.querySelector(".path-input input");
-            if (input) {
-              input.focus();
-              input.select();
-            }
-          });
-        },
-      })
-    );
+    buildPageMountHandlersFromState({
+      actions,
+      pageActionGroups,
+      propertiesExtras: { clearDirStatsCache },
+      showError,
+      exitApp: invokeExit,
+      focusPathInput: () => {
+        requestAnimationFrame(() => {
+          const input = document.querySelector(".path-input input");
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        });
+      },
+    });
 
   // Register Tab/pointer handlers BEFORE lifecycle keydown handler so stopImmediatePropagation works.
   // Logic lives in page_dual_pane_handlers.ts.
@@ -934,15 +871,11 @@
     refresh:     refreshRightGitStatus,
   }));
 
-  // Fetch provider capabilities for the right pane. Lazy-imports tauri_fs to
-  // avoid loading it before the right pane is ever opened.
+  // Fetch provider capabilities for the right pane.
   $effect(createCapabilityFetcher({
-    getPath: () => state.rightPane.currentPath,
-    fetch: async (path) => {
-      const { fsGetCapabilities: rightFetch } = await import("$lib/utils/tauri_fs");
-      return rightFetch(path);
-    },
-    setCapabilities: (v) => { state.rightPane.currentPathCapabilities = v; },
+    getPath:          () => state.rightPane.currentPath,
+    fetch:            fsGetCapabilities,
+    setCapabilities:  (v) => { state.rightPane.currentPathCapabilities = v; },
   }));
 
   // Force single-column layout in dual mode for left pane
@@ -1004,6 +937,16 @@
       : state.filteredEntries
   );
 
+  function makeActivatePaneHandler(paneId, getListEl) {
+    return () => {
+      state.activePaneId = paneId;
+      const activeEl = document.activeElement;
+      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
+        getListEl()?.focus({ preventScroll: true });
+      }
+    };
+  }
+
   const pageShellProps = $derived({
     showTree: state.showTree,
     statusItems: state.statusItems,
@@ -1012,49 +955,22 @@
     layoutMode: state.layoutMode,
     activePaneId: state.activePaneId,
     rightPaneViewProps: state.layoutMode === "dual" ? rightPaneViewProps : null,
-    onActivateLeft: () => {
-      state.activePaneId = "left";
-      const activeEl = document.activeElement;
-      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
-        shellRefs.listEl?.focus({ preventScroll: true });
-      }
-    },
-    onActivateRight: () => {
-      state.activePaneId = "right";
-      const activeEl = document.activeElement;
-      if (!(activeEl instanceof HTMLInputElement) && !(activeEl instanceof HTMLTextAreaElement)) {
-        rightShellRefs.listEl?.focus({ preventScroll: true });
-      }
-    },
+    onActivateLeft:  makeActivatePaneHandler("left",  () => shellRefs.listEl),
+    onActivateRight: makeActivatePaneHandler("right", () => rightShellRefs.listEl),
   });
 
   // ── Settings modal actions ────────────────────────────────────────────────
   // Logic lives in page_settings_logic.ts (pure) and page_settings_actions.ts (side effects).
-
-  async function openSettingsModal(options = undefined) {
-    return settingsActions.openSettingsModal(options);
-  }
-  function closeSettingsModal() {
-    return settingsActions.closeSettingsModal();
-  }
-  async function saveSettings(values) {
-    return settingsActions.saveSettings(values);
-  }
-  async function openConfigFromSettings() {
-    return settingsActions.openConfigFromSettings();
-  }
-  async function createSettingsBackup() {
-    return settingsActions.createSettingsBackup();
-  }
-  async function restoreSettingsBackup() {
-    return settingsActions.restoreSettingsBackup();
-  }
-  async function exportDiagnosticReport(options) {
-    return settingsActions.exportDiagnosticReport(options);
-  }
-  async function runSettingsDiagnostic(kind, values) {
-    return settingsActions.runSettingsDiagnostic(kind, values);
-  }
+  const {
+    openSettingsModal,
+    closeSettingsModal,
+    saveSettings,
+    openConfigFromSettings,
+    createSettingsBackup,
+    restoreSettingsBackup,
+    exportDiagnosticReport,
+    runSettingsDiagnostic,
+  } = settingsActions;
 
   onMount(() => {
     let disposed = false;
@@ -1132,131 +1048,26 @@
     }
   });
 
-  $effect(() => {
-    if (typeof window === "undefined" || !import.meta.env.DEV) {
-      return;
-    }
-
-    const parseBindingToKeyboardEvent = (binding) => {
-      const tokens = String(binding || "")
-        .split("+")
-        .map((part) => part.trim())
-        .filter(Boolean);
-      if (!tokens.length) return null;
-
-      const mods = {
-        ctrlKey: false,
-        shiftKey: false,
-        altKey: false,
-        metaKey: false,
-      };
-      const keyTokens = [];
-      for (const token of tokens) {
-        const normalized = token.toLowerCase();
-        if (normalized === "ctrl" || normalized === "control") {
-          mods.ctrlKey = true;
-        } else if (normalized === "shift") {
-          mods.shiftKey = true;
-        } else if (normalized === "alt") {
-          mods.altKey = true;
-        } else if (
-          normalized === "meta" ||
-          normalized === "cmd" ||
-          normalized === "command" ||
-          normalized === "win" ||
-          normalized === "super"
-        ) {
-          mods.metaKey = true;
-        } else {
-          keyTokens.push(token);
-        }
-      }
-      if (!keyTokens.length) return null;
-      const rawKey = keyTokens[keyTokens.length - 1];
-      const lower = rawKey.toLowerCase();
-      const named = {
-        enter: { key: "Enter", code: "Enter" },
-        tab: { key: "Tab", code: "Tab" },
-        escape: { key: "Escape", code: "Escape" },
-        esc: { key: "Escape", code: "Escape" },
-        space: { key: " ", code: "Space" },
-        delete: { key: "Delete", code: "Delete" },
-        backspace: { key: "Backspace", code: "Backspace" },
-        up: { key: "ArrowUp", code: "ArrowUp" },
-        down: { key: "ArrowDown", code: "ArrowDown" },
-        left: { key: "ArrowLeft", code: "ArrowLeft" },
-        right: { key: "ArrowRight", code: "ArrowRight" },
-      };
-      const namedHit = named[lower];
-      if (namedHit) {
-        return { ...mods, key: namedHit.key, code: namedHit.code };
-      }
-      if (/^f\d{1,2}$/i.test(rawKey)) {
-        const upper = rawKey.toUpperCase();
-        return { ...mods, key: upper, code: upper };
-      }
-      if (/^[a-z]$/i.test(rawKey)) {
-        const upper = rawKey.toUpperCase();
-        return { ...mods, key: rawKey.toLowerCase(), code: `Key${upper}` };
-      }
-      if (/^[0-9]$/.test(rawKey)) {
-        return { ...mods, key: rawKey, code: `Digit${rawKey}` };
-      }
-      return { ...mods, key: rawKey, code: rawKey };
-    };
-
-    const triggerBinding = (binding) => {
-      const init = parseBindingToKeyboardEvent(binding);
-      if (!init) return false;
-      const target = document.activeElement || document.body || window;
-      target.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
-      window.dispatchEvent(new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }));
-      target.dispatchEvent(new KeyboardEvent("keyup", { ...init, bubbles: true, cancelable: true }));
-      window.dispatchEvent(new KeyboardEvent("keyup", { ...init, bubbles: true, cancelable: true }));
-      return true;
-    };
-
-    const hooks = {
-      setCurrentPathCapabilities: (value) => {
-        testCapabilityOverride = value ? normalizeProviderCapabilities(value) : null;
-        state.currentPathCapabilities = normalizeProviderCapabilities(testCapabilityOverride);
-      },
-      setCurrentPathForTest: (value) => {
-        const nextPath = String(value || "");
-        state.currentPath = nextPath;
-        state.pathInput = nextPath;
-      },
-      getCurrentPathCapabilities: () => ({ ...state.currentPathCapabilities }),
-      getStatusMessage: () => String(state.statusMessage || ""),
-      clearStatusMessage: () => {
-        state.statusMessage = "";
-      },
-      canCreateCurrentPath: () =>
-        typeof actions.canCreateCurrentPath === "function"
-          ? Boolean(actions.canCreateCurrentPath())
-          : false,
-      canPasteCurrentPath: () =>
-        typeof actions.canPasteCurrentPath === "function"
-          ? Boolean(actions.canPasteCurrentPath())
-          : false,
-      getActionBinding: (actionId) => {
-        const bindings = keymapBindings.getActionBindings(String(actionId || ""));
-        return Array.isArray(bindings) && bindings.length > 0 ? String(bindings[0] || "") : "";
-      },
-      triggerActionShortcut: (actionId) => {
-        const binding = hooks.getActionBinding(actionId);
-        if (!binding) return false;
-        return triggerBinding(binding);
-      },
-    };
-
-    window.__rf_test_hooks = hooks;
-    return () => {
-      if (window.__rf_test_hooks === hooks) {
-        delete window.__rf_test_hooks;
-      }
-    };
-  });
+  $effect(createDevTestHooksEffect({
+    getTestCapabilityOverride:  () => testCapabilityOverride,
+    setTestCapabilityOverride:  (v) => { testCapabilityOverride = v; },
+    normalizeProviderCapabilities,
+    getCurrentPathCapabilities: () => state.currentPathCapabilities,
+    setCurrentPathCapabilities: (v) => { state.currentPathCapabilities = v; },
+    setCurrentPath:             (v) => { state.currentPath = v; },
+    setPathInput:               (v) => { state.pathInput = v; },
+    getStatusMessage:           () => String(state.statusMessage ?? ""),
+    setStatusMessage:           (v) => { state.statusMessage = v; },
+    canCreateCurrentPath: () =>
+      typeof actions.canCreateCurrentPath === "function"
+        ? Boolean(actions.canCreateCurrentPath())
+        : false,
+    canPasteCurrentPath: () =>
+      typeof actions.canPasteCurrentPath === "function"
+        ? Boolean(actions.canPasteCurrentPath())
+        : false,
+    getActionBindings: (id) => keymapBindings.getActionBindings(String(id ?? "")),
+  }));
 </script>
 
 <PageShellBindings

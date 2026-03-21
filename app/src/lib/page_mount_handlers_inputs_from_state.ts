@@ -76,10 +76,3 @@ export function buildPageMountHandlersFromState(params: MountHandlersFromStatePa
   };
 }
 
-/**
- * @deprecated Use buildPageMountHandlersFromState directly.
- * Kept for backwards compatibility; will be removed.
- */
-export function buildPageMountHandlersInputsFromState(params: MountHandlersFromStateParams) {
-  return buildPageMountHandlersFromState(params);
-}

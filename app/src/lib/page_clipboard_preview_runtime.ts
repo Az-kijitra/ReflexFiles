@@ -70,24 +70,26 @@ export function patchPasteItemsForPreview(
  * Returns a keydown handler that dismisses the clipboard preview on Escape,
  * but only when no other modal is open (modals handle Escape themselves).
  */
+function isAnyModalOpen(state: ClipboardPreviewState, getSettingsOpen: () => boolean): boolean {
+  return (
+    state.deleteConfirmOpen ||
+    state.pasteConfirmOpen  ||
+    state.createOpen        ||
+    state.renameOpen        ||
+    state.propertiesOpen    ||
+    state.zipModalOpen      ||
+    state.aboutOpen         ||
+    state.jumpUrlOpen       ||
+    getSettingsOpen()
+  );
+}
+
 export function makeClipboardEscHandler(
   state: ClipboardPreviewState,
   getSettingsOpen: () => boolean
 ): (e: KeyboardEvent) => void {
   return (e: KeyboardEvent) => {
-    if (
-      e.key === "Escape" &&
-      state.clipboardPreviewVisible &&
-      !state.deleteConfirmOpen &&
-      !state.pasteConfirmOpen &&
-      !state.createOpen &&
-      !state.renameOpen &&
-      !state.propertiesOpen &&
-      !state.zipModalOpen &&
-      !state.aboutOpen &&
-      !state.jumpUrlOpen &&
-      !getSettingsOpen()
-    ) {
+    if (e.key === "Escape" && state.clipboardPreviewVisible && !isAnyModalOpen(state, getSettingsOpen)) {
       state.clipboardPreviewVisible = false;
       e.stopPropagation();
     }
