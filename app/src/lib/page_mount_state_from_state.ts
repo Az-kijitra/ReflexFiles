@@ -16,106 +16,53 @@ import { buildPageMountStateFromVars } from "./page_mount_state_from_vars";
 export function buildPageMountStateFromState(params) {
   const { state } = params;
 
+  // s(field): setter that writes to state (field name matches params.set key)
+  const s = (field) => (v) => { state[field] = v; };
+
   const mountedState = buildPageMountStateFromVars({
     get: {
-      currentPath: () => state.currentPath,
+      currentPath:       () => state.currentPath,
       watchRefreshTimer: params.get.watchRefreshTimer,
-      updateWindowBounds: params.get.updateWindowBounds,
+      updateWindowBounds:params.get.updateWindowBounds,
     },
     set: {
-      watchRefreshTimer: params.set.watchRefreshTimer,
-      dirStatsTimeoutMs: (value) => {
-        state.dirStatsTimeoutMs = value;
-      },
-      showHidden: (value) => {
-        state.showHidden = value;
-      },
-      showSize: (value) => {
-        state.showSize = value;
-      },
-      showTime: (value) => {
-        state.showTime = value;
-      },
-      showTree: (value) => {
-        state.showTree = value;
-      },
-      sortKey: (value) => {
-        state.sortKey = value;
-      },
-      sortOrder: (value) => {
-        state.sortOrder = value;
-      },
-      uiTheme: (value) => {
-        state.ui_theme = value;
-      },
-      uiLanguage: (value) => {
-        state.ui_language = value;
-      },
-      uiFileIconMode: (value) => {
-        state.ui_file_icon_mode = value;
-      },
-      keymapProfile: (value) => {
-        state.keymapProfile = value;
-      },
-      externalAppAssociations: (value) => {
-        state.externalAppAssociations = value;
-      },
-      externalApps: (value) => {
-        state.externalApps = value;
-      },
-      keymapCustom: (value) => {
-        state.keymapCustom = value;
-      },
-      loggingEnabled: (value) => {
-        state.loggingEnabled = value;
-      },
-      logFile: (value) => {
-        state.logFile = value;
-      },
-      pathHistory: (value) => {
-        state.pathHistory = value;
-      },
-      jumpList: (value) => {
-        state.jumpList = value;
-      },
-      searchHistory: (value) => {
-        state.searchHistory = value;
-      },
-      uiConfigLoaded: (value) => {
-        state.uiConfigLoaded = value;
-      },
-      windowBounds: (value) => {
-        state.windowBounds = value;
-      },
-      windowBoundsReady: (value) => {
-        state.windowBoundsReady = value;
-      },
-      updateWindowBounds: params.set.updateWindowBounds,
+      watchRefreshTimer:       params.set.watchRefreshTimer,   // passthrough
+      dirStatsTimeoutMs:       s("dirStatsTimeoutMs"),
+      showHidden:              s("showHidden"),
+      showSize:                s("showSize"),
+      showTime:                s("showTime"),
+      showTree:                s("showTree"),
+      sortKey:                 s("sortKey"),
+      sortOrder:               s("sortOrder"),
+      uiTheme:                 (v) => { state.ui_theme = v; },         // field name differs
+      uiLanguage:              (v) => { state.ui_language = v; },      // field name differs
+      uiFileIconMode:          (v) => { state.ui_file_icon_mode = v; },// field name differs
+      keymapProfile:           s("keymapProfile"),
+      externalAppAssociations: s("externalAppAssociations"),
+      externalApps:            s("externalApps"),
+      keymapCustom:            s("keymapCustom"),
+      loggingEnabled:          s("loggingEnabled"),
+      logFile:                 s("logFile"),
+      pathHistory:             s("pathHistory"),
+      jumpList:                s("jumpList"),
+      searchHistory:           s("searchHistory"),
+      uiConfigLoaded:          s("uiConfigLoaded"),
+      windowBounds:            s("windowBounds"),
+      windowBoundsReady:       s("windowBoundsReady"),
+      updateWindowBounds:      params.set.updateWindowBounds,   // passthrough
     },
   });
 
-  // Extra state accessors needed by page lifecycle experimental features (e.g. D&D phase1)
+  // Extra accessors needed by page lifecycle (e.g. D&D, paste confirmation)
   return {
     ...mountedState,
-    getEntries: () => state.entries,
-    getCurrentPathCapabilities: () => state.currentPathCapabilities,
-    setPasteConfirmOpen: (value) => {
-      state.pasteConfirmOpen = value;
-    },
-    setPastePendingPaths: (value) => {
-      state.pastePendingPaths = value;
-    },
-    setPasteConflicts: (value) => {
-      state.pasteConflicts = value;
-    },
-    setPasteMode: (value) => {
-      state.pasteMode = value;
-    },
-    setPasteApplyAll: (value) => {
-      state.pasteApplyAll = value;
-    },
-    setPasteConfirmIndex: (value) => {
-      state.pasteConfirmIndex = value;
-    },
+    getEntries:                  () => state.entries,
+    getCurrentPathCapabilities:  () => state.currentPathCapabilities,
+    setPasteConfirmOpen:   s("pasteConfirmOpen"),
+    setPastePendingPaths:  s("pastePendingPaths"),
+    setPasteConflicts:     s("pasteConflicts"),
+    setPasteMode:          s("pasteMode"),
+    setPasteApplyAll:      s("pasteApplyAll"),
+    setPasteConfirmIndex:  s("pasteConfirmIndex"),
   };
 }

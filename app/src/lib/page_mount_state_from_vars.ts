@@ -40,81 +40,39 @@
  * }} params
  */
 export function buildPageMountStateFromVars(params) {
+  // g(key): getter that reads from params.get
+  const g = (key) => () => params.get[key]();
+  // d(key): setter that delegates to params.set[key]
+  const d = (key) => (v) => params.set[key](v);
+
   return {
-    getCurrentPath: () => params.get.currentPath(),
-    getWatchRefreshTimer: () => params.get.watchRefreshTimer(),
-    setWatchRefreshTimer: (value) => {
-      params.set.watchRefreshTimer(value);
-    },
-    setDirStatsTimeoutMs: (value) => {
-      params.set.dirStatsTimeoutMs(value);
-    },
-    setShowHidden: (value) => {
-      params.set.showHidden(value);
-    },
-    setShowSize: (value) => {
-      params.set.showSize(value);
-    },
-    setShowTime: (value) => {
-      params.set.showTime(value);
-    },
-    setShowTree: (value) => {
-      params.set.showTree(value);
-    },
-    setSortKey: (value) => {
-      params.set.sortKey(value);
-    },
-    setSortOrder: (value) => {
-      params.set.sortOrder(value);
-    },
-    setUiTheme: (value) => {
-      params.set.uiTheme(value);
-    },
-    setUiLanguage: (value) => {
-      params.set.uiLanguage(value);
-    },
-    setUiFileIconMode: (value) => {
-      params.set.uiFileIconMode(value);
-    },
-    setKeymapProfile: (value) => {
-      params.set.keymapProfile(value);
-    },
-    setExternalAppAssociations: (value) => {
-      params.set.externalAppAssociations(value);
-    },
-    setExternalApps: (value) => {
-      params.set.externalApps(value);
-    },
-    setKeymapCustom: (value) => {
-      params.set.keymapCustom(value);
-    },
-    setLoggingEnabled: (value) => {
-      params.set.loggingEnabled(value);
-    },
-    setLogFile: (value) => {
-      params.set.logFile(value);
-    },
-    setPathHistory: (value) => {
-      params.set.pathHistory(value);
-    },
-    setJumpList: (value) => {
-      params.set.jumpList(value);
-    },
-    setSearchHistory: (value) => {
-      params.set.searchHistory(value);
-    },
-    updateWindowBounds: () => params.get.updateWindowBounds()(),
-    setUiConfigLoaded: (value) => {
-      params.set.uiConfigLoaded(value);
-    },
-    setWindowBounds: (value) => {
-      params.set.windowBounds(value);
-    },
-    setWindowBoundsReady: (value) => {
-      params.set.windowBoundsReady(value);
-    },
-    setUpdateWindowBounds: (value) => {
-      params.set.updateWindowBounds(value);
-    },
+    getCurrentPath:       g("currentPath"),
+    getWatchRefreshTimer: g("watchRefreshTimer"),
+    // Double-call: get the stored function, then invoke it
+    updateWindowBounds:   () => params.get.updateWindowBounds()(),
+    setWatchRefreshTimer:          d("watchRefreshTimer"),
+    setDirStatsTimeoutMs:          d("dirStatsTimeoutMs"),
+    setShowHidden:                 d("showHidden"),
+    setShowSize:                   d("showSize"),
+    setShowTime:                   d("showTime"),
+    setShowTree:                   d("showTree"),
+    setSortKey:                    d("sortKey"),
+    setSortOrder:                  d("sortOrder"),
+    setUiTheme:                    d("uiTheme"),
+    setUiLanguage:                 d("uiLanguage"),
+    setUiFileIconMode:             d("uiFileIconMode"),
+    setKeymapProfile:              d("keymapProfile"),
+    setExternalAppAssociations:    d("externalAppAssociations"),
+    setExternalApps:               d("externalApps"),
+    setKeymapCustom:               d("keymapCustom"),
+    setLoggingEnabled:             d("loggingEnabled"),
+    setLogFile:                    d("logFile"),
+    setPathHistory:                d("pathHistory"),
+    setJumpList:                   d("jumpList"),
+    setSearchHistory:              d("searchHistory"),
+    setUiConfigLoaded:             d("uiConfigLoaded"),
+    setWindowBounds:               d("windowBounds"),
+    setWindowBoundsReady:          d("windowBoundsReady"),
+    setUpdateWindowBounds:         d("updateWindowBounds"),
   };
 }

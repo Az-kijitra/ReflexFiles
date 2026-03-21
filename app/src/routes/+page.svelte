@@ -83,6 +83,10 @@
     patchPasteItemsForPreview,
     makeClipboardEscHandler,
   } from "$lib/page_clipboard_preview_runtime";
+  import {
+    createCapabilityFetcher,
+    createGitStatusEffect,
+  } from "$lib/page_effects_helpers";
 
   import PageShellBindings from "$lib/components/PageShellBindings.svelte";
   import SettingsModal from "$lib/components/modals/SettingsModal.svelte";
@@ -629,45 +633,28 @@
     return moveByColFallback(delta, useRange);
   };
 
+  // Re-run whenever entries, searchQuery, searchRegex, or showHidden changes
   $effect(() => actions.recomputeSearch());
+  // Re-run whenever entries, searchActive, currentPath, or dropdownMode changes
   $effect(() => actions.recomputeDropdownItems());
+  // Re-run whenever entries, selectedPaths, clipboard, or error changes
   $effect(() => actions.recomputeStatusItems());
+  // Re-run whenever dropdownItems or dropdownIndex changes
   $effect(() => actions.clampDropdownSelection());
 
-  // Fetch provider capabilities (copy/move/delete support) for the left pane's current
-  // directory. Runs async and cancels on path change to avoid stale writes.
+  // Fetch provider capabilities (copy/move/delete support) for the left pane.
+  // Runs async on path change; DEV override takes precedence when set.
+  const leftCapsFetcher = createCapabilityFetcher({
+    getPath: () => state.currentPath,
+    fetch: fsGetCapabilities,
+    setCapabilities: (v) => { state.currentPathCapabilities = v; },
+  });
   $effect(() => {
-    const path = String(state.currentPath || "").trim();
-    let cancelled = false;
-
     if (import.meta.env.DEV && testCapabilityOverride) {
       state.currentPathCapabilities = normalizeProviderCapabilities(testCapabilityOverride);
       return;
     }
-
-    if (!path) {
-      state.currentPathCapabilities = normalizeProviderCapabilities(null);
-      return;
-    }
-
-    (async () => {
-      try {
-        const capabilities = await fsGetCapabilities(path);
-        if (cancelled) return;
-        if (state.currentPath === path) {
-          state.currentPathCapabilities = normalizeProviderCapabilities(capabilities);
-        }
-      } catch {
-        if (cancelled) return;
-        if (state.currentPath === path) {
-          state.currentPathCapabilities = normalizeProviderCapabilities(null);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    return leftCapsFetcher();
   });
 
   const {
@@ -753,12 +740,16 @@
   });
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Wraps every method of `source` so that `state.activePaneId` is set to `paneId`
-  // before each call. Using a plain object (not Proxy) to avoid Svelte 5 internals.
-  function createPaneActions(source, paneId) {
+  // Sets state.activePaneId = paneId before every call.
+  // Accepts either an actions object (wraps all methods) or a single function.
+  // Using a plain object (not Proxy) to avoid Svelte 5 internals.
+  function forPane(sourceOrFn, paneId) {
+    if (typeof sourceOrFn === "function") {
+      return (...args) => { state.activePaneId = paneId; return sourceOrFn(...args); };
+    }
     const result = {};
-    for (const key of Object.keys(source)) {
-      const value = source[key];
+    for (const key of Object.keys(sourceOrFn)) {
+      const value = sourceOrFn[key];
       result[key] = typeof value === "function"
         ? (...args) => { state.activePaneId = paneId; return value(...args); }
         : value;
@@ -766,12 +757,7 @@
     return result;
   }
 
-  // Wraps a single function so `state.activePaneId` is set before it runs.
-  function wrapWithPane(fn, paneId) {
-    return (...args) => { state.activePaneId = paneId; return fn(...args); };
-  }
-
-  const leftPageActions = createPaneActions(pageActions, "left");
+  const leftPageActions = forPane(pageActions, "left");
 
   const viewRuntime = createPageViewRuntimeBundle(
     buildPageViewRuntimeBundleInputsFromState({
@@ -822,112 +808,103 @@
     getActualColumnSpan: rightListLayoutHelpers.getActualColumnSpan,
   }));
 
-  const rightPageActions = createPaneActions(pageActions, "right");
+  const rightPageActions = forPane(pageActions, "right");
+
+  // Builds the input object for the right pane's view runtime. Extracted to reduce
+  // the $derived.by block from ~80 lines to the reactive-specific logic only.
+  function buildRightPaneViewInputs() {
+    return {
+      state: {
+        // Pane-specific fields
+        currentPath:                 state.rightPane.currentPath,
+        loading:                     state.rightPane.loading,
+        filteredEntries:             state.rightPane.filteredEntries,
+        entries:                     state.rightPane.entries,
+        pathCompletionPreviewActive: state.rightPane.pathCompletionPreviewActive,
+        overflowLeft:                state.rightPane.overflowLeft,
+        overflowRight:               state.rightPane.overflowRight,
+        visibleColStart:             state.rightPane.visibleColStart,
+        visibleColEnd:               state.rightPane.visibleColEnd,
+        listRows:                    state.rightPane.listRows,
+        selectedPaths:               state.rightPane.selectedPaths,
+        dropdownItems:               state.dropdownItems,
+        searchActive:                state.rightPane.searchActive,
+        searchError:                 state.rightPane.searchError,
+        error:                       state.rightPane.error,
+        // Shared global fields
+        menuOpen:           state.menuOpen,
+        pathHistory:        state.pathHistory,
+        showTree:           false,
+        treeLoading:        state.treeLoading,
+        treeRoot:           state.treeRoot,
+        treeSelectedPath:   state.treeSelectedPath,
+        treeFocusedIndex:   state.treeFocusedIndex,
+        showSize:           state.showSize,
+        showTime:           state.showTime,
+        ui_file_icon_mode:  state.ui_file_icon_mode,
+        sortMenuOpen:       state.sortMenuOpen,
+        aboutOpen:          state.aboutOpen,
+        deleteConfirmOpen:  state.deleteConfirmOpen,
+        deleteTargets:      state.deleteTargets,
+        deleteError:        state.deleteError,
+        pasteConfirmOpen:   state.pasteConfirmOpen,
+        pasteConflicts:     state.pasteConflicts,
+        createOpen:         state.createOpen,
+        createError:        state.createError,
+        jumpUrlOpen:        state.jumpUrlOpen,
+        renameOpen:         state.renameOpen,
+        renameError:        state.renameError,
+        propertiesOpen:     state.propertiesOpen,
+        propertiesData:     state.propertiesData,
+        dirStatsInFlight:   state.dirStatsInFlight,
+        zipModalOpen:       state.zipModalOpen,
+        zipMode:            state.zipMode,
+        zipTargets:         state.zipTargets,
+        zipPasswordAttempts:state.zipPasswordAttempts,
+        zipOverwriteConfirmed:state.zipOverwriteConfirmed,
+        zipError:           state.zipError,
+        contextMenuOpen:    state.contextMenuOpen,
+        contextMenuPos:     state.contextMenuPos,
+        contextMenuIndex:   state.contextMenuIndex,
+        failureModalOpen:   state.failureModalOpen,
+        failureModalTitle:  state.failureModalTitle,
+        failureItems:       state.failureItems,
+        jumpList:           state.jumpList,
+      },
+      treeEl: null,
+      pageActions: rightPageActions,
+      pageActionGroups,
+      menu: {
+        toggleMenu:   actions.toggleMenu,
+        getMenuItems: actions.getMenuItems,
+        closeMenu:    actions.closeMenu,
+      },
+      list: {
+        loadDir:                      forPane(actions.loadDir, "right"),
+        focusList:                    () => rightShellRefs.listEl?.focus({ preventScroll: true }),
+        handlePathTabCompletion:      forPane(actions.handlePathTabCompletion, "right"),
+        handlePathCompletionSeparator:forPane(actions.handlePathCompletionSeparator, "right"),
+        handlePathCompletionInputChange:forPane(actions.handlePathCompletionInputChange, "right"),
+        clearPathCompletionPreview:   forPane(actions.clearPathCompletionPreview, "right"),
+      },
+      tree: { focusTree: () => {}, focusTreeTop: () => {}, selectTreeNode: () => {}, toggleTreeNode: () => {} },
+      keymap: { matchesAction: actions.matchesAction },
+      sort: {
+        setSort:          forPane(actions.setSort, "right"),
+        handleSortMenuKey:forPane(actions.handleSortMenuKey, "right"),
+      },
+      deps:      { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
+      dirStats:  { clearDirStatsCache },
+      meta:      { formatName: formatNameForList, formatSize, formatModified, MENU_GROUPS, ABOUT_URL, ABOUT_LICENSE, ZIP_PASSWORD_MAX_ATTEMPTS, t },
+      overlay:   viewRuntime.getOverlayState(),
+    };
+  }
 
   // Right pane full view runtime (same functionality as left pane)
   const rightPaneViewProps = $derived.by(() => {
     const base = createViewRuntime(
-      buildViewRuntimeInputsFromState({
-        state: {
-          // Pane-specific fields from rightPane
-          currentPath: state.rightPane.currentPath,
-          loading: state.rightPane.loading,
-          filteredEntries: state.rightPane.filteredEntries,
-          entries: state.rightPane.entries,
-          pathCompletionPreviewActive: state.rightPane.pathCompletionPreviewActive,
-          overflowLeft: state.rightPane.overflowLeft,
-          overflowRight: state.rightPane.overflowRight,
-          visibleColStart: state.rightPane.visibleColStart,
-          visibleColEnd: state.rightPane.visibleColEnd,
-          listRows: state.rightPane.listRows,
-          selectedPaths: state.rightPane.selectedPaths,
-          dropdownItems: state.dropdownItems,
-          searchActive: state.rightPane.searchActive,
-          searchError: state.rightPane.searchError,
-          error: state.rightPane.error,
-          // Global fields (shared UI state)
-          menuOpen: state.menuOpen,
-          pathHistory: state.pathHistory,
-          showTree: false,
-          treeLoading: state.treeLoading,
-          treeRoot: state.treeRoot,
-          treeSelectedPath: state.treeSelectedPath,
-          treeFocusedIndex: state.treeFocusedIndex,
-          showSize: state.showSize,
-          showTime: state.showTime,
-          ui_file_icon_mode: state.ui_file_icon_mode,
-          sortMenuOpen: state.sortMenuOpen,
-          aboutOpen: state.aboutOpen,
-          deleteConfirmOpen: state.deleteConfirmOpen,
-          deleteTargets: state.deleteTargets,
-          deleteError: state.deleteError,
-          pasteConfirmOpen: state.pasteConfirmOpen,
-          pasteConflicts: state.pasteConflicts,
-          createOpen: state.createOpen,
-          createError: state.createError,
-          jumpUrlOpen: state.jumpUrlOpen,
-          renameOpen: state.renameOpen,
-          renameError: state.renameError,
-          propertiesOpen: state.propertiesOpen,
-          propertiesData: state.propertiesData,
-          dirStatsInFlight: state.dirStatsInFlight,
-          zipModalOpen: state.zipModalOpen,
-          zipMode: state.zipMode,
-          zipTargets: state.zipTargets,
-          zipPasswordAttempts: state.zipPasswordAttempts,
-          zipOverwriteConfirmed: state.zipOverwriteConfirmed,
-          zipError: state.zipError,
-          contextMenuOpen: state.contextMenuOpen,
-          contextMenuPos: state.contextMenuPos,
-          contextMenuIndex: state.contextMenuIndex,
-          failureModalOpen: state.failureModalOpen,
-          failureModalTitle: state.failureModalTitle,
-          failureItems: state.failureItems,
-          jumpList: state.jumpList,
-        },
-        treeEl: null,
-        pageActions: rightPageActions,
-        pageActionGroups,
-        menu: {
-          toggleMenu: actions.toggleMenu,
-          getMenuItems: actions.getMenuItems,
-          closeMenu: actions.closeMenu,
-        },
-        list: {
-          loadDir: wrapWithPane(actions.loadDir, "right"),
-          focusList: () => rightShellRefs.listEl?.focus({ preventScroll: true }),
-          handlePathTabCompletion: wrapWithPane(actions.handlePathTabCompletion, "right"),
-          handlePathCompletionSeparator: wrapWithPane(actions.handlePathCompletionSeparator, "right"),
-          handlePathCompletionInputChange: wrapWithPane(actions.handlePathCompletionInputChange, "right"),
-          clearPathCompletionPreview: wrapWithPane(actions.clearPathCompletionPreview, "right"),
-        },
-        tree: {
-          focusTree: () => {},
-          focusTreeTop: () => {},
-          selectTreeNode: () => {},
-          toggleTreeNode: () => {},
-        },
-        keymap: { matchesAction: actions.matchesAction },
-        sort: {
-          setSort: wrapWithPane(actions.setSort, "right"),
-          handleSortMenuKey: wrapWithPane(actions.handleSortMenuKey, "right"),
-        },
-        deps: { getVisibleTreeNodes, trapModalTab, openUrl, autofocus },
-        dirStats: { clearDirStatsCache },
-        meta: {
-          formatName: formatNameForList,
-          formatSize,
-          formatModified,
-          MENU_GROUPS,
-          ABOUT_URL,
-          ABOUT_LICENSE,
-          ZIP_PASSWORD_MAX_ATTEMPTS,
-          t,
-        },
-        overlay: viewRuntime.getOverlayState(),
-      })
+      buildViewRuntimeInputsFromState(buildRightPaneViewInputs())
     ).viewProps;
-    // Inject resolveGitBadge for right pane
     const gs = state.rightPane.gitStatus;
     return {
       ...base,
@@ -945,43 +922,28 @@
     state.rightPane.filteredEntries = state.rightPane.entries;
   });
 
-  // Auto-refresh git status when the left pane's current path changes
-  $effect(() => {
-    const path = state.currentPath;
-    if (!path) { state.gitStatus = null; return; }
-    void refreshLeftGitStatus(path);
-  });
+  // Auto-refresh git status whenever a pane's current path changes
+  $effect(createGitStatusEffect({
+    getPath:     () => state.currentPath,
+    clearStatus: () => { state.gitStatus = null; },
+    refresh:     refreshLeftGitStatus,
+  }));
+  $effect(createGitStatusEffect({
+    getPath:     () => state.rightPane.currentPath,
+    clearStatus: () => { state.rightPane.gitStatus = null; },
+    refresh:     refreshRightGitStatus,
+  }));
 
-  // Auto-refresh git status when the right pane's current path changes
-  $effect(() => {
-    const path = state.rightPane.currentPath;
-    if (!path) { state.rightPane.gitStatus = null; return; }
-    void refreshRightGitStatus(path);
-  });
-
-  // Fetch provider capabilities for the right pane's current directory.
-  // Lazy-imports tauri_fs to avoid loading it before the right pane is ever opened.
-  $effect(() => {
-    const path = String(state.rightPane.currentPath || "").trim();
-    if (!path) {
-      state.rightPane.currentPathCapabilities = normalizeProviderCapabilities(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { fsGetCapabilities } = await import("$lib/utils/tauri_fs");
-        const capabilities = await fsGetCapabilities(path);
-        if (cancelled) return;
-        if (state.rightPane.currentPath === path) {
-          state.rightPane.currentPathCapabilities = normalizeProviderCapabilities(capabilities);
-        }
-      } catch {
-        // ignore capability errors for right pane
-      }
-    })();
-    return () => { cancelled = true; };
-  });
+  // Fetch provider capabilities for the right pane. Lazy-imports tauri_fs to
+  // avoid loading it before the right pane is ever opened.
+  $effect(createCapabilityFetcher({
+    getPath: () => state.rightPane.currentPath,
+    fetch: async (path) => {
+      const { fsGetCapabilities: rightFetch } = await import("$lib/utils/tauri_fs");
+      return rightFetch(path);
+    },
+    setCapabilities: (v) => { state.rightPane.currentPathCapabilities = v; },
+  }));
 
   // Force single-column layout in dual mode for left pane
   $effect(() => {
