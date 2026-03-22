@@ -1,11 +1,7 @@
 import { buildPageInitSetInputs } from "./page_init_set_inputs";
+import type { PageInitInputsFromStateParams } from "./page_init_inputs_from_state";
 
-/**
- * @param {object} params
- * @param {any} params.state
- * @param {object} params.set
- */
-export function buildPageInitSetInputsFromState(params) {
+export function buildPageInitSetInputsFromState(params: PageInitInputsFromStateParams) {
   // s(field): setter that writes to state
   const s = (field) => (v) => { params.state[field] = v; };
   // d(key): setter that delegates to params.set[key]

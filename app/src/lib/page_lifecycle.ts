@@ -6,7 +6,7 @@ import {
   readDragDropExperimentPolicyFromStorage,
 } from "$lib/utils/drag_drop_experiment";
 import { getPasteConflicts } from "$lib/utils/file_ops";
-import { MODAL_OVERLAY_SELECTOR } from "$lib/page_constants";
+import { MODAL_OVERLAY_SELECTOR, FS_WATCH_DEBOUNCE_MS } from "$lib/page_constants";
 
 import type { Entry, ExternalAppConfig, JumpItem, ProviderCapabilities } from "$lib/types";
 import type { Window as TauriWindow } from "@tauri-apps/api/window";
@@ -65,23 +65,20 @@ export interface PageLifecycleCtx {
   t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
+// ── Dev-only debug API type ────────────────────────────────────────────────────
+type RfDebugApi = {
+  shellStartFileDrag?: (paths: string[]) => Promise<string>;
+  shellStartFileDragDebug?: (paths: string[]) => Promise<string>;
+  shellStartFileDragWithEffects?: (paths: string[], effectMode: "copy" | "copy_or_move") => Promise<string>;
+  shellStartFileDragDebugWithEffects?: (paths: string[], effectMode: "copy" | "copy_or_move") => Promise<string>;
+};
+declare global {
+  interface Window { __rf_debug?: RfDebugApi; }
+}
+
 export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
-  if (typeof window !== "undefined" && import.meta.env?.DEV) {
-    const debugWindow = window as Window & {
-      __rf_debug?: {
-        shellStartFileDrag?: (paths: string[]) => Promise<string>;
-        shellStartFileDragDebug?: (paths: string[]) => Promise<string>;
-        shellStartFileDragWithEffects?: (
-          paths: string[],
-          effectMode: "copy" | "copy_or_move"
-        ) => Promise<string>;
-        shellStartFileDragDebugWithEffects?: (
-          paths: string[],
-          effectMode: "copy" | "copy_or_move"
-        ) => Promise<string>;
-      };
-    };
-    const debugApi = debugWindow.__rf_debug || {};
+  if (typeof window !== "undefined" && import.meta.env.DEV) {
+    const debugApi: RfDebugApi = window.__rf_debug ?? {};
     debugApi.shellStartFileDrag = (paths) => ctx.invoke("shell_start_file_drag", { paths });
     debugApi.shellStartFileDragDebug = (paths) =>
       ctx.invoke("shell_start_file_drag_debug", { paths });
@@ -89,7 +86,7 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
       ctx.invoke("shell_start_file_drag_with_effects", { paths, effect_mode: effectMode });
     debugApi.shellStartFileDragDebugWithEffects = (paths, effectMode) =>
       ctx.invoke("shell_start_file_drag_debug_with_effects", { paths, effect_mode: effectMode });
-    debugWindow.__rf_debug = debugApi;
+    window.__rf_debug = debugApi;
   }
   const home = await ctx.homeDir();
   let config = null;
@@ -181,7 +178,7 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
       }
       const timer = setTimeout(() => {
         ctx.loadDir(currentPath);
-      }, 300);
+      }, FS_WATCH_DEBOUNCE_MS);
       ctx.setWatchRefreshTimer(timer);
     }
   });
@@ -194,16 +191,19 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
     const index = payload?.index ?? 0;
     const total = payload?.total ?? 0;
     const label = payload?.op === "move" ? ctx.t("status.moving") : ctx.t("status.copying");
-    const status = payload?.status || "";
-    if (status === "start") {
-      ctx.setStatusMessage(`${label} ${name} (${index}/${total})`, 3000);
-    }
-    if (status === "fail") {
-      const reason = payload?.error ? `: ${payload.error}` : "";
-      ctx.setStatusMessage(ctx.t("status.failed", { name, reason }), 4000);
-    }
-    if (status === "done") {
-      ctx.setStatusMessage(ctx.t("status.done", { label, name, index, total }), 1500);
+    const status: string = payload?.status || "";
+    switch (status) {
+      case "start":
+        ctx.setStatusMessage(`${label} ${name} (${index}/${total})`, 3000);
+        break;
+      case "fail": {
+        const reason = payload?.error ? `: ${payload.error}` : "";
+        ctx.setStatusMessage(ctx.t("status.failed", { name, reason }), 4000);
+        break;
+      }
+      case "done":
+        ctx.setStatusMessage(ctx.t("status.done", { label, name, index, total }), 1500);
+        break;
     }
   });
 
@@ -216,7 +216,7 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
         ? readDragDropExperimentPolicyFromStorage((key) => window.localStorage.getItem(key))
         : DND_EXPERIMENT_DEFAULT_POLICY;
     if (typeof win?.onDragDropEvent === "function") {
-      const inboundReasonLabel = (reason) => {
+      const inboundReasonLabel = (reason: unknown): string => {
         switch (String(reason || "")) {
           case "destination_not_local":
             return ctx.t("dnd.import_destination_local_only");
@@ -330,8 +330,8 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
     // D&D experiment probe is optional and must not break startup.
   }
 
-  const onWindowKeydownCapture = (event) => {
-    if ((import.meta as any)?.env?.DEV) {
+  const onWindowKeydownCapture = (event: KeyboardEvent) => {
+    if (import.meta.env.DEV) {
       const ctrl = !!(event.ctrlKey || event.getModifierState?.("Control"));
       const alt = !!(event.altKey || event.getModifierState?.("Alt"));
       const shift = !!(event.shiftKey || event.getModifierState?.("Shift"));
@@ -368,14 +368,14 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
   window.addEventListener("keydown", onWindowKeydownCapture, { capture: true });
   window.addEventListener("click", ctx.onClick, { capture: true });
   window.addEventListener("beforeunload", ctx.onBeforeUnload);
-  const onDndExperimentStatus = (event) => {
+  const onDndExperimentStatus = (event: CustomEvent<{ message?: string; durationMs?: number }>) => {
     const detail = event?.detail ?? {};
     const message = String(detail?.message || "");
     if (!message) return;
     const durationMs = Number(detail?.durationMs ?? 0);
     ctx.setStatusMessage(message, Number.isFinite(durationMs) && durationMs > 0 ? durationMs : undefined);
   };
-  window.addEventListener("rf:dnd-experiment-status", onDndExperimentStatus);
+  window.addEventListener("rf:dnd-experiment-status", onDndExperimentStatus as EventListener);
   const onFocusIn = () => {
     ctx.recomputeStatusItems?.();
   };
@@ -428,7 +428,7 @@ export async function setupPageLifecycle(ctx: PageLifecycleCtx) {
     window.removeEventListener("keydown", onWindowKeydownCapture, { capture: true });
     window.removeEventListener("click", ctx.onClick, { capture: true });
     window.removeEventListener("beforeunload", ctx.onBeforeUnload);
-    window.removeEventListener("rf:dnd-experiment-status", onDndExperimentStatus);
+    window.removeEventListener("rf:dnd-experiment-status", onDndExperimentStatus as EventListener);
     window.removeEventListener("focusin", onFocusIn, { capture: true });
     unlistenMove();
     unlistenResize();

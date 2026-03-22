@@ -1,13 +1,7 @@
 import { buildPageInitStateInputs } from "./page_init_state_inputs";
+import type { PageInitInputsFromStateParams } from "./page_init_inputs_from_state";
 
-/**
- * @param {object} params
- * @param {any} params.state
- * @param {object | (() => object)} params.refs
- * @param {object} params.get
- * @param {object} params.values
- */
-export function buildPageInitStateInputsFromState(params) {
+export function buildPageInitStateInputsFromState(params: PageInitInputsFromStateParams) {
   const getRefs = typeof params.refs === "function" ? params.refs : () => params.refs;
   const readRef = (key) => () => getRefs()[key];
 

@@ -17,6 +17,8 @@ export const GIT_PANEL_WIDTH = "300px";
 
 /** Debounce delay (ms) before persisting the undo/redo session to disk. */
 export const UNDO_SAVE_DEBOUNCE_MS = 250;
+/** Debounce delay (ms) before reloading the directory after a filesystem-change event. */
+export const FS_WATCH_DEBOUNCE_MS = 300;
 
 // ── DOM selectors ─────────────────────────────────────────────────────────────
 
